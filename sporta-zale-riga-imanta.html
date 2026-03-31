@@ -329,12 +329,18 @@ h1, h2, h3, h4, h5, h6,
     border-radius: 10px;
     overflow: hidden;
     background: #0b1120;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 320px;
   }
   .hall-image-wrap img {
     display: block;
     width: 100%;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
+    max-width: 100%;
+    height: auto;
+    max-height: min(70vh, 640px);
+    object-fit: contain;
   }
   .hall-gallery-wrap {
     margin-top: 26px;
