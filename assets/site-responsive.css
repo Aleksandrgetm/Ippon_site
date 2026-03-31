@@ -385,6 +385,15 @@ body {
   z-index: 3;
 }
 
+.ippon-lang-note {
+  margin-left: 8px;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+}
 .elementor-location-header .elementor-nav-menu .ippon-lang-menu-item {
   list-style: none !important;
   margin: 0 !important;
@@ -463,6 +472,10 @@ body {
 
 @media (max-width: 1024px) {
   .ippon-lang-host {
+    display: none !important;
+  }
+
+  .ippon-lang-note {
     display: none !important;
   }
 
@@ -571,4 +584,5 @@ body {
     padding-left: 18px !important;
   }
 }
+
 

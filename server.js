@@ -298,9 +298,11 @@ function ensureJaunumiTable() {
       datums TEXT NOT NULL,
       nosaukums TEXT NOT NULL,
       foto_attels TEXT,
+      galerija TEXT,
       ievads TEXT,
       zina TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
+      position INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
@@ -334,8 +336,8 @@ function ensureJaunumiTable() {
   ];
 
   const stmt = db.prepare(`
-    INSERT INTO jaunumi (datums, nosaukums, foto_attels, ievads, zina, slug, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO jaunumi (datums, nosaukums, foto_attels, galerija, ievads, zina, slug, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const ts = nowTs();
   for (const row of seedRows) {
@@ -343,9 +345,11 @@ function ensureJaunumiTable() {
       row.datums,
       row.nosaukums,
       row.foto_attels,
+      null,
       row.ievads,
       row.zina,
       uniqueNewsSlug(row.nosaukums),
+      0,
       ts,
       ts
     );
@@ -521,6 +525,12 @@ function ensureSportistiMediaColumns() {
   ensureTableColumn('ippon_sportists', 'foto_attels', 'TEXT');
   ensureTableColumn('ippon_sportists', 'galerija', 'TEXT');
   ensureTableColumn('ippon_sportists', 'is_hidden', 'INTEGER NOT NULL DEFAULT 0');
+  ensureTableColumn('ippon_sportists', 'position', 'INTEGER NOT NULL DEFAULT 0');
+}
+
+function ensureJaunumiMediaColumns() {
+  ensureTableColumn('jaunumi', 'galerija', 'TEXT');
+  ensureTableColumn('jaunumi', 'position', 'INTEGER NOT NULL DEFAULT 0');
 }
 
 function ensureRezultatiSchema() {
@@ -996,9 +1006,11 @@ function mapNewsRow(row) {
     datums: row.datums,
     nosaukums: row.nosaukums,
     foto_attels: row.foto_attels,
+    galerija: parseGallery(row.galerija),
     ievads: row.ievads,
     zina: row.zina,
     slug: row.slug,
+    position: Number(row.position || 0),
     created_at: row.created_at,
     updated_at: row.updated_at
   };
@@ -2295,6 +2307,7 @@ function initializeDatabase() {
   }
 
   ensureJaunumiTable();
+  ensureJaunumiMediaColumns();
   ensureTreneriTable();
   ensureKlubaNoteikumiTable();
   ensureHallsTables();
@@ -2423,6 +2436,12 @@ function toIntFlag(value, fallback = 0) {
   return fallback ? 1 : 0;
 }
 
+function toIntValue(value, fallback = 0) {
+  if (value === null || value === undefined || value === '') return Number(fallback) || 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : (Number(fallback) || 0);
+}
+
 function pickSportistRow(row) {
   return {
     id: row.id,
@@ -2460,7 +2479,7 @@ function handleContentApi(req, res, reqUrl) {
       FROM ippon_sportists s
       LEFT JOIN ippon_galery g ON g.id = s.galery_id
       ${where}
-      ORDER BY s.ordering DESC, s.id DESC
+      ORDER BY COALESCE(s.position, 0) DESC, s.id DESC
     `).all();
 
     const items = rows.map((row) => ({
@@ -3721,7 +3740,7 @@ function handleApi(req, res, reqUrl) {
     const offset = (page - 1) * limit;
     const rows = db.prepare(`
       SELECT * FROM jaunumi
-      ORDER BY created_at DESC, id DESC
+      ORDER BY COALESCE(position, 0) DESC, id DESC
       LIMIT ?
       OFFSET ?
     `).all(limit, offset);
@@ -3800,7 +3819,7 @@ function handleApi(req, res, reqUrl) {
       FROM ippon_sportists s
       WHERE s.remove_date = 0
         AND COALESCE(s.is_hidden, 0) = 0
-      ORDER BY s.ordering DESC, s.id DESC
+      ORDER BY COALESCE(s.position, 0) DESC, s.id DESC
     `).all();
 
     const items = rows.map((row, idx) => {
@@ -3944,7 +3963,7 @@ function handleApi(req, res, reqUrl) {
         const insertStmt = db.prepare(`
           INSERT INTO sportisti_sasniegumi (
             sportist_id, datums, nosaukums, rezultats, vieta, statuss, informacija, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         db.exec('BEGIN');
@@ -4180,7 +4199,11 @@ function handleApi(req, res, reqUrl) {
       ? 'date DESC, id DESC'
       : table === 'video_galerija'
         ? 'date DESC, id DESC'
-      : (table === 'jaunumi' || table === 'treneri' || table === 'kluba_noteikumi' || table === 'ippon_sorevnovanija' || table.startsWith('zales_') || table.startsWith('nodarbibas_'))
+      : table === 'jaunumi'
+        ? 'COALESCE(position, 0) DESC, id DESC'
+      : table === 'ippon_sportists'
+        ? 'COALESCE(position, 0) DESC, id DESC'
+      : (table === 'treneri' || table === 'kluba_noteikumi' || table === 'ippon_sorevnovanija' || table.startsWith('zales_') || table.startsWith('nodarbibas_'))
         ? 'created_at DESC, id DESC'
         : `${pk} DESC`;
     const rows = db.prepare(`SELECT * FROM ${table} ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`).all(...whereArgs, limit, offset);
@@ -4209,9 +4232,9 @@ function handleApi(req, res, reqUrl) {
               area_id, galery_id, name_ru, name_lv, name_en, date,
               o_sebe_ru, o_sebe_lv, o_sebe_en,
               dostizhenija_ru, dostizhenija_lv, dostizhenija_en,
-              image, foto_attels, galerija, is_hidden, public, special, ordering, c_time, m_time, remove_date, remove_user
+              image, foto_attels, galerija, is_hidden, position, public, special, ordering, c_time, m_time, remove_date, remove_user
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             15,
             0,
@@ -4229,6 +4252,7 @@ function handleApi(req, res, reqUrl) {
             body.foto_attels ? String(body.foto_attels).trim() : null,
             JSON.stringify(parseGallery(body.galerija)),
             toIntFlag(body.is_hidden, 0),
+            toIntValue(body.position, 0),
             1,
             0,
             0,
@@ -4256,15 +4280,17 @@ function handleApi(req, res, reqUrl) {
           const ts = nowTs();
           const slug = uniqueNewsSlug(slugInput);
           const info = db.prepare(`
-            INSERT INTO jaunumi (datums, nosaukums, foto_attels, ievads, zina, slug, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO jaunumi (datums, nosaukums, foto_attels, galerija, ievads, zina, slug, position, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             datums,
             title,
             body.foto_attels ? String(body.foto_attels).trim() : null,
+            JSON.stringify(parseGallery(body.galerija)),
             body.ievads ? String(body.ievads).trim() : null,
             zina,
             slug,
+            toIntValue(body.position, 0),
             ts,
             ts
           );
@@ -4610,6 +4636,7 @@ function handleApi(req, res, reqUrl) {
               foto_attels = ?,
               galerija = ?,
               is_hidden = ?,
+              position = ?,
               m_time = ?
             WHERE id = ?
           `).run(
@@ -4620,6 +4647,7 @@ function handleApi(req, res, reqUrl) {
             body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
             JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
             body.is_hidden != null ? toIntFlag(body.is_hidden, Number(existing.is_hidden || 0)) : Number(existing.is_hidden || 0),
+            body.position != null ? toIntValue(body.position, Number(existing.position || 0)) : Number(existing.position || 0),
             nowTs(),
             id
           );
@@ -4651,15 +4679,17 @@ function handleApi(req, res, reqUrl) {
 
           db.prepare(`
             UPDATE jaunumi
-            SET datums = ?, nosaukums = ?, foto_attels = ?, ievads = ?, zina = ?, slug = ?, updated_at = ?
+            SET datums = ?, nosaukums = ?, foto_attels = ?, galerija = ?, ievads = ?, zina = ?, slug = ?, position = ?, updated_at = ?
             WHERE id = ?
           `).run(
             datums,
             title,
             body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
+            JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
             body.ievads != null ? String(body.ievads).trim() : existing.ievads,
             zina,
             slug,
+            body.position != null ? toIntValue(body.position, Number(existing.position || 0)) : Number(existing.position || 0),
             nowTs(),
             id
           );
@@ -5251,4 +5281,10 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log('Home:  http://127.0.0.1:' + PORT + '/index.html');
   console.log('Admin: http://127.0.0.1:' + PORT + '/admin');
 });
+
+
+
+
+
+
 

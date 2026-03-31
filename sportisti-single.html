@@ -557,6 +557,19 @@ h1, h2, h3, h4, h5, h6,
       .trim();
   }
 
+
+  function normalizeMojibakeText(value) {
+    const text = String(value ?? '');
+    if (!text) return '';
+    return text
+      .replace(/â€”/g, '—')
+      .replace(/â€“/g, '–')
+      .replace(/â€™/g, "'")
+      .replace(/â€˜/g, "'")
+      .replace(/â€œ/g, '"')
+      .replace(/â€�/g, '"')
+      .replace(/Â/g, '');
+  }
   (async function loadSportistsSingle() {
     const slug = getSlug();
     if (!slug) {
@@ -575,7 +588,7 @@ h1, h2, h3, h4, h5, h6,
       document.getElementById('sportistsBirth').textContent = formatDate(item.dzimsanas_datums);
 
       const bioEl = document.getElementById('sportistsBio');
-      const bioHtml = sanitizeLegacyHtml(item.par_sevi_html || item.par_sevi_text || '');
+      const bioHtml = sanitizeLegacyHtml(normalizeMojibakeText(item.par_sevi_html || item.par_sevi_text || '')); 
       bioEl.innerHTML = bioHtml || 'Informacija par sportistu vel nav pievienota.';
 
       const img = document.getElementById('sportistsPhoto');
@@ -598,12 +611,12 @@ h1, h2, h3, h4, h5, h6,
         document.getElementById('achievementsEmpty').style.display = 'none';
         tbody.innerHTML = achievements.map((a) => `
           <tr>
-            <td>${escapeHtml(formatDate(a.datums) || 'â€”')}</td>
-            <td>${escapeHtml(a.nosaukums || 'â€”')}</td>
-            <td>${escapeHtml(a.rezultats || 'â€”')}</td>
-            <td>${escapeHtml(a.vieta || 'â€”')}</td>
-            <td>${escapeHtml(a.statuss || 'â€”')}</td>
-            <td>${escapeHtml(a.informacija || 'â€”')}</td>
+            <td>${escapeHtml(formatDate(a.datums) || '—')}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.nosaukums || '—'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.rezultats || '—'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.vieta || '—'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.statuss || '—'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.informacija || '—'))}</td>
           </tr>
         `).join('');
       }
@@ -663,7 +676,7 @@ h1, h2, h3, h4, h5, h6,
 		<div class="elementor-element elementor-element-9013468 e-flex e-con-boxed e-con e-parent" data-id="9013468" data-element_type="container" data-e-type="container" data-settings="{&quot;background_background&quot;:&quot;classic&quot;}">
 					<div class="e-con-inner">
 				<div class="elementor-element elementor-element-ee9b6c2 elementor-widget elementor-widget-heading" data-id="ee9b6c2" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default">Â© 2011-2026 IPPON.LV. Visas tiesibas aizsargatas</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default">© 2011-2026 IPPON.LV. Visas tiesibas aizsargatas</h2>				</div>
 					</div>
 				</div>
 				</div>
@@ -740,6 +753,11 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
+
+
+
+
+
 
 
 

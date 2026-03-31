@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   if (window.__ipponLangSwitcherInit) return;
   window.__ipponLangSwitcherInit = true;
 
@@ -25,30 +25,45 @@
   function getCurrentLang() {
     var m = document.cookie.match(/(?:^|;\s*)googtrans=([^;]+)/);
     if (!m) return "lv";
-    var val = decodeURIComponent(m[1] || "");
-    if (val.indexOf("/lv/ru") !== -1) return "ru";
-    if (val.indexOf("/lv/en") !== -1) return "en";
+    var val = decodeURIComponent(m[1] || "").toLowerCase();
+    if (val.indexOf("/ru") !== -1) return "ru";
+    if (val.indexOf("/en") !== -1) return "en";
     return "lv";
   }
 
   function applyLang(lang) {
+    // Clear previous values first to avoid conflicting googtrans cookies.
+    deleteCookie("googtrans");
+
     if (lang === "lv") {
-      deleteCookie("googtrans");
       location.reload();
       return;
     }
 
-    var value = "/lv/" + lang;
+    var value = "/auto/" + lang;
     setCookie("googtrans", value, 365);
     if (location.hostname.indexOf(".") > -1) {
       var d = location.hostname.replace(/^www\./, "");
       setCookie("googtrans", value, 365, "." + d);
       setCookie("googtrans", value, 365, d);
     }
-    location.reload();
+
+    setTimeout(function () {
+      location.reload();
+    }, 30);
   }
 
-  function ensureTranslateElement() {
+  
+  function normalizeButtonLabels(root) {
+    var buttons = (root || document).querySelectorAll('.ippon-lang-btn');
+    buttons.forEach(function (b) {
+      var fixed = b.getAttribute('data-fixed-label');
+      if (fixed && b.textContent !== fixed) {
+        b.textContent = fixed;
+      }
+    });
+  }
+function ensureTranslateElement() {
     if (!document.getElementById("google_translate_element")) {
       var hidden = document.createElement("div");
       hidden.id = "google_translate_element";
@@ -79,8 +94,10 @@
     langs.forEach(function (item, idx) {
       var btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "ippon-lang-btn" + (current === item.code ? " is-active" : "");
+      btn.className = "ippon-lang-btn notranslate" + (current === item.code ? " is-active" : "");
       btn.textContent = item.label;
+      btn.setAttribute("data-fixed-label", item.label);
+      btn.setAttribute("translate", "no");
       btn.setAttribute("aria-label", "Switch language to " + item.label);
       btn.addEventListener("click", function () {
         applyLang(item.code);
@@ -95,6 +112,12 @@
       }
     });
 
+    // Add compact Google Translate note near the language buttons.
+    var note = document.createElement("span");
+    note.className = "ippon-lang-note notranslate";
+    note.textContent = "Google Translate";
+    note.setAttribute("translate", "no");
+
     // Cleanup old mount mode (inside nav <li>) if present.
     var oldLi = document.querySelector(".ippon-lang-menu-item");
     if (oldLi && oldLi.parentElement) oldLi.parentElement.removeChild(oldLi);
@@ -103,7 +126,15 @@
     var host = document.createElement("div");
     host.className = "ippon-lang-host";
     host.appendChild(wrap);
+    host.appendChild(note);
     navHost.appendChild(host);
+
+    normalizeButtonLabels(host);
+
+    var mo = new MutationObserver(function () {
+      normalizeButtonLabels(host);
+    });
+    mo.observe(host, { childList: true, subtree: true, characterData: true });
   }
 
   function bindLogoHome() {
@@ -162,3 +193,5 @@
     init();
   }
 })();
+
+

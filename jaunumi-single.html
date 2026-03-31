@@ -374,6 +374,111 @@ h1, h2, h3, h4, h5, h6,
     line-height: 1.45;
     white-space: pre-wrap;
   }
+  .post-gallery {
+    margin-top: 26px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: #060606;
+    padding: 14px;
+  }
+  .post-gallery-title {
+    margin: 0 0 10px;
+    font: 700 22px/1 "Oswald", sans-serif;
+    color:#ef2020;
+    text-transform: uppercase;
+  }
+  .post-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .post-gallery-item {
+    display: block;
+    height: 170px;
+    border-radius: 8px;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    overflow: hidden;
+    cursor: pointer;
+    padding: 0 !important;
+    appearance: none;
+  }
+  .post-gallery-item img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 18%;
+    border-radius: 8px;
+  }
+  .post-lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.9);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .post-lightbox.open { display:flex; }
+  .post-lightbox img {
+    max-width: min(1200px, 92vw);
+    max-height: 88vh;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 10px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+  }
+  .post-lightbox-close,
+  .post-lightbox-nav {
+    position: absolute;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    appearance: none;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+    color: #ee2b2b !important;
+    font-family: "Oswald", sans-serif;
+    text-shadow: none !important;
+    cursor: pointer;
+    transition: none !important;
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .post-lightbox-close {
+    top: 18px;
+    right: 18px;
+    width: 44px;
+    height: 44px;
+    font-size: 44px;
+    display: grid;
+    place-items: center;
+  }
+  .post-lightbox-nav {
+    top: 50%;
+    transform: translateY(-50%) !important;
+    width: 64px;
+    height: 64px;
+    font-size: 92px;
+    display: grid;
+    place-items: center;
+  }
+  .post-lightbox-prev { left: 18px; }
+  .post-lightbox-next { right: 18px; }
+  .post-lightbox-close:hover,
+  .post-lightbox-close:focus,
+  .post-lightbox-nav:hover,
+  .post-lightbox-nav:focus {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #ee2b2b !important;
+    outline: none;
+  }
   .post-empty,
   .post-error {
     padding: 28px 20px;
@@ -395,6 +500,8 @@ h1, h2, h3, h4, h5, h6,
     .post-title { margin-bottom: 14px; font-size: clamp(34px, 9.6vw, 50px); }
     .post-intro { font-size: clamp(15px, 4vw, 20px); margin-bottom: 12px; }
     .post-zina { font-size: clamp(14px, 3.5vw, 17px); line-height: 1.48; }
+    .post-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .post-gallery-item { height: 150px; }
   }
 </style>
 <script>
@@ -459,7 +566,75 @@ h1, h2, h3, h4, h5, h6,
         .trim();
     }
 
+    function parseGalleryUrls(value) {
+      if (!value) return [];
+      if (Array.isArray(value)) return value.filter(Boolean).map(String);
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+      } catch (_) {}
+      return [];
+    }
+
+    let postLightboxEl = null;
+    let postLightboxItems = [];
+    let postLightboxIndex = 0;
+
+    function ensurePostLightbox() {
+      if (postLightboxEl) return postLightboxEl;
+      const lb = document.createElement('div');
+      lb.className = 'post-lightbox';
+      lb.innerHTML = '<button type="button" class="post-lightbox-close" aria-label="Close">&times;</button>' +
+        '<button type="button" class="post-lightbox-nav post-lightbox-prev" aria-label="Previous">&lsaquo;</button>' +
+        '<button type="button" class="post-lightbox-nav post-lightbox-next" aria-label="Next">&rsaquo;</button>' +
+        '<img alt="Foto">';
+      lb.addEventListener('click', (event) => {
+        if (event.target === lb) lb.classList.remove('open');
+      });
+      lb.querySelector('.post-lightbox-close').addEventListener('click', () => lb.classList.remove('open'));
+      lb.querySelector('.post-lightbox-prev').addEventListener('click', (event) => {
+        event.stopPropagation();
+        openPostLightbox(postLightboxIndex - 1);
+      });
+      lb.querySelector('.post-lightbox-next').addEventListener('click', (event) => {
+        event.stopPropagation();
+        openPostLightbox(postLightboxIndex + 1);
+      });
+      document.addEventListener('keydown', (event) => {
+        if (!lb.classList.contains('open')) return;
+        if (event.key === 'Escape') lb.classList.remove('open');
+        if (event.key === 'ArrowLeft') openPostLightbox(postLightboxIndex - 1);
+        if (event.key === 'ArrowRight') openPostLightbox(postLightboxIndex + 1);
+      });
+      document.body.appendChild(lb);
+      postLightboxEl = lb;
+      return lb;
+    }
+
+    function renderPostLightboxImage() {
+      if (!postLightboxItems.length) return;
+      const lb = ensurePostLightbox();
+      const img = lb.querySelector('img');
+      const prevBtn = lb.querySelector('.post-lightbox-prev');
+      const nextBtn = lb.querySelector('.post-lightbox-next');
+      const total = postLightboxItems.length;
+      postLightboxIndex = (postLightboxIndex + total) % total;
+      img.src = postLightboxItems[postLightboxIndex];
+      img.alt = 'Foto ' + (postLightboxIndex + 1);
+      const showNav = total > 1;
+      if (prevBtn) prevBtn.style.display = showNav ? 'grid' : 'none';
+      if (nextBtn) nextBtn.style.display = showNav ? 'grid' : 'none';
+    }
+
+    function openPostLightbox(index) {
+      if (!postLightboxItems.length) return;
+      postLightboxIndex = index;
+      renderPostLightboxImage();
+      ensurePostLightbox().classList.add('open');
+    }
+
     function render(item) {
+      const gallery = parseGalleryUrls(item.galerija);
       root.innerHTML =
         '<div class="post-content">' +
           '<div class="post-layout">' +
@@ -479,9 +654,28 @@ h1, h2, h3, h4, h5, h6,
                 : '') +
             '</aside>' +
           '</div>' +
+          (gallery.length
+            ? '<section class="post-gallery">' +
+                '<h2 class="post-gallery-title">Galerija</h2>' +
+                '<div class="post-gallery-grid">' +
+                  gallery.map((url, idx) =>
+                    '<button type="button" class="post-gallery-item" data-gallery-index="' + idx + '">' +
+                      '<img src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.nosaukums || 'Galerija') + '" loading="lazy">' +
+                    '</button>'
+                  ).join('') +
+                '</div>' +
+              '</section>'
+            : '') +
         '</div>';
 
       document.title = (item.nosaukums || 'Jaunums') + ' | IPPON.LV';
+
+      postLightboxItems = gallery.slice();
+      const galleryButtons = root.querySelectorAll('.post-gallery-item[data-gallery-index]');
+      galleryButtons.forEach((btn) => {
+        const idx = Number(btn.getAttribute('data-gallery-index') || 0);
+        btn.addEventListener('click', () => openPostLightbox(idx));
+      });
     }
 
     async function load() {
@@ -633,56 +827,5 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

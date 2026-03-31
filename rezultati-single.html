@@ -1,6 +1,6 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!-- saved from url=(0019)https://club-wp.eu/ -->
-<html lang="en-US"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<html lang="en-US"><head><meta charset="UTF-8"><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 	
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<base href="/">
@@ -557,6 +557,19 @@ h1, h2, h3, h4, h5, h6,
     return [];
   }
 
+  const STATUS_MAP = {
+    0: 'Latvijas čempionāts',
+    1: 'Pasaules čempionāts',
+    2: 'Eiropas čempionāts',
+    21: 'WKF Karate1 Turnīrs',
+    22: 'Starptautisks turnīrs vairāk par 25 valstīm',
+    23: 'Starptautisks turnīrs 16–25 valstis',
+    24: 'Starptautisks turnīrs 6–15 valstis',
+    3: 'Starptautisks turnīrs līdz 5 valstīm',
+    4: '1.līga',
+    5: '2.līga (turnīrs iesācējiem)'
+  };
+
   function renderTable(headers, rows) {
     const safeRows = Array.isArray(rows) ? rows : [];
     return `
@@ -580,7 +593,7 @@ h1, h2, h3, h4, h5, h6,
     const chips = [];
     if (item.datums) chips.push(`Datums: ${fmtDate(item.datums)}`);
     if (item.vieta) chips.push(`Vieta: ${item.vieta}`);
-    if (item.statuss) chips.push(`Statuss: ${item.statuss}`);
+    if (item.statuss != null && item.statuss !== '') chips.push(`Statuss: ${STATUS_MAP[item.statuss] || item.statuss}`);
     if (item.vietu_skaits != null && item.vietu_skaits !== '') chips.push(`Vietu skaits: ${item.vietu_skaits}`);
 
     let content = '';
@@ -760,7 +773,7 @@ h1, h2, h3, h4, h5, h6,
 		<div class="elementor-element elementor-element-9013468 e-flex e-con-boxed e-con e-parent" data-id="9013468" data-element_type="container" data-e-type="container" data-settings="{&quot;background_background&quot;:&quot;classic&quot;}">
 					<div class="e-con-inner">
 				<div class="elementor-element elementor-element-ee9b6c2 elementor-widget elementor-widget-heading" data-id="ee9b6c2" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default">Â© 2011-2026 IPPON.LV. Visas tiesibas aizsargatas</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default">© 2011-2026 IPPON.LV. Visas tiesibas aizsargatas</h2>				</div>
 					</div>
 				</div>
 				</div>

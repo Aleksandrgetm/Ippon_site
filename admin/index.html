@@ -87,6 +87,53 @@
       resize: vertical;
     }
 
+    .rez-sportists-autocomplete {
+      position: relative;
+    }
+
+    .rez-sportists-autocomplete input {
+      margin-bottom: 0;
+    }
+
+    .rez-sportists-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      z-index: 40;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    }
+
+    .rez-sportists-option {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: var(--text);
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      padding: 8px 10px;
+      font-family: Roboto, sans-serif;
+      font-size: 14px;
+      text-transform: none;
+      font-weight: 400;
+      letter-spacing: 0;
+      cursor: pointer;
+    }
+
+    .rez-sportists-option:last-child {
+      border-bottom: 0;
+    }
+
+    .rez-sportists-option:hover {
+      background: #f8fafc;
+    }
+
     button {
       border: 0;
       border-radius: 10px;
@@ -674,7 +721,19 @@
               </div>
               <div class="rez-inline rez-only-sac">
                 <input id="rezManualPlace" type="text" placeholder="Vieta" />
-                <input id="rezManualStatus" type="text" placeholder="Statuss" />
+                <select id="rezManualStatus">
+                  <option value="">---</option>
+                  <option value="0">Latvijas čempionāts</option>
+                  <option value="1">Pasaules čempionāts</option>
+                  <option value="2">Eiropas čempionāts</option>
+                  <option value="21">WKF Karate1 Turnīrs (Premier League, SeriesA, Youth League)</option>
+                  <option value="22">Starptautisks turnīrs vairāk par 25 valstīm</option>
+                  <option value="23">Starptautisks turnīrs 16-25 valstis</option>
+                  <option value="24">Starptautisks turnīrs 6-15 valstis</option>
+                  <option value="3">Starptautisks turnīrs līdz 5 valstīm</option>
+                  <option value="4">1.līga</option>
+                  <option value="5">2.līga (turnīrs iesācējiem)</option>
+                </select>
               </div>
               <div class="rez-inline rez-only-sac">
                 <input id="rezManualPlacesCount" type="text" placeholder="Vietu skaits" />
@@ -693,10 +752,28 @@
               </div>
 
               <div class="rez-only-sac">
-                <label style="margin-bottom:6px;">Importēt rezultātus no Excel/CSV</label>
-                <input id="rezSacExcelFile" type="file" accept=".xlsx,.xls,.csv" />
-                <div id="rezSacExcelStatus" class="small"></div>
-                <textarea id="rezSacResultsRows" style="min-height:110px;" placeholder="Sportists | Vieta | Informācija&#10;Sportists | Vieta | Informācija"></textarea>
+                <div id="rezInlineResultsManager" class="rez-only-sac" style="margin-top:10px;">
+                  <label style="margin-bottom:8px;">Rezultatu pievienosana</label>
+                  <div class="rez-inline" style="grid-template-columns:1.4fr .8fr 1.4fr auto; align-items:end; gap:8px;">
+                    <div>
+                      <label style="margin-bottom:4px; opacity:.9;">Sportists</label>
+                      <div class="rez-sportists-autocomplete">
+                        <input id="rezInlineSportists" type="text" placeholder="Sportists" autocomplete="off" />
+                        <div id="rezSportistiDropdown" class="rez-sportists-dropdown hidden"></div>
+                      </div>
+                    </div>
+                    <div>
+                      <label style="margin-bottom:4px; opacity:.9;">Vieta</label>
+                      <input id="rezInlineVieta" type="number" placeholder="Vieta" />
+                    </div>
+                    <div>
+                      <label style="margin-bottom:4px; opacity:.9;">Informacija</label>
+                      <input id="rezInlineInfo" type="text" placeholder="Informacija" />
+                    </div>
+                    <button id="rezInlineAddBtn" type="button">Pievienot rezultatu</button>
+                  </div>
+                  <div id="rezInlineResultsList" style="margin-top:10px; display:grid; gap:8px;"></div>
+                </div>
                 <textarea id="rezManualStructuredData" class="hidden" style="min-height:110px;" placeholder='[{"sportists":"","vieta":"","informacija":""}]'></textarea>
               </div>
               <div>
@@ -842,15 +919,18 @@
     const rezMainImageLabel = document.getElementById('rezMainImageLabel');
     const rezSacMainImageFile = document.getElementById('rezSacMainImageFile');
     const rezSacMainPreview = document.getElementById('rezSacMainPreview');
-    const rezSacExcelFile = document.getElementById('rezSacExcelFile');
-    const rezSacExcelStatus = document.getElementById('rezSacExcelStatus');
     const rezSacGalleryFiles = document.getElementById('rezSacGalleryFiles');
     const rezGalleryLabel = document.getElementById('rezGalleryLabel');
     const rezSacGalleryPreview = document.getElementById('rezSacGalleryPreview');
     const rezHtmlTableFile = document.getElementById('rezHtmlTableFile');
     const rezHtmlTableStatus = document.getElementById('rezHtmlTableStatus');
     const rezManualStructuredData = document.getElementById('rezManualStructuredData');
-    const rezSacResultsRows = document.getElementById('rezSacResultsRows');
+    const rezInlineSportists = document.getElementById('rezInlineSportists');
+    const rezSportistiDropdown = document.getElementById('rezSportistiDropdown');
+    const rezInlineVieta = document.getElementById('rezInlineVieta');
+    const rezInlineInfo = document.getElementById('rezInlineInfo');
+    const rezInlineAddBtn = document.getElementById('rezInlineAddBtn');
+    const rezInlineResultsList = document.getElementById('rezInlineResultsList');
     const rezManualCustomHtml = document.getElementById('rezManualCustomHtml');
     const rezLegacyHint = document.getElementById('rezLegacyHint');
     const rezManualHtmlPreview = document.getElementById('rezManualHtmlPreview');
@@ -888,6 +968,7 @@
     let apiBase = '';
     let selectedNewsFile = null;
     let selectedNewsPreviewUrl = '';
+    let selectedNewsGalleryFiles = [];
     let selectedRakstiPreseFile = null;
     let selectedRakstiPresePreviewUrl = '';
     let selectedRulesFile = null;
@@ -901,6 +982,9 @@
     let selectedNodarbibasPreviewUrl = '';
     let selectedRezMainFile = null;
     let selectedRezMainPreviewUrl = '';
+    let rezInlineEditIndex = -1;
+    let rezSacRows = [];
+    let rezSportistiOptions = [];
     let selectedRezGalleryItems = [];
     let selectedFotoGalerijaFiles = [];
     let fotoGalerijaCurrentImages = [];
@@ -1036,9 +1120,11 @@
       datums: 'Datums',
       nosaukums: 'Nosaukums',
       foto_attels: 'Fotoattēls',
+      galerija: 'Galerija',
       ievads: 'Ievads',
       zina: 'Ziņa',
       slug: 'Slug (URL)',
+      position: 'Pozīcija sarakstā',
       created_at: 'Izveidots',
       updated_at: 'Atjaunots'
     };
@@ -1106,6 +1192,7 @@
       dostizhenija_lv: 'sasniegumiem',
       foto_attels: 'Fotoattēls',
       galerija: 'Galerija',
+      position: 'Pozīcija sarakstā',
       is_hidden: 'Slēpt sportistu'
     };
     const TRAINER_RICH_FIELDS = ['izglitiba', 'par_mani', 'sasniegumi'];
@@ -1426,63 +1513,172 @@
     }
 
     function parseCsvToMatrix(text) {
-      const lines = String(text || '').split(/\r?\n/).filter((l) => l.trim() !== '');
-      if (!lines.length) return [];
-      const delimiters = [';', ',', '\t'];
-      const score = (d) => lines.slice(0, 5).reduce((sum, line) => sum + (line.split(d).length - 1), 0);
-      const delimiter = delimiters.sort((a, b) => score(b) - score(a))[0] || ';';
-      return lines.map((line) => line.split(delimiter).map((cell) => String(cell || '').trim()));
+      const rows = [];
+      const lines = String(text || '').split(/\r?\n/).filter((line) => line.trim() !== '');
+      for (const line of lines) {
+        const cells = [];
+        let cur = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i += 1) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+              cur += '"';
+              i += 1;
+            } else {
+              inQuotes = !inQuotes;
+            }
+            continue;
+          }
+          if (!inQuotes && (ch === ';' || ch === ',')) {
+            cells.push(cur.trim());
+            cur = '';
+            continue;
+          }
+          cur += ch;
+        }
+        cells.push(cur.trim());
+        rows.push(cells);
+      }
+      return rows;
     }
 
-    function escapeHtml(value) {
-      return String(value || '')
+    function escapeHtml(text) {
+      if (!text) return '';
+      return String(text)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .replace(/'/g, '&#039;');
     }
 
-    function matrixToHtmlTable(matrix) {
-      const rows = Array.isArray(matrix)
-        ? matrix
-          .filter((row) => Array.isArray(row))
-          .map((row) => row.map((cell) => String(cell == null ? '' : cell).trim()))
-          .filter((row) => row.some((cell) => cell !== ''))
-        : [];
-      if (!rows.length) return '';
-      const header = rows[0];
-      const body = rows.slice(1);
-      const th = header.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('');
-      const bodyRows = body.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('');
-      return `<table><thead><tr>${th}</tr></thead><tbody>${bodyRows}</tbody></table>`;
+    function rezNormalizeRows(rows) {
+      if (!Array.isArray(rows)) return [];
+      return rows.map((row) => ({
+        sportists: String(row?.sportists || '').trim(),
+        vieta: String(row?.vieta || '').trim(),
+        informacija: String(row?.informacija || '').trim()
+      })).filter((row) => row.sportists || row.vieta || row.informacija);
     }
 
-    function rezRowsToLines(rows) {
-      if (!Array.isArray(rows)) return '';
-      return rows.map((row) => {
-        const s = String(row?.sportists || '').trim();
-        const v = String(row?.vieta || '').trim();
-        const i = String(row?.informacija || '').trim();
-        return `${s} | ${v} | ${i}`;
-      }).join('\n');
+    function rezApplyStructuredRowsToHidden() {
+      if (rezManualStructuredData) {
+        rezManualStructuredData.value = JSON.stringify({ rows: rezSacRows }, null, 2);
+      }
     }
 
-    function rezLinesToRows(text) {
-      return String(text || '')
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const parts = line.split('|').map((x) => String(x || '').trim());
-          return {
-            sportists: parts[0] || '',
-            vieta: parts[1] || '',
-            informacija: parts.slice(2).join(' | ') || ''
-          };
-        })
-        .filter((row) => row.sportists || row.vieta || row.informacija);
+    function rezResetInlineResultForm() {
+      rezInlineEditIndex = -1;
+      if (rezInlineSportists) rezInlineSportists.value = '';
+      if (rezInlineVieta) rezInlineVieta.value = '';
+      if (rezInlineInfo) rezInlineInfo.value = '';
+      if (rezInlineAddBtn) rezInlineAddBtn.textContent = 'Pievienot rezultatu';
+      rezHideSportistiDropdown();
     }
+
+    function rezFilterSportistiOptions(term) {
+      const source = Array.isArray(rezSportistiOptions) ? rezSportistiOptions : [];
+      const q = String(term || '').trim().toLowerCase();
+      if (!q) return source.slice(0, 120);
+      return source
+        .filter((name) => String(name || '').toLowerCase().includes(q))
+        .slice(0, 120);
+    }
+
+    function rezHideSportistiDropdown() {
+      if (!rezSportistiDropdown) return;
+      rezSportistiDropdown.classList.add('hidden');
+      rezSportistiDropdown.innerHTML = '';
+    }
+
+    function rezRenderSportistiDropdown(list) {
+      if (!rezSportistiDropdown) return;
+      const options = Array.isArray(list) ? list : [];
+      rezSportistiDropdown.innerHTML = '';
+      if (!options.length) {
+        rezHideSportistiDropdown();
+        return;
+      }
+      options.forEach((name) => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'rez-sportists-option';
+        item.setAttribute('data-name', String(name));
+        item.textContent = String(name);
+        rezSportistiDropdown.appendChild(item);
+      });
+      rezSportistiDropdown.classList.remove('hidden');
+    }
+
+    async function loadRezSportistiOptions() {
+      try {
+        const data = await api('/api/table/ippon_sportists?limit=500&offset=0&includeRemoved=0');
+        const rows = Array.isArray(data?.rows) ? data.rows : [];
+        if (!rows || !Array.isArray(rows)) return;
+        rezSportistiOptions = rows
+          .map((r) => r?.name_lv || r?.vards_uzvards || r?.name_ru || r?.name_en)
+          .filter(Boolean)
+          .map((v) => String(v).trim())
+          .filter(Boolean);
+        rezSportistiOptions = Array.from(new Set(rezSportistiOptions)).sort((a, b) => a.localeCompare(b, 'lv'));
+        console.log('SPORTISTI LOADED:', rezSportistiOptions);
+      } catch (e) {
+        console.error('LOAD ERROR', e);
+        rezSportistiOptions = [];
+      }
+    }
+
+    function rezRenderInlineResultsList() {
+      if (!rezInlineResultsList) return;
+      rezInlineResultsList.innerHTML = '';
+      if (!rezSacRows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'small';
+        empty.textContent = 'Rezultati vel nav pievienoti.';
+        rezInlineResultsList.appendChild(empty);
+        return;
+      }
+      rezSacRows.forEach((row, index) => {
+        const item = document.createElement('div');
+        item.style.display = 'grid';
+        item.style.gridTemplateColumns = '1.2fr .6fr 1.4fr auto';
+        item.style.gap = '8px';
+        item.style.alignItems = 'center';
+        item.style.border = '1px solid var(--line)';
+        item.style.borderRadius = '8px';
+        item.style.padding = '8px';
+        item.innerHTML = [
+          '<div>' + escapeHtml(row.sportists || '-') + '</div>',
+          '<div>' + escapeHtml(row.vieta || '-') + '</div>',
+          '<div>' + escapeHtml(row.informacija || '-') + '</div>',
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">'
+            + '<button type="button" class="light" data-rez-edit="' + index + '" title="Rediget">&#9998;</button>'
+            + '<button type="button" class="danger" data-rez-del="' + index + '" title="Dzest">&#128465;</button>'
+            + '</div>'
+        ].join('');
+        rezInlineResultsList.appendChild(item);
+      });
+    }
+
+    function rezSetRows(rows) {
+      rezSacRows = rezNormalizeRows(rows);
+      rezApplyStructuredRowsToHidden();
+      rezRenderInlineResultsList();
+    }
+    function setRezManualStatusValue(value) {
+      if (!rezManualStatus) return;
+      const next = String(value || '').trim();
+      const has = Array.from(rezManualStatus.options || []).some((opt) => String(opt.value) === next);
+      if (!has && next) {
+        const extra = document.createElement('option');
+        extra.value = next;
+        extra.textContent = next;
+        rezManualStatus.appendChild(extra);
+      }
+      rezManualStatus.value = next;
+    }
+
 
     function updateRezCategoryUi() {
       const isSac = rezCurrentCategory === 'sacensibas';
@@ -1581,13 +1777,13 @@
         rezManualTitle.value = '';
         rezManualDate.value = '';
         rezManualPlace.value = '';
-        rezManualStatus.value = '';
+        setRezManualStatusValue("");
         rezManualPlacesCount.value = '';
         rezManualImage.value = '';
         selectedRezGalleryItems = [];
-        if (rezSacExcelStatus) rezSacExcelStatus.textContent = '';
-        if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
-        if (rezSacResultsRows) rezSacResultsRows.value = '';
+                if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
+        rezSetRows([]);
+      rezResetInlineResultForm();
         rezManualStructuredData.value = '';
         rezManualCustomHtml.value = '';
         rezSourceSlugOverride.value = '';
@@ -1605,17 +1801,15 @@
       rezManualTitle.value = item.title || item.nosaukums || '';
       rezManualDate.value = toDateInputValue(item.date || item.datums || '');
       rezManualPlace.value = item.location || '';
-      rezManualStatus.value = item.statuss || '';
+      setRezManualStatusValue(item.statuss || "");
       rezManualPlacesCount.value = item.vietu_skaits != null ? String(item.vietu_skaits) : '';
       rezManualImage.value = item.image || item.foto_attels || '';
       const structuredGallery = Array.isArray(item?.structured_data?.gallery) ? item.structured_data.gallery : [];
       selectedRezGalleryItems = Array.isArray(item.galerija) && item.galerija.length ? [...item.galerija] : [...structuredGallery];
-      if (rezSacExcelStatus) rezSacExcelStatus.textContent = '';
-      if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
+            if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
       rezManualStructuredData.value = item.structured_data ? JSON.stringify(item.structured_data, null, 2) : '';
-      if (rezSacResultsRows) {
-        rezSacResultsRows.value = rezRowsToLines(Array.isArray(item?.structured_data?.rows) ? item.structured_data.rows : []);
-      }
+      rezSetRows(Array.isArray(item?.structured_data?.rows) ? item.structured_data.rows : []);
+      rezResetInlineResultForm();
       rezManualCustomHtml.value = normalizeHtmlText(item.custom_html || item.description || '');
       if (rezManualHtmlPreview) {
         const html = normalizeHtmlText(rezManualCustomHtml.value || '').trim();
@@ -1653,13 +1847,13 @@
       rezManualTitle.value = '';
       rezManualDate.value = '';
       rezManualPlace.value = '';
-      rezManualStatus.value = '';
+      setRezManualStatusValue("");
       rezManualPlacesCount.value = '';
       rezManualImage.value = '';
       selectedRezGalleryItems = [];
-      if (rezSacExcelStatus) rezSacExcelStatus.textContent = '';
-      if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
-      if (rezSacResultsRows) rezSacResultsRows.value = '';
+            if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
+      rezSetRows([]);
+      loadRezSportistiOptions().catch(() => {});
       rezManualStructuredData.value = '';
       rezManualCustomHtml.value = '';
       updateRezCategoryUi();
@@ -1687,16 +1881,14 @@
       rezManualTitle.value = item.title || '';
       rezManualDate.value = toDateInputValue(item.date || '');
       rezManualPlace.value = item.location || '';
-      rezManualStatus.value = item.statuss || '';
+      setRezManualStatusValue(item.statuss || "");
       rezManualPlacesCount.value = item.vietu_skaits != null ? String(item.vietu_skaits) : '';
       rezManualImage.value = item.image || '';
       const structuredGallery = Array.isArray(item?.structured_data?.gallery) ? item.structured_data.gallery : [];
       selectedRezGalleryItems = [...structuredGallery];
       if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
-      if (rezSacResultsRows) {
-        const rows = Array.isArray(item?.structured_data?.rows) ? item.structured_data.rows : [];
-        rezSacResultsRows.value = rezRowsToLines(rows);
-      }
+      rezSetRows(Array.isArray(item?.structured_data?.rows) ? item.structured_data.rows : []);
+      rezResetInlineResultForm();
       rezManualStructuredData.value = item.structured_data ? JSON.stringify(item.structured_data, null, 2) : '';
       rezManualCustomHtml.value = normalizeHtmlText(item.custom_html || '');
       fillSelectOptions(rezManualRecordType, REZULTATI_RECORD_TYPE_OPTIONS, item.record_type || 'reitings');
@@ -2147,6 +2339,36 @@
 
           wrap.appendChild(uploadRow);
           wrap.appendChild(preview);
+        } else if (currentTable === NEWS_TABLE && col.name === 'galerija') {
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.dataset.col = col.name;
+          field.id = `f_${col.name}`;
+          wrap.appendChild(field);
+
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.multiple = true;
+          fileInput.id = 'newsGalleryFiles';
+          fileInput.style.marginBottom = '6px';
+          wrap.appendChild(fileInput);
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.id = 'newsGalleryClearBtn';
+          clearBtn.className = 'light';
+          clearBtn.style.marginBottom = '8px';
+          clearBtn.textContent = 'Notirit galeriju';
+          wrap.appendChild(clearBtn);
+
+          const preview = document.createElement('div');
+          preview.id = 'newsGalleryPreview';
+          preview.style.display = 'grid';
+          preview.style.gridTemplateColumns = 'repeat(4, minmax(0, 1fr))';
+          preview.style.gap = '6px';
+          preview.style.marginBottom = '8px';
+          wrap.appendChild(preview);
         } else if (isTrainerMediaTable(currentTable) && col.name === 'foto_attels') {
           const field = document.createElement('input');
           field.type = 'hidden';
@@ -2400,7 +2622,7 @@
           const hint = document.createElement('div');
           hint.className = 'small';
           hint.id = 'fotoGalerijaHint';
-          hint.textContent = 'Pievieno vairākas fotogrāfijas vienai galerijai.';
+          hint.textContent = 'Jo lielāks skaitlis, jo augstāk sarakstā';
           wrap.appendChild(hint);
 
           const preview = document.createElement('div');
@@ -2536,11 +2758,15 @@
             || (currentTable === FOTO_GALERIJA_TABLE && col.name === 'date')
             || (currentTable === VIDEO_GALERIJA_TABLE && col.name === 'date')
             || (currentTable === RAKSTI_PRESE_TABLE && col.name === 'datums');
-          const useTextarea = isLongText && !forceDateInput;
+          const forceNumberInput =
+            ((currentTable === NEWS_TABLE || currentTable === 'ippon_sportists') && col.name === 'position');
+          const useTextarea = isLongText && !forceDateInput && !forceNumberInput;
           const field = document.createElement(useTextarea ? 'textarea' : 'input');
           if (!useTextarea) {
             if (forceDateInput) {
               field.type = 'date';
+            } else if (forceNumberInput) {
+              field.type = 'number';
             } else {
               field.type = 'text';
             }
@@ -2549,6 +2775,12 @@
           field.disabled = col.name === currentPk;
           field.id = `f_${col.name}`;
           wrap.appendChild(field);
+          if (forceNumberInput) {
+            const hint = document.createElement('small');
+            hint.style.opacity = '0.8';
+            hint.textContent = 'Jo liel?ks skaitlis, jo augst?k sarakst?';
+            wrap.appendChild(hint);
+          }
         }
         formFields.appendChild(wrap);
       });
@@ -2612,7 +2844,11 @@
       }
       const fileInput = document.getElementById('newsImageFile');
       if (fileInput) fileInput.value = '';
+      const newsGalleryInput = document.getElementById('newsGalleryFiles');
+      if (newsGalleryInput) newsGalleryInput.value = '';
+      selectedNewsGalleryFiles = [];
       updateNewsImagePreview();
+      renderNewsGalleryPreview();
       selectedRakstiPreseFile = null;
       if (selectedRakstiPresePreviewUrl) {
         URL.revokeObjectURL(selectedRakstiPresePreviewUrl);
@@ -2673,9 +2909,7 @@
       selectedRezGalleryItems = [];
       if (rezSacMainImageFile) rezSacMainImageFile.value = '';
       if (rezSacGalleryFiles) rezSacGalleryFiles.value = '';
-      if (rezSacExcelFile) rezSacExcelFile.value = '';
-      if (rezSacExcelStatus) rezSacExcelStatus.textContent = '';
-      if (rezHtmlTableFile) rezHtmlTableFile.value = '';
+                  if (rezHtmlTableFile) rezHtmlTableFile.value = '';
       if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
       updateRezMainPreview();
       renderRezGalleryPreview();
@@ -2746,12 +2980,32 @@
       const valueInput = document.getElementById(isRakstiPrese ? 'f_attels' : 'f_foto_attels');
       if (!fileInput || !valueInput) return;
       const file = fileInput.files && fileInput.files[0];
-      if (!file) return;
-      const url = await uploadNewsImageFile(file);
-      valueInput.value = url;
-      updateNewsImagePreview();
-      fileInput.value = '';
-      setStatus('Attēls augšupielādēts serverī.', 'ok');
+      if (file) {
+        const url = await uploadNewsImageFile(file);
+        valueInput.value = url;
+        updateNewsImagePreview();
+        fileInput.value = '';
+        setStatus('Attēls augšupielādēts serverī.', 'ok');
+      }
+
+      if (currentTable === NEWS_TABLE) {
+        const galleryInput = document.getElementById('f_galerija');
+        const galleryFileInput = document.getElementById('newsGalleryFiles');
+        if (galleryInput) {
+          if (selectedNewsGalleryFiles.length > 0) {
+            const uploaded = [];
+            for (const galleryFile of selectedNewsGalleryFiles) {
+              uploaded.push(await uploadNewsImageFile(galleryFile));
+            }
+            setNewsGalleryValue(uploaded);
+            selectedNewsGalleryFiles = [];
+            if (galleryFileInput) galleryFileInput.value = '';
+            renderNewsGalleryPreview();
+          } else {
+            setNewsGalleryValue(parseNewsGalleryValue(galleryInput.value));
+          }
+        }
+      }
     }
 
     function updateRulesFilePreview() {
@@ -2857,6 +3111,38 @@
         updateNewsImagePreview();
         setStatus('Attēls izvēlēts. Nospied Saglabāt.', 'ok');
       });
+
+      if (currentTable === NEWS_TABLE) {
+        const galleryInput = document.getElementById('f_galerija');
+        const galleryFile = document.getElementById('newsGalleryFiles');
+        const clearGalleryBtn = document.getElementById('newsGalleryClearBtn');
+
+        if (galleryInput) {
+          galleryInput.addEventListener('input', renderNewsGalleryPreview);
+        }
+
+        if (galleryFile) {
+          galleryFile.addEventListener('change', () => {
+            selectedNewsGalleryFiles = Array.from(galleryFile.files || []);
+            if (selectedNewsGalleryFiles.length > 0) {
+              setStatus(`Galerija: izveleti ${selectedNewsGalleryFiles.length} faili. Nospied Saglabat.`, 'ok');
+            }
+            renderNewsGalleryPreview();
+          });
+        }
+
+        if (clearGalleryBtn) {
+          clearGalleryBtn.addEventListener('click', () => {
+            selectedNewsGalleryFiles = [];
+            if (galleryFile) galleryFile.value = '';
+            setNewsGalleryValue([]);
+            renderNewsGalleryPreview();
+            setStatus('Galerija notirita. Nospied Saglabat.', 'ok');
+          });
+        }
+
+        renderNewsGalleryPreview();
+      }
     }
 
     function setupRulesFileTools() {
@@ -3693,6 +3979,52 @@
       valueInput.value = JSON.stringify(items || []);
     }
 
+    function parseNewsGalleryValue(value) {
+      return parseHallGalleryValue(value);
+    }
+
+    function setNewsGalleryValue(items) {
+      const valueInput = document.getElementById('f_galerija');
+      if (!valueInput) return;
+      valueInput.value = JSON.stringify(items || []);
+    }
+
+    function renderNewsGalleryPreview() {
+      if (currentTable !== NEWS_TABLE) return;
+      const valueInput = document.getElementById('f_galerija');
+      const preview = document.getElementById('newsGalleryPreview');
+      if (!valueInput || !preview) return;
+
+      preview.innerHTML = '';
+      const pending = selectedNewsGalleryFiles || [];
+      if (pending.length > 0) {
+        pending.forEach((file) => {
+          const img = document.createElement('img');
+          img.style.width = '100%';
+          img.style.height = '72px';
+          img.style.objectFit = 'cover';
+          img.style.borderRadius = '6px';
+          img.style.border = '1px solid var(--line)';
+          img.src = URL.createObjectURL(file);
+          img.title = file.name;
+          preview.appendChild(img);
+        });
+        return;
+      }
+
+      const currentItems = parseNewsGalleryValue(valueInput.value);
+      currentItems.forEach((url) => {
+        const img = document.createElement('img');
+        img.style.width = '100%';
+        img.style.height = '72px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '6px';
+        img.style.border = '1px solid var(--line)';
+        img.src = url;
+        preview.appendChild(img);
+      });
+    }
+
     function parseTrainerGalleryValue(value) {
       return parseHallGalleryValue(value);
     }
@@ -4419,7 +4751,7 @@
 
       const visibleColumns = getVisibleColumns();
       const displayColumns = currentTable === NEWS_TABLE
-        ? visibleColumns.filter((c) => ['id', 'datums', 'nosaukums', 'foto_attels'].includes(c.name))
+        ? visibleColumns.filter((c) => ['id', 'datums', 'nosaukums', 'foto_attels', 'galerija'].includes(c.name))
         : currentTable === RAKSTI_PRESE_TABLE
           ? visibleColumns.filter((c) => ['id', 'datums', 'nosaukums', 'attels', 'ievads', 'saite'].includes(c.name))
         : currentTable === TRAINERS_TABLE
@@ -4501,6 +4833,9 @@
             td.innerHTML = val
               ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:52px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
               : '—';
+          } else if (currentTable === NEWS_TABLE && col.name === 'galerija') {
+            const count = parseNewsGalleryValue(val).length;
+            td.textContent = count > 0 ? `${count} foto` : '—';
           } else if (currentTable === RAKSTI_PRESE_TABLE && col.name === 'attels') {
             td.innerHTML = val
               ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:52px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
@@ -4840,7 +5175,7 @@
       const rawStructured = String(rezManualStructuredData.value || '').trim();
       let structuredForLayout = null;
       if (rezCurrentCategory === 'sacensibas') {
-        const rows = rezLinesToRows(rezSacResultsRows?.value || '');
+        const rows = rezSacRows.slice();
         structuredForLayout = normalizeRezStructuredByLayout(layoutType, { rows });
       } else if (selectedRezGalleryItems.length) {
         structuredForLayout = { gallery: [...selectedRezGalleryItems] };
@@ -4914,7 +5249,7 @@
         return;
       }
       if (recordType === 'sacensibas') {
-        const rows = rezLinesToRows(rezSacResultsRows?.value || '');
+        const rows = rezSacRows.slice();
         payload.structured_data = normalizeRezStructuredByLayout(layoutType, { rows });
       } else {
         payload.structured_data = selectedRezGalleryItems.length
@@ -5315,12 +5650,15 @@
     if (kalSaveBtn) kalSaveBtn.addEventListener('click', saveKalendarsEntry);
     if (kalDeleteBtn) kalDeleteBtn.addEventListener('click', deleteKalendarsEntry);
 
+    loadRezSportistiOptions().catch(() => {});
+
     const switchRezCategory = (nextCategory) => {
       rezCurrentCategory = nextCategory;
       rezSelectedSource = null;
       rezSelectedManual = null;
       resetManualForm();
       if (currentTable === REZULTATI_TABLE) {
+        loadRezSportistiOptions().catch(() => {});
         loadRezultatiCompositeData().catch((error) => setStatus(error.message, 'error'));
       }
     };
@@ -5388,42 +5726,6 @@
       });
     }
 
-    if (rezSacExcelFile) {
-      rezSacExcelFile.addEventListener('change', async (event) => {
-        const file = event.target.files && event.target.files[0];
-        if (!file) return;
-        try {
-          const name = String(file.name || '').toLowerCase();
-          let matrix = [];
-          if (name.endsWith('.csv')) {
-            const text = await file.text();
-            matrix = parseCsvToMatrix(text);
-          } else {
-            if (!window.XLSX) {
-              throw new Error('Excel parseris nav pieejams. Pārlādē lapu un mēģini vēlreiz.');
-            }
-            const arr = await file.arrayBuffer();
-            const wb = window.XLSX.read(arr, { type: 'array' });
-            const firstSheet = wb.SheetNames[0];
-            matrix = window.XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, raw: false });
-          }
-          const rows = extractRezRowsFromMatrix(matrix);
-          if (!rows.length) {
-            throw new Error('Neizdevās atrast kolonnas Sportists / Vieta / Informācija.');
-          }
-          rezSacResultsRows.value = rezRowsToLines(rows);
-          rezManualStructuredData.value = JSON.stringify({ rows }, null, 2);
-          if (rezSacExcelStatus) rezSacExcelStatus.textContent = `Importētas ${rows.length} rindas.`;
-          setStatus('Excel dati importēti.', 'ok');
-        } catch (error) {
-          if (rezSacExcelStatus) rezSacExcelStatus.textContent = '';
-          setStatus(error.message, 'error');
-        } finally {
-          rezSacExcelFile.value = '';
-        }
-      });
-    }
-
     if (rezHtmlTableFile) {
       rezHtmlTableFile.addEventListener('change', async (event) => {
         const file = event.target.files && event.target.files[0];
@@ -5462,10 +5764,95 @@
       });
     }
 
-    if (rezSacResultsRows) {
-      rezSacResultsRows.addEventListener('input', () => {
-        const rows = rezLinesToRows(rezSacResultsRows.value || '');
-        rezManualStructuredData.value = JSON.stringify({ rows }, null, 2);
+    if (rezInlineSportists) {
+      const ensureSportistiOptions = async () => {
+        if (!rezSportistiOptions || !Array.isArray(rezSportistiOptions) || !rezSportistiOptions.length) {
+          await loadRezSportistiOptions();
+        }
+      };
+
+      rezInlineSportists.addEventListener('focus', async () => {
+        try {
+          await ensureSportistiOptions();
+          rezRenderSportistiDropdown(rezSportistiOptions);
+        } catch (e) {
+          console.error('Autocomplete error:', e);
+        }
+      });
+
+      rezInlineSportists.addEventListener('input', async () => {
+        try {
+          await ensureSportistiOptions();
+          const filtered = rezFilterSportistiOptions(rezInlineSportists.value || '');
+          rezRenderSportistiDropdown(filtered);
+        } catch (e) {
+          console.error('Autocomplete error:', e);
+        }
+      });
+    }
+
+    if (rezSportistiDropdown) {
+      rezSportistiDropdown.addEventListener('click', (event) => {
+        const target = event.target instanceof HTMLElement ? event.target.closest('[data-name]') : null;
+        if (!target) return;
+        const name = String(target.getAttribute('data-name') || '').trim();
+        if (rezInlineSportists) rezInlineSportists.value = name;
+        rezHideSportistiDropdown();
+      });
+
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target) return;
+        if (target.closest('.rez-sportists-autocomplete')) return;
+        rezHideSportistiDropdown();
+      });
+    }
+
+    if (rezInlineAddBtn) {
+      rezInlineAddBtn.addEventListener('click', () => {
+        const sportists = String(rezInlineSportists?.value || '').trim();
+        const vieta = String(rezInlineVieta?.value || '').trim();
+        const informacija = String(rezInlineInfo?.value || '').trim();
+        if (!sportists && !vieta && !informacija) return;
+        const next = { sportists, vieta, informacija };
+        const rows = rezSacRows.slice();
+        if (rezInlineEditIndex >= 0 && rezInlineEditIndex < rows.length) {
+          rows[rezInlineEditIndex] = next;
+        } else {
+          rows.push(next);
+        }
+        rezSetRows(rows);
+        rezResetInlineResultForm();
+      });
+    }
+
+    if (rezInlineResultsList) {
+      rezInlineResultsList.addEventListener('click', (event) => {
+        const target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target) return;
+        const editBtn = target.closest('[data-rez-edit]');
+        if (editBtn) {
+          const index = Number(editBtn.getAttribute('data-rez-edit'));
+          if (Number.isInteger(index) && rezSacRows[index]) {
+            rezInlineEditIndex = index;
+            if (rezInlineSportists) rezInlineSportists.value = String(rezSacRows[index].sportists || '');
+            if (rezInlineVieta) rezInlineVieta.value = String(rezSacRows[index].vieta || '');
+            if (rezInlineInfo) rezInlineInfo.value = String(rezSacRows[index].informacija || '');
+            if (rezInlineAddBtn) rezInlineAddBtn.textContent = 'Saglabat rezultatu';
+            rezRenderSportistiDropdown(rezFilterSportistiOptions(rezInlineSportists?.value || ''));
+          }
+          return;
+        }
+        const delBtn = target.closest('[data-rez-del]');
+        if (delBtn) {
+          const index = Number(delBtn.getAttribute('data-rez-del'));
+          if (Number.isInteger(index) && rezSacRows[index]) {
+            const rows = rezSacRows.slice();
+            rows.splice(index, 1);
+            rezSetRows(rows);
+            rezResetInlineResultForm();
+          }
+        }
       });
     }
 
