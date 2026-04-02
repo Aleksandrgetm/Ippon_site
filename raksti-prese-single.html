@@ -214,7 +214,7 @@ h1, h2, h3, h4, h5, h6,
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
 </li>
-<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="#" class="elementor-sub-item">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item">Foto galerija</a></li></ul></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/raksti-prese.html" class="elementor-sub-item">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item">Foto galerija</a></li></ul></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-77"><a href="#" class="elementor-item elementor-item-anchor">Kontakti</a></li>
 </ul>			</nav>
 					<div class="elementor-menu-toggle" role="button" tabindex="0" aria-label="Menu Toggle" aria-expanded="false">
@@ -247,7 +247,7 @@ h1, h2, h3, h4, h5, h6,
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
 </li>
-<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item" tabindex="-1">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="#" class="elementor-sub-item" tabindex="-1">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item" tabindex="-1">Foto galerija</a></li></ul></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item" tabindex="-1">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/raksti-prese.html" class="elementor-sub-item" tabindex="-1">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item" tabindex="-1">Foto galerija</a></li></ul></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-77"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1">Kontakti</a></li>
 </ul>			</nav>
 						</div>
@@ -285,77 +285,143 @@ h1, h2, h3, h4, h5, h6,
     margin-top: auto !important;
   }
 
-  .fgs-shell { padding: 118px 0 62px; background: #000; }
-  .fgs-wrap { width: min(1200px, calc(100% - 48px)); margin: 0 auto; }
+  .fgs-shell { padding: 122px 0 72px; background: #000; }
+  .fgs-wrap { width: min(1320px, calc(100% - 64px)); margin: 0 auto; }
+  .fgs-detail { color: #fff; }
   .fgs-state {
     color: rgba(255,255,255,.8);
     font-family: "Oswald", sans-serif;
     font-size: 30px;
   }
   .fgs-back {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    color: #fff;
+    display: inline-block;
+    color: #ef4444;
     text-decoration: none;
     font-family: "Oswald", sans-serif;
-    font-size: 18px;
-    line-height: 1.2;
-    margin-bottom: 14px;
+    font-size: clamp(14px, 0.9vw, 18px);
+    line-height: 1;
+    margin: 0 0 14px;
   }
-  .fgs-kicker {
-    margin: 0 0 8px;
+  .fgs-back:hover { color: #ffffff; }
+  .post-card {
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    background: #000;
+  }
+  .post-layout {
+    display: grid;
+    grid-template-columns: minmax(560px, 1.1fr) minmax(400px, 0.9fr);
+    gap: 44px;
+    align-items: start;
+  }
+  .post-main {
+    min-width: 0;
+  }
+  .post-media {
+    padding-top: 132px;
+  }
+  .post-image-wrap {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    max-width: 520px;
+    margin-left: auto;
+  }
+  .post-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    object-fit: cover;
+  }
+  .post-content {
+    padding: 0;
+  }
+  .post-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .post-date {
     color: #ef4444;
-    text-transform: uppercase;
     font-family: "Oswald", sans-serif;
-    letter-spacing: 0.08em;
-    font-size: 12px;
-    font-weight: 400;
+    font-size: clamp(20px, 1.35vw, 30px);
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
   }
-  .fgs-title {
+  .post-meta-divider {
+    width: 76px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.45);
+    flex: 0 0 auto;
+  }
+  .post-meta-label {
+    color: #dbe0e7;
+    font-family: "Oswald", sans-serif;
+    font-size: clamp(13px, 0.85vw, 16px);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .post-title {
+    margin: 0 0 28px;
+    color: #fff;
+    font-family: "Oswald", sans-serif;
+    font-weight: 700;
+    font-size: clamp(44px, 3.8vw, 68px);
+    line-height: 1.18;
+  }
+  .post-intro {
+    margin: 0 0 20px;
+    color: #ffffff;
+    font-family: "Roboto", sans-serif;
+    font-size: clamp(16px, 1.05vw, 22px);
+    font-weight: 700;
+    line-height: 1.5;
+    max-width: 600px;
+  }
+  .post-zina {
     margin: 0;
     color: #fff;
+    font-family: "Roboto", sans-serif;
+    font-size: clamp(13px, 0.92vw, 17px);
+    font-weight: 400;
+    line-height: 1.45;
+  }
+  .post-zina p {
+    margin: 0 0 22px;
+  }
+  .post-zina ul {
+    margin: 0 0 24px;
+    padding-left: 24px;
+  }
+  .post-zina li {
+    margin-bottom: 12px;
+  }
+  .post-link {
+    display: inline-block;
+    margin-top: 18px;
+    padding: 10px 18px;
+    border: 1px solid rgba(239, 68, 68, 0.7);
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.08);
+    color: #ffffff;
+    text-decoration: none;
     font-family: "Oswald", sans-serif;
+    font-size: 15px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    font-size: clamp(40px, 4.8vw, 74px);
-    line-height: .95;
+    transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease, box-shadow .2s ease;
   }
-  .fgs-meta {
-    margin-top: 14px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .fgs-chip {
-    border: 1px solid rgba(255,255,255,.2);
-    color: #fff;
-    background: rgba(255,31,41,.14);
-    font-family: "Oswald", sans-serif;
-    font-size: 19px;
-    text-transform: uppercase;
-    padding: 4px 9px;
-    border-radius: 4px;
-  }
-  .fgs-desc {
-    margin-top: 16px;
-    color: rgba(255,255,255,.9);
-    font-size: 18px;
-    line-height: 1.75;
-  }
-  .fgs-grid {
-    margin-top: 24px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px;
-  }
-  .fgs-grid img {
-    width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: cover;
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 10px;
-    background: rgba(255,255,255,.04);
-    cursor: pointer;
+  .post-link:hover {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(239, 68, 68, 0.28);
   }
 
   .fgs-lightbox {
@@ -405,8 +471,28 @@ h1, h2, h3, h4, h5, h6,
   .fgs-lightbox-next { right: 18px; }
 
   @media (max-width: 1024px) {
-    .fgs-wrap { width: min(1200px, calc(100% - 24px)); }
-    .fgs-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    .fgs-wrap { width: min(1320px, calc(100% - 20px)); }
+    .fgs-shell { padding: 114px 0 40px; }
+    .post-layout { grid-template-columns: 1fr; gap: 20px; }
+    .post-media { padding-top: 0; }
+    .post-image-wrap { max-width: 100%; margin-left: 0; }
+    .post-content { padding: 0; }
+    .post-meta-line { gap: 10px; margin-bottom: 12px; }
+    .post-meta-divider { width: 56px; }
+    .post-date { font-size: clamp(20px, 6vw, 30px); }
+    .post-meta-label { font-size: clamp(14px, 4.2vw, 18px); }
+    .post-title { margin-bottom: 14px; font-size: clamp(34px, 9.6vw, 50px); }
+    .post-intro { font-size: clamp(15px, 4vw, 20px); margin-bottom: 12px; }
+    .post-zina { font-size: clamp(14px, 3.5vw, 17px); line-height: 1.48; }
+  }
+
+  @media (min-width: 1024px) and (max-width: 1366px) {
+    .fgs-shell { padding: 126px 0 52px; }
+    .fgs-wrap { width: min(1320px, calc(100% - 48px)); }
+  }
+
+  @media (max-width: 768px) {
+    .fgs-lightbox { padding: 16px; }
   }
 </style>
 <script>
@@ -431,6 +517,28 @@ h1, h2, h3, h4, h5, h6,
     .replace(/<[^>]*>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  function renderText(raw) {
+    const text = String(raw || '')
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\r\n/g, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]*>/g, '')
+      .trim();
+    if (!text) return '';
+
+    const blocks = text.split(/\n\s*\n+/).map((block) => block.trim()).filter(Boolean);
+    return blocks.map((block) => {
+      const lines = block.split('\n').map((line) => line.trim()).filter(Boolean);
+      const isList = lines.length > 1 && lines.every((line) => /^[-*•]/.test(line));
+      if (isList) {
+        return `<ul>${lines.map((line) => `<li>${esc(line.replace(/^[-*•]\s*/, ''))}</li>`).join('')}</ul>`;
+      }
+      return `<p>${esc(lines.join(' '))}</p>`;
+    }).join('');
+  }
 
   function ensureLightbox() {
     if (lbEl) return lbEl;
@@ -489,21 +597,35 @@ h1, h2, h3, h4, h5, h6,
     const title = item.nosaukums || 'Raksti prese';
     const date = item.datums || '';
     const ievads = norm(item.ievads || '');
-    const zina = norm(item.zina || '');
+    const zina = renderText(item.zina || '');
     const image = item.attels || '';
     const saite = item.saite || '';
+    lbItems = image ? [image] : [];
 
     return `
       <a class="fgs-back" href="/raksti-prese.html">← Atpakal uz rakstiem prese</a>
-      <header>
-        <p class="fgs-kicker">Galerija</p>
-        <h1 class="fgs-title">${esc(title)}</h1>
-        <div class="fgs-meta">${date ? `<span class="fgs-chip">Datums: ${esc(date)}</span>` : ''}</div>
-      </header>
-      ${image ? `<section class="fgs-grid"><img src="${esc(image)}" alt="${esc(title)}" loading="lazy"></section>` : ''}
-      ${ievads ? `<p class="fgs-desc">${esc(ievads)}</p>` : ''}
-      ${zina ? `<p class="fgs-desc">${esc(zina)}</p>` : ''}
-      ${saite ? `<p class="fgs-desc"><a href="${esc(saite)}" target="_blank" rel="noopener noreferrer" style="color:#ef4444; text-decoration:underline;">Atvert publikaciju</a></p>` : ''}
+      <article class="post-card">
+        <div class="post-content">
+          <div class="post-layout">
+            <div class="post-main">
+              <div class="post-meta-line">
+                ${date ? `<span class="post-date">${esc(date)}</span>` : ''}
+                <span class="post-meta-divider"></span>
+                <span class="post-meta-label">Raksti prese</span>
+              </div>
+              <h1 class="post-title">${esc(title)}</h1>
+              ${ievads ? `<div class="post-intro">${esc(ievads)}</div>` : ''}
+              <div class="post-zina">
+                ${zina}
+                ${saite ? `<a class="post-link" href="${esc(saite)}" target="_blank" rel="noopener noreferrer">Atvert publikaciju</a>` : ''}
+              </div>
+            </div>
+            <aside class="post-media">
+              ${image ? `<div class="post-image-wrap"><img class="post-image" src="${esc(image)}" alt="${esc(title)}" loading="eager" data-open-image="0"></div>` : ''}
+            </aside>
+          </div>
+        </div>
+      </article>
     `;
   }
 
@@ -519,7 +641,10 @@ h1, h2, h3, h4, h5, h6,
       if (!item) throw new Error('Raksts nav atrasts');
 
       detailEl.innerHTML = buildDetail(item);
-            detailEl.hidden = false;
+      detailEl.querySelectorAll('[data-open-image]').forEach((node, index) => {
+        node.addEventListener('click', () => openLightbox(index));
+      });
+      detailEl.hidden = false;
       stateEl.hidden = true;
       document.title = `${item.nosaukums || 'Foto galerija'} - IPPON.LV`;
     } catch (error) {

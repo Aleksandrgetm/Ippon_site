@@ -620,6 +620,21 @@
       .layout { grid-template-columns: 1fr; }
       .rez-composite-grid { grid-template-columns: 1fr; }
     }
+
+    @media (min-width: 1024px) and (max-width: 1366px) {
+      .layout { grid-template-columns: 340px minmax(0, 1fr); }
+      .records { overflow-x: auto; }
+      table { min-width: 640px; }
+    }
+
+    @media (max-width: 768px) {
+      .app { padding: 12px; }
+      .panel { padding: 12px; }
+      .toolbar, .search-row { flex-wrap: wrap; }
+      .search-row input, #formFields input, #formFields textarea, #formFields select { min-width: 0; width: 100%; }
+      .records { overflow-x: auto; max-height: none; }
+      table { min-width: 560px; }
+    }
   </style>
 </head>
 <body>
@@ -2743,6 +2758,38 @@
           preview.style.marginBottom = '10px';
           preview.style.display = 'none';
           wrap.appendChild(preview);
+        } else if (currentTable === RAKSTI_PRESE_TABLE && (col.name === 'ievads' || col.name === 'zina')) {
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.dataset.col = col.name;
+          field.id = `f_${col.name}`;
+          wrap.appendChild(field);
+
+          const key = col.name === 'ievads' ? 'RakstiPreseIevads' : 'RakstiPreseZina';
+          const editor = document.createElement('div');
+          editor.className = 'rich-editor';
+          editor.innerHTML = `
+            <div class="rich-editor-top">
+              <div class="rich-editor-tabs">
+                <button type="button" class="rich-editor-tab active" id="${key}TabVisual">Visual</button>
+                <button type="button" class="rich-editor-tab" id="${key}TabCode">Code</button>
+              </div>
+            </div>
+            <div class="rich-editor-toolbar" id="${key}Toolbar">
+              <button type="button" class="rich-editor-btn" data-cmd="bold"><b>B</b></button>
+              <button type="button" class="rich-editor-btn" data-cmd="italic"><i>I</i></button>
+              <button type="button" class="rich-editor-btn" data-cmd="underline"><u>U</u></button>
+              <button type="button" class="rich-editor-btn" data-cmd="insertUnorderedList">• List</button>
+              <button type="button" class="rich-editor-btn" data-cmd="insertOrderedList">1. List</button>
+              <button type="button" class="rich-editor-btn" data-cmd="formatBlock" data-value="h3">H3</button>
+              <button type="button" class="rich-editor-btn" data-cmd="formatBlock" data-value="p">P</button>
+              <button type="button" class="rich-editor-btn" data-cmd="createLink">Link</button>
+              <button type="button" class="rich-editor-btn" data-cmd="removeFormat">Clear</button>
+            </div>
+            <div id="${key}Visual" class="rich-editor-visual" contenteditable="true"></div>
+            <textarea id="${key}Code" class="rich-editor-code"></textarea>
+          `;
+          wrap.appendChild(editor);
         } else {
           const lowerType = String(col.type || '').toLowerCase();
           const isLongText = lowerType.includes('text')
@@ -2791,6 +2838,7 @@
       setupHallIevadsEditor();
       setupSadarbibaSatursEditor();
       setupMusuPartneriInformacijaEditor();
+      setupRakstiPreseEditors();
       setupRezultatiEditor();
       setupTrainerTextEditors();
       setupHallTools();
@@ -2857,6 +2905,7 @@
       const rakstiFileInput = document.getElementById('rakstiPreseImageFile');
       if (rakstiFileInput) rakstiFileInput.value = '';
       updateNewsImagePreview();
+      refreshRakstiPreseEditorsFromHidden();
       selectedRulesFile = null;
       const rulesFileInput = document.getElementById('rulesFileInput');
       if (rulesFileInput) rulesFileInput.value = '';
@@ -3434,6 +3483,101 @@
       if (!hiddenInput || !visual || !code) return;
       const isCodeMode = code.style.display !== 'none';
       hiddenInput.value = isCodeMode ? code.value : visual.innerHTML;
+    }
+
+    function setupRakstiPreseEditors() {
+      if (currentTable !== RAKSTI_PRESE_TABLE) return;
+
+      [
+        { field: 'ievads', key: 'RakstiPreseIevads' },
+        { field: 'zina', key: 'RakstiPreseZina' }
+      ].forEach(({ field, key }) => {
+        const hiddenInput = document.getElementById(`f_${field}`);
+        const visual = document.getElementById(`${key}Visual`);
+        const code = document.getElementById(`${key}Code`);
+        const tabVisual = document.getElementById(`${key}TabVisual`);
+        const tabCode = document.getElementById(`${key}TabCode`);
+        const toolbar = document.getElementById(`${key}Toolbar`);
+        if (!hiddenInput || !visual || !code || !tabVisual || !tabCode || !toolbar) return;
+
+        let mode = 'visual';
+        visual.innerHTML = hiddenInput.value || '';
+        code.value = hiddenInput.value || '';
+
+        function switchMode(nextMode) {
+          mode = nextMode;
+          if (mode === 'visual') {
+            visual.innerHTML = code.value;
+            hiddenInput.value = visual.innerHTML;
+            visual.style.display = 'block';
+            code.style.display = 'none';
+            toolbar.style.display = 'flex';
+            tabVisual.classList.add('active');
+            tabCode.classList.remove('active');
+          } else {
+            code.value = visual.innerHTML;
+            hiddenInput.value = code.value;
+            visual.style.display = 'none';
+            code.style.display = 'block';
+            toolbar.style.display = 'none';
+            tabCode.classList.add('active');
+            tabVisual.classList.remove('active');
+          }
+        }
+
+        tabVisual.addEventListener('click', () => switchMode('visual'));
+        tabCode.addEventListener('click', () => switchMode('code'));
+        visual.addEventListener('input', () => { if (mode === 'visual') hiddenInput.value = visual.innerHTML; });
+        code.addEventListener('input', () => { if (mode === 'code') hiddenInput.value = code.value; });
+        toolbar.addEventListener('click', (event) => {
+          const btn = event.target.closest('.rich-editor-btn');
+          if (!btn) return;
+          const cmd = btn.dataset.cmd;
+          const value = btn.dataset.value;
+          visual.focus();
+          if (cmd === 'createLink') {
+            const url = prompt('Enter URL', 'https://');
+            if (url) document.execCommand('createLink', false, url);
+          } else if (cmd === 'formatBlock') {
+            document.execCommand('formatBlock', false, value || 'p');
+          } else {
+            document.execCommand(cmd, false, null);
+          }
+          hiddenInput.value = visual.innerHTML;
+        });
+
+        switchMode('visual');
+      });
+    }
+
+    function refreshRakstiPreseEditorsFromHidden() {
+      if (currentTable !== RAKSTI_PRESE_TABLE) return;
+      [
+        { field: 'ievads', key: 'RakstiPreseIevads' },
+        { field: 'zina', key: 'RakstiPreseZina' }
+      ].forEach(({ field, key }) => {
+        const hiddenInput = document.getElementById(`f_${field}`);
+        const visual = document.getElementById(`${key}Visual`);
+        const code = document.getElementById(`${key}Code`);
+        if (!hiddenInput || !visual || !code) return;
+        const value = hiddenInput.value || '';
+        visual.innerHTML = value;
+        code.value = value;
+      });
+    }
+
+    function syncRakstiPreseEditorsToHidden() {
+      if (currentTable !== RAKSTI_PRESE_TABLE) return;
+      [
+        { field: 'ievads', key: 'RakstiPreseIevads' },
+        { field: 'zina', key: 'RakstiPreseZina' }
+      ].forEach(({ field, key }) => {
+        const hiddenInput = document.getElementById(`f_${field}`);
+        const visual = document.getElementById(`${key}Visual`);
+        const code = document.getElementById(`${key}Code`);
+        if (!hiddenInput || !visual || !code) return;
+        hiddenInput.value = code.style.display !== 'none' ? code.value : visual.innerHTML;
+      });
     }
 
     function setupMusuPartneriInformacijaEditor() {
@@ -5074,6 +5218,8 @@
           syncSadarbibaSatursEditorToHidden();
           syncMusuPartneriInformacijaEditorToHidden();
           await uploadSelectedTrainerMediaIfNeeded();
+        } else if (currentTable === RAKSTI_PRESE_TABLE) {
+          syncRakstiPreseEditorsToHidden();
         }
         if (currentTable === REZULTATI_TABLE) {
           syncRezultatiEditorToHidden();

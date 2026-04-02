@@ -367,7 +367,7 @@ body {
 }
 
 @media (min-width: 1025px) and (max-width: 1366px) {
-  .elementor-location-header .elementor-element-4534216 { padding-left: 10px !important; padding-right: 10px !important; gap: 8px !important; overflow: visible !important; }
+  .elementor-location-header .elementor-element-4534216 { padding-left: 0 !important; padding-right: 10px !important; gap: 8px !important; overflow: visible !important; }
   .elementor-location-header .elementor-element-e48e2a2 img { max-height: 40px !important; width: auto !important; }
   .elementor-location-header .elementor-element-f058eba,
   .elementor-location-header .elementor-element-ad27a2f,

@@ -214,7 +214,7 @@ h1, h2, h3, h4, h5, h6,
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
 </li>
-<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="#" class="elementor-sub-item">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item">Foto galerija</a></li></ul></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/raksti-prese.html" class="elementor-sub-item">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item">Foto galerija</a></li></ul></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-77"><a href="#" class="elementor-item elementor-item-anchor">Kontakti</a></li>
 </ul>			</nav>
 					<div class="elementor-menu-toggle" role="button" tabindex="0" aria-label="Menu Toggle" aria-expanded="false">
@@ -247,7 +247,7 @@ h1, h2, h3, h4, h5, h6,
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
 </li>
-<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item" tabindex="-1">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="#" class="elementor-sub-item" tabindex="-1">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item" tabindex="-1">Foto galerija</a></li></ul></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-76 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1">Galerija</a><ul class="sub-menu elementor-nav-menu--dropdown"><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/video-galerija.html" class="elementor-sub-item" tabindex="-1">Video galerija</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/raksti-prese.html" class="elementor-sub-item" tabindex="-1">Raksti prese</a></li><li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/foto-galerija.html" class="elementor-sub-item" tabindex="-1">Foto galerija</a></li></ul></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-77"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1">Kontakti</a></li>
 </ul>			</nav>
 						</div>
@@ -394,6 +394,24 @@ h1, h2, h3, h4, h5, h6,
     .fg-wrap { width: min(1220px, calc(100% - 24px)); }
     .fg-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
     .fg-title { font-size: clamp(42px, 8.6vw, 72px); }
+  }
+
+  @media (min-width: 1024px) and (max-width: 1366px) {
+    .fg-shell { padding: 104px 0 56px; }
+    .fg-wrap { width: min(100%, calc(100% - 32px)); }
+    .fg-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .fg-content { padding: 12px; }
+    .fg-desc { font-size: 15px; }
+  }
+
+  @media (max-width: 768px) {
+    .fg-shell { padding: 94px 0 44px; }
+    .fg-wrap { width: min(100%, calc(100% - 20px)); }
+    .fg-search-wrap { max-width: none; }
+    .fg-grid { grid-template-columns: 1fr; }
+    .fg-content { padding: 12px; }
+    .fg-name { font-size: 24px; }
+    .fg-desc { font-size: 15px; }
   }
 </style>
 <script>

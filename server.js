@@ -3963,7 +3963,7 @@ function handleApi(req, res, reqUrl) {
         const insertStmt = db.prepare(`
           INSERT INTO sportisti_sasniegumi (
             sportist_id, datums, nosaukums, rezultats, vieta, statuss, informacija, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         db.exec('BEGIN');
@@ -4199,6 +4199,8 @@ function handleApi(req, res, reqUrl) {
       ? 'date DESC, id DESC'
       : table === 'video_galerija'
         ? 'date DESC, id DESC'
+      : table === 'raksti_prese'
+        ? 'datums DESC, id DESC'
       : table === 'jaunumi'
         ? 'COALESCE(position, 0) DESC, id DESC'
       : table === 'ippon_sportists'
@@ -4296,6 +4298,32 @@ function handleApi(req, res, reqUrl) {
           );
           const row = db.prepare('SELECT * FROM jaunumi WHERE id = ?').get(info.lastInsertRowid);
           sendJson(res, 201, { row: mapNewsRow(row) });
+          return;
+        }
+
+        if (table === 'raksti_prese') {
+          const nosaukums = String(body.nosaukums || '').trim();
+          if (!nosaukums) {
+            sendJson(res, 400, { error: 'Field nosaukums is required' });
+            return;
+          }
+
+          const ts = nowTs();
+          const info = db.prepare(`
+            INSERT INTO raksti_prese (datums, nosaukums, attels, ievads, zina, saite, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            String(body.datums || '').trim(),
+            nosaukums,
+            body.attels ? String(body.attels).trim() : null,
+            body.ievads != null ? String(body.ievads) : '',
+            body.zina != null ? String(body.zina) : '',
+            body.saite ? String(body.saite).trim() : '',
+            ts,
+            ts
+          );
+          const row = db.prepare('SELECT * FROM raksti_prese WHERE id = ?').get(info.lastInsertRowid);
+          sendJson(res, 201, { row });
           return;
         }
 
@@ -4695,6 +4723,40 @@ function handleApi(req, res, reqUrl) {
           );
           const row = db.prepare('SELECT * FROM jaunumi WHERE id = ?').get(id);
           sendJson(res, 200, { row: mapNewsRow(row) });
+          return;
+        }
+
+        if (table === 'raksti_prese') {
+          const existing = db.prepare('SELECT * FROM raksti_prese WHERE id = ? LIMIT 1').get(id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Row not found' });
+            return;
+          }
+
+          const nosaukums = body.nosaukums != null
+            ? String(body.nosaukums).trim()
+            : String(existing.nosaukums || '').trim();
+          if (!nosaukums) {
+            sendJson(res, 400, { error: 'Field nosaukums is required' });
+            return;
+          }
+
+          db.prepare(`
+            UPDATE raksti_prese
+            SET datums = ?, nosaukums = ?, attels = ?, ievads = ?, zina = ?, saite = ?, updated_at = ?
+            WHERE id = ?
+          `).run(
+            body.datums != null ? String(body.datums).trim() : String(existing.datums || ''),
+            nosaukums,
+            body.attels != null ? String(body.attels).trim() : existing.attels,
+            body.ievads != null ? String(body.ievads) : String(existing.ievads || ''),
+            body.zina != null ? String(body.zina) : String(existing.zina || ''),
+            body.saite != null ? String(body.saite).trim() : String(existing.saite || ''),
+            nowTs(),
+            id
+          );
+          const row = db.prepare('SELECT * FROM raksti_prese WHERE id = ?').get(id);
+          sendJson(res, 200, { row });
           return;
         }
 
