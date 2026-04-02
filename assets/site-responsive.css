@@ -366,6 +366,24 @@ body {
   }
 }
 
+@media (min-width: 1025px) and (max-width: 1366px) {
+  .elementor-location-header .elementor-element-4534216 { padding-left: 10px !important; padding-right: 10px !important; gap: 8px !important; overflow: visible !important; }
+  .elementor-location-header .elementor-element-e48e2a2 img { max-height: 40px !important; width: auto !important; }
+  .elementor-location-header .elementor-element-f058eba,
+  .elementor-location-header .elementor-element-ad27a2f,
+  .elementor-location-header .elementor-element-ad27a2f .elementor-nav-menu--main { min-width: 0 !important; overflow: visible !important; }
+  .elementor-location-header .elementor-element-ad27a2f .elementor-nav-menu--main,
+  .elementor-location-header .elementor-element-ad27a2f .elementor-nav-menu,
+  .elementor-location-header .elementor-nav-menu { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 8px !important; }
+  .elementor-location-header .elementor-nav-menu > li { margin: 0 5px !important; white-space: nowrap !important; flex: 0 0 auto !important; font-size: 13px !important; }
+  .elementor-location-header .elementor-nav-menu > li > .elementor-item { font-size: 13px !important; white-space: nowrap !important; padding-left: 0 !important; padding-right: 0 !important; }
+  .ippon-lang-switcher { display: flex !important; gap: 5px !important; padding-left: 8px !important; }
+  .ippon-lang-switcher button,
+  .ippon-lang-switcher a { padding: 4px 8px !important; font-size: 12px !important; white-space: nowrap !important; }
+  .elementor-location-header .elementor-nav-menu .menu-item-has-children { position: relative !important; }
+  .elementor-location-header .elementor-nav-menu .menu-item-has-children > .sub-menu { position: absolute !important; z-index: 9999 !important; }
+}
+
 .ippon-lang-switcher {
   display: inline-flex;
   align-items: center;
