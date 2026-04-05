@@ -209,7 +209,7 @@ h1, h2, h3, h4, h5, h6,
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-74"><a href="/rezultati.html" class="elementor-item elementor-item-anchor">Rezultāti</a></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-75 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" id="sm-17732495563145625-5" aria-haspopup="true" aria-controls="sm-17732495563145625-6" aria-expanded="false">Sadarbība</a>
 <ul class="sub-menu elementor-nav-menu--dropdown">
-  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zāles-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
+  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zales-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sponsoru-atbalsts.html" class="elementor-sub-item">Sponsoru atbalsts</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
@@ -242,7 +242,7 @@ h1, h2, h3, h4, h5, h6,
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-74"><a href="/rezultati.html" class="elementor-item elementor-item-anchor" tabindex="-1">Rezultāti</a></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-75 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1" id="sm-17732495563168945-5" aria-haspopup="true" aria-controls="sm-17732495563168945-6" aria-expanded="false">Sadarbība</a>
 <ul class="sub-menu elementor-nav-menu--dropdown">
-  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zāles-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
+  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zales-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sponsoru-atbalsts.html" class="elementor-sub-item">Sponsoru atbalsts</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
@@ -258,7 +258,7 @@ h1, h2, h3, h4, h5, h6,
   <main id="content" class="site-main">
     <section class="sportists-shell">
       <div class="sportists-container">
-      <a class="sportists-back" href="/sportisti.html"> ? Atpakal uz sportistiem</a>
+      <a class="sportists-back" href="/sportisti.html"> ←  Atpakal uz sportistiem</a>
         <div class="sportists-meta-row">
           <span id="sportistsBirth" class="sportists-date"></span>
           <span class="sportists-line"></span>
@@ -500,7 +500,7 @@ h1, h2, h3, h4, h5, h6,
     const lb = document.createElement('div');
     lb.className = 'sportists-lightbox';
     lb.innerHTML = `
-      <button type="button" class="sportists-lightbox-close" aria-label="Close">&times;?</button>
+      <button type="button" class="sportists-lightbox-close" aria-label="Close">&times;</button>
       <img alt="Sportists">
     `;
     lb.addEventListener('click', (event) => {
@@ -562,14 +562,65 @@ h1, h2, h3, h4, h5, h6,
     const text = String(value ?? '');
     if (!text) return '';
     return text
-      .replace(/—/g, '©')
-      .replace(/–/g, '©')
+      .replace(/—/g, '-')
+      .replace(/–/g, '-')
       .replace(/’/g, "'")
       .replace(/‘/g, "'")
       .replace(/“/g, '"')
       .replace(/©?/g, '"')
-      .replace(/©/g, '');
+      .replace(/©/g, '-');
   }
+  function decodeHtmlEntities(value) {
+    const text = String(value ?? '');
+    if (!text) return '';
+    const el = document.createElement('textarea');
+    el.innerHTML = text;
+    return el.value;
+  }
+
+  function tryDecodeUtf8Mojibake(value) {
+    const text = String(value ?? '');
+    if (!text || !/[ÃÂÅÄÐÑ]/.test(text)) return text;
+    try {
+      const bytes = Uint8Array.from(Array.from(text, (ch) => ch.charCodeAt(0) & 255));
+      const decoded = new TextDecoder('utf-8').decode(bytes);
+      return decoded && decoded !== text ? decoded : text;
+    } catch (error) {
+      return text;
+    }
+  }
+
+  normalizeMojibakeText = function(value) {
+    let text = String(value ?? '');
+    if (!text) return '';
+
+    const trimmed = text.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || trimmed.includes('\\"')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'string') text = parsed;
+      } catch (error) {
+      }
+    }
+
+    text = text
+      .replace(/\\r\\n/g, '\n')
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/â€”/g, '—')
+      .replace(/â€“/g, '–')
+      .replace(/â€™/g, "'")
+      .replace(/â€˜/g, "'")
+      .replace(/â€œ/g, '"')
+      .replace(/â€\x9d/g, '"')
+      .replace(/Â/g, '');
+
+    text = tryDecodeUtf8Mojibake(text);
+    text = decodeHtmlEntities(text);
+    return text.trim();
+  };
+
   (async function loadSportistsSingle() {
     const slug = getSlug();
     if (!slug) {
@@ -611,12 +662,12 @@ h1, h2, h3, h4, h5, h6,
         document.getElementById('achievementsEmpty').style.display = 'none';
         tbody.innerHTML = achievements.map((a) => `
           <tr>
-            <td>${escapeHtml(formatDate(a.datums) || '©')}</td>
-            <td>${escapeHtml(normalizeMojibakeText(a.nosaukums || '©'))}</td>
-            <td>${escapeHtml(normalizeMojibakeText(a.rezultats || '©'))}</td>
-            <td>${escapeHtml(normalizeMojibakeText(a.vieta || '©'))}</td>
-            <td>${escapeHtml(normalizeMojibakeText(a.statuss || '©'))}</td>
-            <td>${escapeHtml(normalizeMojibakeText(a.informacija || '©'))}</td>
+            <td>${escapeHtml(formatDate(a.datums) || '-')}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.nosaukums || '-'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.rezultats || '-'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.vieta || '-'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.statuss || '-'))}</td>
+            <td>${escapeHtml(normalizeMojibakeText(a.informacija || '-'))}</td>
           </tr>
         `).join('');
       }

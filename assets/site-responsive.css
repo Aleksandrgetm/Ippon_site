@@ -269,6 +269,121 @@ main {
   }
 }
 
+.swiper-button-next,
+.swiper-button-prev,
+.elementor-swiper-button {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  body:not(:has(#par-klubu)) {
+    overflow-x: hidden !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content,
+  body:not(:has(#par-klubu)) main#content *,
+  body:not(:has(#par-klubu)) main#content *::before,
+  body:not(:has(#par-klubu)) main#content *::after {
+    box-sizing: border-box;
+  }
+
+  body:not(:has(#par-klubu)) main#content {
+    overflow-x: hidden !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content .elementor-section,
+  body:not(:has(#par-klubu)) main#content .elementor-container,
+  body:not(:has(#par-klubu)) main#content .elementor-column,
+  body:not(:has(#par-klubu)) main#content .e-con,
+  body:not(:has(#par-klubu)) main#content .e-con-full,
+  body:not(:has(#par-klubu)) main#content .e-con-inner,
+  body:not(:has(#par-klubu)) main#content .elementor-widget,
+  body:not(:has(#par-klubu)) main#content .elementor-widget-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content .elementor-container,
+  body:not(:has(#par-klubu)) main#content .e-con,
+  body:not(:has(#par-klubu)) main#content .e-con-full,
+  body:not(:has(#par-klubu)) main#content .e-con-inner,
+  body:not(:has(#par-klubu)) main#content .elementor-section {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content .elementor-column,
+  body:not(:has(#par-klubu)) main#content .elementor-col-50,
+  body:not(:has(#par-klubu)) main#content .elementor-col-33,
+  body:not(:has(#par-klubu)) main#content .elementor-col-25 {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content img,
+  body:not(:has(#par-klubu)) main#content video,
+  body:not(:has(#par-klubu)) main#content iframe {
+    display: block;
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content table {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto;
+  }
+
+  body:not(:has(#par-klubu)) main#content h1,
+  body:not(:has(#par-klubu)) main#content h2,
+  body:not(:has(#par-klubu)) main#content h3,
+  body:not(:has(#par-klubu)) main#content h4,
+  body:not(:has(#par-klubu)) main#content p,
+  body:not(:has(#par-klubu)) main#content span,
+  body:not(:has(#par-klubu)) main#content a,
+  body:not(:has(#par-klubu)) main#content li {
+    max-width: 100% !important;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  body:not(:has(#par-klubu)) main#content [class*="gallery"],
+  body:not(:has(#par-klubu)) main#content [class*="galer"],
+  body:not(:has(#par-klubu)) main#content .elementor-image-gallery,
+  body:not(:has(#par-klubu)) main#content .blocks-gallery-grid {
+    grid-template-columns: 1fr !important;
+    display: grid !important;
+    gap: 16px !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content [class*="card"],
+  body:not(:has(#par-klubu)) main#content [class*="item"],
+  body:not(:has(#par-klubu)) main#content [class*="post"],
+  body:not(:has(#par-klubu)) main#content [class*="detail"],
+  body:not(:has(#par-klubu)) main#content [class*="content"] {
+    min-width: 0 !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content [style*="width: 1200px"],
+  body:not(:has(#par-klubu)) main#content [style*="width:1200px"],
+  body:not(:has(#par-klubu)) main#content [style*="width: 1100px"],
+  body:not(:has(#par-klubu)) main#content [style*="width:1100px"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body:not(:has(#par-klubu)) main#content [style*="margin: auto"],
+  body:not(:has(#par-klubu)) main#content [style*="margin:auto"] {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
+
 @media (max-width: 480px) {
   .rez-title,
   .kal-title,
@@ -1111,6 +1226,67 @@ body {
 /* УБРАТЬ ЛИНИЮ НА ДЕСКТОПЕ */
 @media (min-width: 769px) {
   .ippon-mobile-backdrop {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  html,
+  body {
+    overflow-x: hidden !important;
+  }
+
+  .elementor-element-qx8gufa,
+  .home-sponsors-section {
+    display: none !important;
+  }
+
+  #par-klubu,
+  #par-klubu > .e-con-inner,
+  #par-klubu .elementor-element-2044682,
+  #par-klubu .elementor-element-2044682 > .e-con-inner,
+  #par-klubu .elementor-element-373b60a,
+  #par-klubu .elementor-widget,
+  #par-klubu .elementor-widget-container,
+  #par-klubu .elementor-element-2759e5b {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #par-klubu,
+  #par-klubu > .e-con-inner,
+  #par-klubu .elementor-element-2044682 > .e-con-inner,
+  #par-klubu .elementor-element-373b60a {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  #par-klubu .elementor-element-2044682,
+  #par-klubu .elementor-element-373b60a,
+  #par-klubu .elementor-widget,
+  #par-klubu .elementor-widget-container {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    transform: none !important;
+    translate: none !important;
+  }
+
+  #par-klubu h1,
+  #par-klubu h2,
+  #par-klubu h3,
+  #par-klubu p,
+  #par-klubu span {
+    overflow-wrap: break-word;
+  }
+
+  #par-klubu .elementor-element-2759e5b,
+  #par-klubu .elementor-element-2759e5b img {
+    max-width: 100% !important;
+  }
+
+  .home #par-klubu .elementor-element-2759e5b,
+  .home .elementor-element-da1ba75 .elementor-element-ab89e90 {
     display: none !important;
   }
 }

@@ -209,7 +209,7 @@ h1, h2, h3, h4, h5, h6,
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-74"><a href="/rezultati.html" class="elementor-item elementor-item-anchor">Rezultāti</a></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-75 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" id="sm-17732495563145625-5" aria-haspopup="true" aria-controls="sm-17732495563145625-6" aria-expanded="false">Sadarbība</a>
 <ul class="sub-menu elementor-nav-menu--dropdown">
-  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zāles-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
+  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zales-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sponsoru-atbalsts.html" class="elementor-sub-item">Sponsoru atbalsts</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
@@ -242,7 +242,7 @@ h1, h2, h3, h4, h5, h6,
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-74"><a href="/rezultati.html" class="elementor-item elementor-item-anchor" tabindex="-1">Rezultāti</a></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-75 menu-item-has-children"><a href="#" class="elementor-item elementor-item-anchor" tabindex="-1" id="sm-17732495563168945-5" aria-haspopup="true" aria-controls="sm-17732495563168945-6" aria-expanded="false">Sadarbība</a>
 <ul class="sub-menu elementor-nav-menu--dropdown">
-  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zāles-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
+  <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zales-ire.html" class="elementor-sub-item">Sporta zāles ire</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sponsoru-atbalsts.html" class="elementor-sub-item">Sponsoru atbalsts</a></li>
   <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/musu-partneri.html" class="elementor-sub-item">Mūsu partneri</a></li>
 </ul>
@@ -509,6 +509,8 @@ h1, h2, h3, h4, h5, h6,
 (() => {
   const stateEl = document.getElementById('ireState');
   const detailEl = document.getElementById('ireDetail');
+  const fallbackStateText = stateEl ? stateEl.textContent : '';
+  const fallbackDetailHtml = detailEl ? detailEl.innerHTML : '';
   let ireLightboxEl = null;
   let ireLightboxItems = [];
   let ireLightboxIndex = 0;
@@ -532,9 +534,9 @@ h1, h2, h3, h4, h5, h6,
     const lb = document.createElement('div');
     lb.className = 'ire-lightbox';
     lb.innerHTML = `
-      <button type="button" class="ire-lightbox-close" aria-label="Close">&times;?</button>
-      <button type="button" class="ire-lightbox-nav ire-lightbox-prev" aria-label="Previous">&lsaquo;?</button>
-      <button type="button" class="ire-lightbox-nav ire-lightbox-next" aria-label="Next">&rsaquo;?</button>
+      <button type="button" class="ire-lightbox-close" aria-label="Close">&times;</button>
+      <button type="button" class="ire-lightbox-nav ire-lightbox-prev" aria-label="Previous">&lsaquo;</button>
+      <button type="button" class="ire-lightbox-nav ire-lightbox-next" aria-label="Next">&rsaquo;</button>
       <img alt="Foto">
     `;
     lb.addEventListener('click', (event) => {
@@ -614,16 +616,29 @@ h1, h2, h3, h4, h5, h6,
     `;
   }
 
+  function renderFallback() {
+    if (fallbackDetailHtml && fallbackDetailHtml.trim()) {
+      detailEl.innerHTML = fallbackDetailHtml;
+      detailEl.hidden = false;
+      stateEl.hidden = true;
+      return;
+    }
+
+    stateEl.textContent = fallbackStateText || 'Saturs pašlaik nav pieejams.';
+    stateEl.hidden = false;
+    detailEl.hidden = true;
+  }
+
   async function init() {
     try {
-      const res = await fetch('/api/sadarbiba/sporta-zāles-ire');
+      const res = await fetch('/api/sadarbiba/sporta-zales-ire');
+      console.log('Sporta zales ire response:', res);
       if (!res.ok) throw new Error('Neizdevas ieladet datus');
       const data = await res.json();
+      console.log('Sporta zales ire payload:', data);
       const item = data && data.item ? data.item : null;
       if (!item) {
-        stateEl.textContent = 'Saturs pagaidam nav pievienots.';
-        stateEl.hidden = false;
-        detailEl.hidden = true;
+        renderFallback();
         return;
       }
 
@@ -636,10 +651,9 @@ h1, h2, h3, h4, h5, h6,
       detailEl.hidden = false;
       stateEl.hidden = true;
     } catch (error) {
-      stateEl.textContent = 'Neizdevas ieladet Sporta zāles īres lapu.';
-      stateEl.hidden = false;
-      detailEl.hidden = true;
+      console.log('Sporta zales ire error:', error);
       console.error(error);
+      renderFallback();
     }
   }
 
