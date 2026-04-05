@@ -157,6 +157,121 @@ function ensureTranslateElement() {
     });
   }
 
+  function initMobileHeader() {
+    var widgets = document.querySelectorAll(".elementor-location-header .elementor-element-ad27a2f");
+    if (!widgets.length) return;
+
+    function isMobile() {
+      return window.innerWidth <= 768;
+    }
+
+    widgets.forEach(function (widget) {
+      if (widget.__ipponMobileHeaderInit) return;
+      widget.__ipponMobileHeaderInit = true;
+
+      var toggle = widget.querySelector(".elementor-menu-toggle");
+      var dropdown = widget.querySelector(".elementor-nav-menu--dropdown.elementor-nav-menu__container");
+      if (!toggle || !dropdown) return;
+
+      var backdrop = document.createElement("button");
+      backdrop.type = "button";
+      backdrop.className = "ippon-mobile-backdrop";
+      backdrop.setAttribute("aria-label", "Aizvert mobilo izvelni");
+      widget.appendChild(backdrop);
+
+      function setOpen(nextOpen) {
+        var open = !!nextOpen && isMobile();
+        widget.classList.toggle("ippon-mobile-open", open);
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        dropdown.setAttribute("aria-hidden", open ? "false" : "true");
+        document.body.classList.toggle("ippon-menu-open", open);
+
+        if (!open) {
+          widget.querySelectorAll(".menu-item-has-children.ippon-submenu-open").forEach(function (item) {
+            item.classList.remove("ippon-submenu-open");
+            var trigger = item.querySelector(":scope > .elementor-item");
+            if (trigger) trigger.setAttribute("aria-expanded", "false");
+          });
+        }
+      }
+
+      toggle.addEventListener("click", function (event) {
+        if (!isMobile()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(!widget.classList.contains("ippon-mobile-open"));
+      });
+
+      toggle.addEventListener("keydown", function (event) {
+        if (!isMobile()) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setOpen(!widget.classList.contains("ippon-mobile-open"));
+        }
+      });
+
+      backdrop.addEventListener("click", function () {
+        setOpen(false);
+      });
+
+      dropdown.querySelectorAll(".menu-item-has-children").forEach(function (item) {
+        var trigger = item.querySelector(":scope > .elementor-item");
+        var submenu = item.querySelector(":scope > .sub-menu");
+        if (!trigger || !submenu) return;
+
+        trigger.setAttribute("aria-expanded", "false");
+        trigger.addEventListener("click", function (event) {
+          if (!isMobile()) return;
+          var href = (trigger.getAttribute("href") || "").trim();
+          if (!href || href === "#") {
+            event.preventDefault();
+          }
+          event.stopPropagation();
+
+          var willOpen = !item.classList.contains("ippon-submenu-open");
+          item.parentElement.querySelectorAll(":scope > .menu-item-has-children.ippon-submenu-open").forEach(function (openItem) {
+            if (openItem !== item) {
+              openItem.classList.remove("ippon-submenu-open");
+              var openTrigger = openItem.querySelector(":scope > .elementor-item");
+              if (openTrigger) openTrigger.setAttribute("aria-expanded", "false");
+            }
+          });
+
+          item.classList.toggle("ippon-submenu-open", willOpen);
+          trigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+        });
+      });
+
+      dropdown.querySelectorAll("a[href]").forEach(function (link) {
+        link.addEventListener("click", function () {
+          var href = (link.getAttribute("href") || "").trim();
+          if (!isMobile()) return;
+          if (!href || href === "#") return;
+          setOpen(false);
+        });
+      });
+
+      document.addEventListener("click", function (event) {
+        if (!isMobile()) return;
+        if (!widget.classList.contains("ippon-mobile-open")) return;
+        if (widget.contains(event.target)) return;
+        setOpen(false);
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+          setOpen(false);
+        }
+      });
+
+      window.addEventListener("resize", function () {
+        if (!isMobile()) {
+          setOpen(false);
+        }
+      });
+    });
+  }
+
   window.__ipponInitGoogleTranslate = function () {
     if (window.google && window.google.translate && window.google.translate.TranslateElement) {
       new window.google.translate.TranslateElement(
@@ -184,6 +299,7 @@ function ensureTranslateElement() {
     ensureTranslateElement();
     mountSwitcher();
     bindLogoHome();
+    initMobileHeader();
     loadGoogleTranslate();
   }
 
