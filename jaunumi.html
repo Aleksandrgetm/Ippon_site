@@ -200,7 +200,7 @@ h1, h2, h3, h4, h5, h6,
 <ul class="sub-menu elementor-nav-menu--dropdown">
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/saraksts.html" class="elementor-sub-item">Saraksts</a></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/izlases-grupas.html" class="elementor-sub-item">Izlases grupas</a></li>
-<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/individuālas-nodarbibas.html" class="elementor-sub-item">Individuālas nodarbibas</a></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/individualas-nodarbibas.html" class="elementor-sub-item">Individuālas nodarbibas</a></li>
 </ul>
 </li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1185"><a href="/sportisti.html" class="elementor-item">Sportisti</a></li>
@@ -233,7 +233,7 @@ h1, h2, h3, h4, h5, h6,
 <ul class="sub-menu elementor-nav-menu--dropdown">
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/saraksts.html" class="elementor-sub-item" tabindex="-1">Saraksts</a></li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/izlases-grupas.html" class="elementor-sub-item" tabindex="-1">Izlases grupas</a></li>
-<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/individuālas-nodarbibas.html" class="elementor-sub-item">Individuālas nodarbibas</a></li>
+<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/individualas-nodarbibas.html" class="elementor-sub-item">Individuālas nodarbibas</a></li>
 </ul>
 </li>
 <li class="menu-item menu-item-type-custom menu-item-object-custom menu-item-1185"><a href="/sportisti.html" class="elementor-item" tabindex="-1">Sportisti</a></li>
@@ -555,17 +555,17 @@ h1, h2, h3, h4, h5, h6,
 
       const pages = [];
       pages.push(`
-        <button class="jaunumi-page-btn" data-page="${safePage - 1}" ${safePage <= 1 ? 'disabled' : ''}>&lt;?</button>
+        <button class="jaunumi-page-btn" data-page="${safePage - 1}" ${safePage <= 1 ? 'disabled' : ''}>&lt;</button>
       `);
 
       for (let i = 1; i <= safeTotalPages; i += 1) {
         pages.push(`
-          <button class="jaunumi-page-btn ${i === safePage ? 'is-active' : ''}" data-page="${i}">${i}?</button>
+          <button class="jaunumi-page-btn ${i === safePage ? 'is-active' : ''}" data-page="${i}">${i}</button>
         `);
       }
 
       pages.push(`
-        <button class="jaunumi-page-btn" data-page="${safePage + 1}" ${safePage >= safeTotalPages ? 'disabled' : ''}>&gt;?</button>
+        <button class="jaunumi-page-btn" data-page="${safePage + 1}" ${safePage >= safeTotalPages ? 'disabled' : ''}>&gt;</button>
       `);
 
       pagination.innerHTML = pages.join('');
