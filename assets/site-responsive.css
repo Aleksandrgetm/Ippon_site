@@ -1241,6 +1241,19 @@ body {
     display: none !important;
   }
 
+  .fb-page,
+  .fb-page iframe,
+  .fb_iframe_widget,
+  .fb_iframe_widget span {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  iframe[src*="facebook"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
   #par-klubu,
   #par-klubu > .e-con-inner,
   #par-klubu .elementor-element-2044682,
