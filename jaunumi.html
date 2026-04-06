@@ -263,7 +263,7 @@ h1, h2, h3, h4, h5, h6,
         </div>
         <div class="jaunumi-search-row">
           <input id="jaunumiSearch" class="jaunumi-search-input" type="text" placeholder="Meklet pec zinas nosaukuma..." autocomplete="off">
-          <button id="jaunumiSearchClear" class="jaunumi-search-clear" type="button">Notirit?</button>
+          <button id="jaunumiSearchClear" class="jaunumi-search-clear" type="button">Notīrit</button>
         </div>
         <div id="jaunumiSearchMeta" class="jaunumi-search-meta" aria-live="polite"></div>
         <div id="jaunumiList" class="jaunumi-list"></div>
@@ -342,7 +342,36 @@ h1, h2, h3, h4, h5, h6,
     font-family: "Oswald",sans-serif;
     font-size: 17px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     line-height: 1;
+    position: relative;
+    overflow: hidden;
+    transition: transform .18s ease, box-shadow .22s ease, filter .22s ease, background .22s ease;
+  }
+  .jaunumi-search-clear::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -130%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.32), transparent);
+    transform: skewX(-18deg);
+    transition: left .35s ease;
+  }
+  .jaunumi-search-clear:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(239,32,32,.28);
+    filter: brightness(1.05);
+  }
+  .jaunumi-search-clear:hover::before {
+    left: 145%;
+  }
+  .jaunumi-search-clear:active {
+    transform: translateY(0);
+    box-shadow: 0 3px 10px rgba(239,32,32,.2);
   }
   .jaunumi-search-meta {
     min-height: 18px;

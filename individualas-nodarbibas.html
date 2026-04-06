@@ -379,7 +379,7 @@ h1, h2, h3, h4, h5, h6,
     if (!introEl) return;
 
     try {
-      const res = await fetch('/api/nodarbibas/individuālas-nodarbibas');
+      const res = await fetch('/api/nodarbibas/individualas-nodarbibas');
       const data = await res.json();
       if (!res.ok || !data.item) throw new Error(data.error || 'Neizdevas ieladet datus');
 
