@@ -1305,3 +1305,81 @@ body {
     display: none !important;
   }
 }
+
+@media (max-width: 768px) {
+  footer .elementor-widget-image,
+  .elementor-location-footer .elementor-widget-image {
+    width: 100% !important;
+    max-width: 200px !important;
+    margin: 0 auto !important;
+  }
+
+  footer .elementor-widget-image img,
+  .elementor-location-footer .elementor-widget-image img {
+    width: 100% !important;
+    max-width: 200px !important;
+    height: auto !important;
+  }
+
+  footer .elementor-container,
+  .elementor-location-footer .e-con-inner {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 16px !important;
+    padding-top: 24px !important;
+    padding-bottom: 24px !important;
+  }
+
+  footer .elementor-widget-wrap,
+  .elementor-location-footer .e-con-full,
+  .elementor-location-footer .elementor-widget-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    width: 100% !important;
+  }
+
+  footer .elementor-social-icons,
+  footer .elementor-social-icons-wrapper,
+  .elementor-location-footer .elementor-social-icons,
+  .elementor-location-footer .elementor-social-icons-wrapper {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  footer .elementor-social-icon,
+  .elementor-location-footer .elementor-social-icon {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  footer img,
+  .elementor-location-footer img {
+    max-width: 120px !important;
+    height: auto !important;
+  }
+
+  footer p,
+  footer span,
+  .elementor-location-footer p,
+  .elementor-location-footer span,
+  .elementor-location-footer .elementor-heading-title {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
+
+  footer h3,
+  footer .social-title,
+  .elementor-location-footer h3,
+  .elementor-location-footer .social-title {
+    font-size: 14px !important;
+    letter-spacing: 1px !important;
+  }
+}

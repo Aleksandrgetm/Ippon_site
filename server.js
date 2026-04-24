@@ -3,10 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 5500;
 const ROOT = __dirname;
-const DB_DIR = path.join(ROOT, 'data');
-const DB_PATH = path.join(DB_DIR, 'ippon.db');
+const ENV_PATH = path.join(ROOT, '.env');
+
+loadEnvFile(ENV_PATH);
+
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+const DEFAULT_DB_PATH = path.join(ROOT, 'data', 'ippon.db');
+const DB_PATH = path.resolve(process.env.DB_PATH || DEFAULT_DB_PATH);
+const DB_DIR = path.dirname(DB_PATH);
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const NEWS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'news');
 const RULES_UPLOADS_DIR = path.join(UPLOADS_DIR, 'rules');
@@ -16,13 +22,14 @@ const TRAINERS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'trainers');
 const RESULTS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'results');
 const SADARBIBA_UPLOADS_DIR = path.join(UPLOADS_DIR, 'sadarbiba');
 const GALLERY_UPLOADS_DIR = path.join(UPLOADS_DIR, 'gallery');
+const LEGACY_IMPORT_DIR = path.join(ROOT, 'legacy_import');
 
 const DUMP_FILES = [
-  'C:\\Users\\xXx\\Downloads\\ippon_galery (1).sql',
-  'C:\\Users\\xXx\\Downloads\\ippon_images (1).sql',
-  'C:\\Users\\xXx\\Downloads\\ippon_results (1).sql',
-  'C:\\Users\\xXx\\Downloads\\ippon_sorevnovanija (1).sql',
-  'C:\\Users\\xXx\\Downloads\\ippon_sportists (1).sql'
+  path.join(LEGACY_IMPORT_DIR, 'ippon_galery.sql'),
+  path.join(LEGACY_IMPORT_DIR, 'ippon_images.sql'),
+  path.join(LEGACY_IMPORT_DIR, 'ippon_results.sql'),
+  path.join(LEGACY_IMPORT_DIR, 'ippon_sorevnovanija.sql'),
+  path.join(LEGACY_IMPORT_DIR, 'ippon_sportists.sql')
 ];
 
 const ALLOWED_TABLES = new Set([
@@ -81,35 +88,63 @@ const MIME = {
   '.woff2': 'font/woff2'
 };
 
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-}
-if (!fs.existsSync(NEWS_UPLOADS_DIR)) {
-  fs.mkdirSync(NEWS_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(RULES_UPLOADS_DIR)) {
-  fs.mkdirSync(RULES_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(HALLS_UPLOADS_DIR)) {
-  fs.mkdirSync(HALLS_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(NODARBIBAS_UPLOADS_DIR)) {
-  fs.mkdirSync(NODARBIBAS_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(TRAINERS_UPLOADS_DIR)) {
-  fs.mkdirSync(TRAINERS_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(RESULTS_UPLOADS_DIR)) {
-  fs.mkdirSync(RESULTS_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(SADARBIBA_UPLOADS_DIR)) {
-  fs.mkdirSync(SADARBIBA_UPLOADS_DIR, { recursive: true });
-}
-if (!fs.existsSync(GALLERY_UPLOADS_DIR)) {
-  fs.mkdirSync(GALLERY_UPLOADS_DIR, { recursive: true });
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const separatorIndex = trimmed.indexOf('=');
+    if (separatorIndex === -1) continue;
+
+    const key = trimmed.slice(0, separatorIndex).trim();
+    const rawValue = trimmed.slice(separatorIndex + 1).trim();
+    const unquoted = rawValue.replace(/^(['"])(.*)\1$/, '$2');
+    if (key && process.env[key] == null) {
+      process.env[key] = unquoted;
+    }
+  }
 }
 
-const db = new DatabaseSync(DB_PATH);
+function logSqliteError(context, error) {
+  const details = error && error.message ? error.message : String(error);
+  console.error(`[sqlite] ${context}: ${details}`);
+  if (error && error.code) {
+    console.error(`[sqlite] code: ${error.code}`);
+  }
+}
+
+function ensureDir(dirPath) {
+  if (!fs.existsSync(dirPath)) {
+    fs.mkdirSync(dirPath, { recursive: true });
+  }
+}
+
+ensureDir(DB_DIR);
+ensureDir(UPLOADS_DIR);
+ensureDir(NEWS_UPLOADS_DIR);
+ensureDir(RULES_UPLOADS_DIR);
+ensureDir(HALLS_UPLOADS_DIR);
+ensureDir(NODARBIBAS_UPLOADS_DIR);
+ensureDir(TRAINERS_UPLOADS_DIR);
+ensureDir(RESULTS_UPLOADS_DIR);
+ensureDir(SADARBIBA_UPLOADS_DIR);
+ensureDir(GALLERY_UPLOADS_DIR);
+
+if (!fs.existsSync(DB_PATH)) {
+  console.warn(`[startup] SQLite database not found at ${DB_PATH}`);
+  console.warn('[startup] If this is a fresh server, copy data/ippon.db before starting or add SQL dumps to legacy_import/.');
+}
+
+let db;
+try {
+  db = new DatabaseSync(DB_PATH);
+} catch (error) {
+  logSqliteError(`failed to open database at ${DB_PATH}`, error);
+  process.exit(1);
+}
 
 function nowTs() {
   return Math.floor(Date.now() / 1000);
@@ -2284,8 +2319,13 @@ function importDumpFile(filePath) {
 }
 
 function initializeDatabase() {
-  db.exec('PRAGMA journal_mode = WAL');
-  db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA foreign_keys = OFF');
+  } catch (error) {
+    logSqliteError('failed to apply startup PRAGMA settings', error);
+    throw error;
+  }
 
   const tableExistsStmt = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name=?"
@@ -2301,6 +2341,13 @@ function initializeDatabase() {
 
   const needsImport = coreTables.some((table) => !tableExistsStmt.get(table));
   if (needsImport) {
+    const existingDumpFiles = DUMP_FILES.filter((filePath) => fs.existsSync(filePath));
+    if (existingDumpFiles.length === 0) {
+      throw new Error(
+        `Core SQLite tables are missing in ${DB_PATH}. Copy the database to /data/ippon.db or place import dumps in ${LEGACY_IMPORT_DIR}.`
+      );
+    }
+
     for (const filePath of DUMP_FILES) {
       importDumpFile(filePath);
     }
@@ -5202,10 +5249,15 @@ function handleApi(req, res, reqUrl) {
   return true;
 }
 
-initializeDatabase();
+try {
+  initializeDatabase();
+} catch (error) {
+  logSqliteError('database initialization failed', error);
+  process.exit(1);
+}
 
 const server = http.createServer((req, res) => {
-  const reqUrl = new URL(req.url, `http://${req.headers.host}`);
+  const reqUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
 
   if (pathname.startsWith('/api/')) {
@@ -5337,11 +5389,24 @@ const server = http.createServer((req, res) => {
   sendFile(res, candidate);
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Server running at http://127.0.0.1:${PORT}`);
-  console.log(`DB path: ${DB_PATH}`);
-  console.log('Home:  http://127.0.0.1:' + PORT + '/index.html');
-  console.log('Admin: http://127.0.0.1:' + PORT + '/admin');
+server.on('error', (error) => {
+  console.error(`[server] startup failed: ${error.message}`);
+});
+
+process.on('uncaughtException', (error) => {
+  logSqliteError('uncaught exception', error);
+});
+
+process.on('unhandledRejection', (error) => {
+  logSqliteError('unhandled rejection', error);
+});
+
+server.listen(PORT, HOST, () => {
+  console.log(`[startup] Server is listening on ${HOST}:${PORT}`);
+  console.log(`[startup] Database: ${DB_PATH}`);
+  console.log(`[startup] Uploads: ${UPLOADS_DIR}`);
+  console.log(`[startup] Home:  http://localhost:${PORT}/index.html`);
+  console.log(`[startup] Admin: http://localhost:${PORT}/admin`);
 });
 
 
