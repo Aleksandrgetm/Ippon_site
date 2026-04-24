@@ -5,8 +5,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<base href="/">
 	<link rel="profile" href="https://gmpg.org/xfn/11">
-	<title>IPPON.LV – 道場</title>
-<meta name="robots" content="noindex, nofollow">
+	<title>Karate rezult?ts Riga | IPPON.LV</title>
+<meta name="robots" content="index, follow">
 <style id="wp-img-auto-sizes-contain-inline-css">
 img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 /*# sourceURL=wp-img-auto-sizes-contain-inline-css */
@@ -45,7 +45,15 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <script src="./IPPON.LV – 道場_files/sdk.js.download" async="" crossorigin="anonymous"></script><script src="./IPPON.LV – 道場_files/jquery.min.js.download" id="jquery-core-js"></script>
 <script src="./IPPON.LV – 道場_files/jquery-migrate.min.js.download" id="jquery-migrate-js"></script>
 
-<link rel="canonical" href="#">
+<!-- SEO: static metadata for search engines and social sharing -->
+<meta name="description" content="Detaliz?ti sacens?bu rezult?ti un inform?cija par IPPON.LV sportistiem un karate Riga pas?kumiem.">
+<meta name="keywords" content="karate Riga, karate rezult?ti, karate treni?i, c??as m?ksla Latvija, sporta klubs R?ga">
+<meta property="og:title" content="Karate rezult?ts Riga | IPPON.LV">
+<meta property="og:description" content="Detaliz?ti sacens?bu rezult?ti un inform?cija par IPPON.LV sportistiem un karate Riga pas?kumiem.">
+<meta property="og:image" content="https://ippon.lv/uploads/footer/footer.png">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ippon.lv/rezultati">
+<link rel="canonical" href="https://ippon.lv/rezultati">
 <style>
 				.e-con.e-parent:nth-of-type(n+4):not(.e-lazyloaded):not(.e-no-lazyload),
 				.e-con.e-parent:nth-of-type(n+4):not(.e-lazyloaded):not(.e-no-lazyload) * {
@@ -170,6 +178,7 @@ h1, h2, h3, h4, h5, h6,
 </style>
 
 <link rel='stylesheet' href='/assets/site-responsive.css'>
+<script src="/assets/seo.js" defer></script>
 </head>
 <body class="home wp-singular page-template page-template-elementor_header_footer page page-id-10 wp-embed-responsive wp-theme-hello-elementor hello-elementor-default elementor-default elementor-template-full-width elementor-kit-8 elementor-page elementor-page-10 e--ua-blink e--ua-chrome e--ua-webkit" data-elementor-device-mode="desktop">
 
@@ -258,6 +267,8 @@ h1, h2, h3, h4, h5, h6,
   <main id="content" class="site-main">
     <section class="rez-shell rez-single-shell">
       <div class="rez-single-wrap">
+      <!-- SEO: keep a single page-level h1 even before client data is loaded -->
+      <h1 class="seo-only">Karate rezultāti Riga</h1>
       <a href="/rezultati.html" class="rez-back-link"> ← Atpakal uz rezultatiem</a>
         <div id="rezState" class="rez-state">Ieladejam sacensibu datus...</div>
         <article id="rezDetail" class="rez-detail" hidden></article>
@@ -347,6 +358,17 @@ h1, h2, h3, h4, h5, h6,
     font-size: clamp(32px, 2.4vw, 48px);
     line-height: 1;
     color: #fff;
+  }
+  .seo-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
   .rez-list {
     display: flex;
@@ -685,6 +707,12 @@ h1, h2, h3, h4, h5, h6,
     const detailEl = document.getElementById('rezDetail');
     if (!stateEl || !detailEl) return;
 
+    function getSlug() {
+      const pathMatch = window.location.pathname.match(/\/rezultati\/([a-z0-9-]+)\/?$/i);
+      if (pathMatch && pathMatch[1]) return pathMatch[1];
+      return new URL(window.location.href).searchParams.get('slug') || '';
+    }
+
     function setState(text) {
       stateEl.textContent = text || '';
       stateEl.hidden = false;
@@ -693,7 +721,7 @@ h1, h2, h3, h4, h5, h6,
     }
 
     try {
-      const slug = new URL(window.location.href).searchParams.get('slug') || '';
+      const slug = getSlug();
       if (!slug) {
         setState('Nav noradits sacensibu ieraksts.');
         return;
@@ -716,6 +744,13 @@ h1, h2, h3, h4, h5, h6,
       stateEl.hidden = true;
       detailEl.hidden = false;
       detailEl.innerHTML = buildDetail(item);
+      // SEO: update dynamic metadata after the result entry is loaded.
+      window.__ipponSeo && window.__ipponSeo.update({
+        title: `${item.nosaukums || 'Rezultati'} | IPPON.LV`,
+        description: item.info || item.apraksts || 'IPPON.LV sacensību rezultāti un karate Riga jaunumi.',
+        image: item.foto_attels || '',
+        url: window.location.href
+      });
     } catch (error) {
       console.error(error);
       setState('Neizdevas ieladet sacensibu datus.');
@@ -726,7 +761,7 @@ h1, h2, h3, h4, h5, h6,
 					<div class="e-con-inner flex flex-col items-center text-center md:flex-row md:justify-between md:text-left space-y-4 md:space-y-0">
 		<div class="elementor-element elementor-element-75ce9cc e-con-full e-flex e-con e-child w-full flex flex-col items-center text-center md:w-auto md:items-start md:text-left" data-id="75ce9cc" data-element_type="container" data-e-type="container">
 				<div class="elementor-element elementor-element-0836316 elementor-widget elementor-widget-image" data-id="0836316" data-element_type="widget" data-e-type="widget" data-widget_type="image.default">
-<img width="300" height="102" src="./uploads/footer/footer.png" class="attachment-medium size-medium wp-image-637 w-24 md:w-auto" alt="" srcset="./uploads/footer/footer.png 300w, ./uploads/footer/footer.png 768w, ./uploads/footer/footer.png 1024w, ./uploads/footer/footer.png 1536w" sizes="(max-width: 300px) 100vw, 300px">															</div>
+<img width="300" height="102" src="./uploads/footer/footer.png" class="attachment-medium size-medium wp-image-637 w-24 md:w-auto" alt="IPPON.LV sporta klubs R?ga logo" srcset="./uploads/footer/footer.png 300w, ./uploads/footer/footer.png 768w, ./uploads/footer/footer.png 1024w, ./uploads/footer/footer.png 1536w" sizes="(max-width: 300px) 100vw, 300px">															</div>
 				<div class="elementor-element elementor-element-774392a elementor-widget elementor-widget-heading" data-id="774392a" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
 					<h2 class="elementor-heading-title elementor-size-default text-sm md:text-base">Liguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
 				</div>
