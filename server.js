@@ -2173,6 +2173,26 @@ function sendFile(res, filePath) {
   });
 }
 
+function serveStatic(filePath, res) {
+  const ext = path.extname(filePath).toLowerCase();
+
+  const contentTypeMap = {
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2'
+  };
+
+  const contentType = contentTypeMap[ext] || 'application/octet-stream';
+
+  res.writeHead(200, { 'Content-Type': contentType });
+  res.end(fs.readFileSync(filePath));
+}
+
 function parseDataUrlImage(dataUrl) {
   const match = String(dataUrl || '').match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/);
   if (!match) return null;
@@ -5258,33 +5278,26 @@ const server = http.createServer((req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
   if (pathname.startsWith('/assets/')) {
-  const filePath = path.join(ROOT, pathname);
+    const filePath = path.join(ROOT, pathname);
 
-  if (fs.existsSync(filePath)) {
-    const ext = path.extname(filePath).toLowerCase();
-
-    const contentTypeMap = {
-      '.css': 'text/css',
-      '.js': 'application/javascript',
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.svg': 'image/svg+xml',
-      '.woff': 'font/woff',
-      '.woff2': 'font/woff2'
-    };
-
-    const contentType = contentTypeMap[ext] || 'application/octet-stream';
-
-    res.writeHead(200, { 'Content-Type': contentType });
-    res.end(fs.readFileSync(filePath));
-    return;
-  } else {
-    res.writeHead(404);
-    res.end('File not found');
-    return;
+    if (fs.existsSync(filePath)) {
+      return serveStatic(filePath, res);
+    }
   }
-}
+
+  if (pathname.includes('_files/')) {
+    const safePath = pathname.split('_files/')[1];
+
+    const filePath = path.join(
+      ROOT,
+      'IPPON.LV – 道場_files',
+      safePath
+    );
+
+    if (fs.existsSync(filePath)) {
+      return serveStatic(filePath, res);
+    }
+  }
 
   if (pathname.startsWith('/api/')) {
     if (req.method === 'OPTIONS') {
