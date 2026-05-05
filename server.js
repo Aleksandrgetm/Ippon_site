@@ -5277,6 +5277,19 @@ try {
 const server = http.createServer((req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
+  if (pathname.startsWith('/uploads/')) {
+    const filePath = path.join(__dirname, 'uploads', pathname.replace('/uploads/', ''));
+
+    if (!fs.existsSync(filePath)) {
+      console.log('MISS upload:', filePath);
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+
+    return serveStatic(filePath, res);
+  }
+
   if (pathname.startsWith('/assets/')) {
     const filePath = path.join(ROOT, pathname);
 
