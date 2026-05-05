@@ -5413,7 +5413,14 @@ server.listen(PORT, HOST, () => {
 });
 
 
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Server works 🚀');
+});
 
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+});
 
 
 
