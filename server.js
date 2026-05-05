@@ -1,7 +1,7 @@
 ﻿const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 
 
 const ROOT = __dirname;
@@ -10,13 +10,8 @@ const DEFAULT_DB_PATH = path.join(ROOT, 'data', 'ippon.db');
 const DB_PATH = path.resolve(process.env.DB_PATH || DEFAULT_DB_PATH);
 const ENV_PATH = path.join(ROOT, '.env');
 
-const db = new sqlite3.Database(DB_PATH, (err) => {
-  if (err) {
-    console.error('Ошибка подключения к БД:', err.message)
-  } else {
-    console.log('✅ SQLite подключена')
-  }
-});
+const db = new Database(DB_PATH);
+console.log('SQLite подключена')
 
 loadEnvFile(ENV_PATH);
 
@@ -2343,7 +2338,7 @@ function initializeDatabase() {
   ];
 
   const needsImport = coreTables.some((table) => !tableExistsStmt.get(table));
-  if (needsImport) {
+  if (false && needsImport)  {
     const existingDumpFiles = DUMP_FILES.filter((filePath) => fs.existsSync(filePath));
     if (existingDumpFiles.length === 0) {
       throw new Error(
@@ -5253,7 +5248,7 @@ function handleApi(req, res, reqUrl) {
 }
 
 try {
-  initializeDatabase();
+  //initializeDatabase();
 } catch (error) {
   logSqliteError('database initialization failed', error);
   process.exit(1);
