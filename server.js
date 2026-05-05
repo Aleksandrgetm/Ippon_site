@@ -5278,16 +5278,33 @@ const server = http.createServer((req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
   if (pathname.startsWith('/uploads/')) {
-    const filePath = path.join(__dirname, 'uploads', pathname.replace('/uploads/', ''));
+    const filePath = path.join(ROOT, pathname);
 
-    if (!fs.existsSync(filePath)) {
-      console.log('MISS upload:', filePath);
-      res.writeHead(404);
-      res.end('Not found');
-      return;
-    }
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+      }
 
-    return serveStatic(filePath, res);
+      const ext = path.extname(filePath).toLowerCase();
+
+      const mimeTypes = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.webp': 'image/webp',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml'
+      };
+
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(data);
+    });
+
+    return;
   }
 
   if (pathname.startsWith('/assets/')) {
