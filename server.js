@@ -1,17 +1,27 @@
 ﻿const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { DatabaseSync } = require('node:sqlite');
+const sqlite3 = require('sqlite3').verbose();
+
 
 const ROOT = __dirname;
+
+const DEFAULT_DB_PATH = path.join(ROOT, 'data', 'ippon.db');
+const DB_PATH = path.resolve(process.env.DB_PATH || DEFAULT_DB_PATH);
 const ENV_PATH = path.join(ROOT, '.env');
+
+const db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    console.error('Ошибка подключения к БД:', err.message)
+  } else {
+    console.log('✅ SQLite подключена')
+  }
+});
 
 loadEnvFile(ENV_PATH);
 
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const DEFAULT_DB_PATH = path.join(ROOT, 'data', 'ippon.db');
-const DB_PATH = path.resolve(process.env.DB_PATH || DEFAULT_DB_PATH);
 const DB_DIR = path.dirname(DB_PATH);
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const NEWS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'news');
