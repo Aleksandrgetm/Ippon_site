@@ -5285,17 +5285,24 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  if (pathname.includes('_files/')) {
-    const safePath = pathname.split('_files/')[1];
+  if (pathname.includes('_files')) {
+    // достаём всё после "_files"
+    const match = pathname.match(/_files\/(.+)/);
 
-    const filePath = path.join(
-      ROOT,
-      'IPPON.LV – 道場_files',
-      safePath
-    );
+    if (match && match[1]) {
+      const safePath = match[1];
 
-    if (fs.existsSync(filePath)) {
-      return serveStatic(filePath, res);
+      const filePath = path.join(
+        ROOT,
+        'IPPON.LV – 道場_files',
+        safePath
+      );
+
+      if (fs.existsSync(filePath)) {
+        return serveStatic(filePath, res);
+      } else {
+        console.log('MISS _files:', filePath);
+      }
     }
   }
 
