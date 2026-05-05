@@ -5411,17 +5411,3 @@ server.listen(PORT, HOST, () => {
   console.log(`[startup] Home:  http://localhost:${PORT}/index.html`);
   console.log(`[startup] Admin: http://localhost:${PORT}/admin`);
 });
-
-
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Server works 🚀');
-});
-
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-});
-
-
-
-
