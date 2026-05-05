@@ -148,13 +148,6 @@ if (!fs.existsSync(DB_PATH)) {
   console.warn('[startup] If this is a fresh server, copy data/ippon.db before starting or add SQL dumps to legacy_import/.');
 }
 
-let db;
-try {
-  db = new DatabaseSync(DB_PATH);
-} catch (error) {
-  logSqliteError(`failed to open database at ${DB_PATH}`, error);
-  process.exit(1);
-}
 
 function nowTs() {
   return Math.floor(Date.now() / 1000);
