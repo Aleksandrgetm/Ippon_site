@@ -1212,16 +1212,50 @@ function getMainImage(type, id, entity = {}) {
 function getGallery(type, id, entity = {}) {
   const normalizedId = sanitizeStorageSegment(id, '');
   const expectedGalleryPath = normalizedId ? `uploads/gallery/${normalizedId}` : '';
+  const galleryRoot = path.join(ROOT, 'uploads', 'gallery');
 
   console.log('ENTITY:', entity);
   console.log('ENTITY ID:', id);
   console.log('EXPECTED GALLERY PATH:', expectedGalleryPath);
+  try {
+    const availableFolders = fs.existsSync(galleryRoot)
+      ? fs.readdirSync(galleryRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+      : [];
+    console.log('AVAILABLE GALLERY FOLDERS:', availableFolders);
+  } catch (error) {
+    console.log('AVAILABLE GALLERY FOLDERS: []', error?.message || error);
+  }
 
   if (normalizedId) {
-    const idBasedDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
+    const idBasedDir = path.join(galleryRoot, normalizedId);
     const idBasedUrls = filePathsToUrls(listImageFilesInDir(idBasedDir, { recursive: true }));
     if (idBasedUrls.length) {
       return uniqueUrls(idBasedUrls);
+    }
+  }
+
+  if (fs.existsSync(galleryRoot)) {
+    try {
+      const folders = fs.readdirSync(galleryRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name);
+
+      for (const folder of folders) {
+        const folderDir = path.join(galleryRoot, folder);
+        const urls = filePathsToUrls(listImageFilesInDir(folderDir, { recursive: true }));
+        if (urls.length) {
+          console.log('GALLERY ID MISMATCH DETECTED:', {
+            entityId: normalizedId || null,
+            fallbackFolder: folder,
+            galleryCount: urls.length
+          });
+          return uniqueUrls(urls);
+        }
+      }
+    } catch (error) {
+      console.log('GALLERY FALLBACK SCAN FAILED:', error?.message || error);
     }
   }
 
