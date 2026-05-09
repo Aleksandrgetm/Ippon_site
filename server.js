@@ -1042,6 +1042,35 @@ function isImageFileName(name) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
 }
 
+function buildGalleryUrlsFromDir(dirPath) {
+  if (!dirPath || !fs.existsSync(dirPath)) return [];
+  try {
+    const rawFiles = fs.readdirSync(dirPath, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
+    console.log('RAW FILES:', rawFiles);
+
+    const files = rawFiles
+      .map((file) => String(file || '').trim())
+      .filter((file) => {
+        const normalized = file.toLowerCase();
+        return /\.(jpg|jpeg|png|webp|gif)$/i.test(normalized);
+      });
+    console.log('FILTERED FILES BEFORE RETURN:', files);
+
+    return files
+      .map((file) => {
+        const relative = path.relative(ROOT, path.join(dirPath, file)).replace(/\\/g, '/');
+        if (!relative.startsWith('uploads/')) return '';
+        return buildPublicUploadUrl(relative);
+      })
+      .filter(Boolean);
+  } catch (error) {
+    console.log('GALLERY DIR READ FAILED:', dirPath, error?.message || error);
+    return [];
+  }
+}
+
 function listImageFilesInDir(dirPath, { recursive = false } = {}) {
   if (!dirPath || !fs.existsSync(dirPath)) return [];
   const out = [];
@@ -1230,7 +1259,7 @@ function getGallery(type, id, entity = {}) {
 
   if (normalizedId) {
     const idBasedDir = path.join(galleryRoot, normalizedId);
-    const idBasedUrls = filePathsToUrls(listImageFilesInDir(idBasedDir, { recursive: true }));
+    const idBasedUrls = buildGalleryUrlsFromDir(idBasedDir);
     if (idBasedUrls.length) {
       return uniqueUrls(idBasedUrls);
     }
@@ -1244,7 +1273,7 @@ function getGallery(type, id, entity = {}) {
 
       for (const folder of folders) {
         const folderDir = path.join(galleryRoot, folder);
-        const urls = filePathsToUrls(listImageFilesInDir(folderDir, { recursive: true }));
+        const urls = buildGalleryUrlsFromDir(folderDir);
         if (urls.length) {
           console.log('GALLERY ID MISMATCH DETECTED:', {
             entityId: normalizedId || null,
