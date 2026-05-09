@@ -1157,6 +1157,11 @@ function getMainImage(type, id, entity = {}) {
   const legacyTypes = getLegacyMediaTypes(type);
   const nameTypes = getNameBasedMediaTypes(type);
   const normalizedId = sanitizeStorageSegment(id, '');
+  const expectedGalleryPath = normalizedId ? `uploads/gallery/${normalizedId}` : '';
+
+  console.log('ENTITY:', entity);
+  console.log('ENTITY ID:', id);
+  console.log('EXPECTED GALLERY PATH:', expectedGalleryPath);
 
   if (normalizedId) {
     const galleryDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
@@ -1205,14 +1210,22 @@ function getMainImage(type, id, entity = {}) {
 }
 
 function getGallery(type, id, entity = {}) {
-  const urls = [];
   const normalizedId = sanitizeStorageSegment(id, '');
+  const expectedGalleryPath = normalizedId ? `uploads/gallery/${normalizedId}` : '';
+
+  console.log('ENTITY:', entity);
+  console.log('ENTITY ID:', id);
+  console.log('EXPECTED GALLERY PATH:', expectedGalleryPath);
 
   if (normalizedId) {
     const idBasedDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
-    urls.push(...filePathsToUrls(listImageFilesInDir(idBasedDir, { recursive: true })));
+    const idBasedUrls = filePathsToUrls(listImageFilesInDir(idBasedDir, { recursive: true }));
+    if (idBasedUrls.length) {
+      return uniqueUrls(idBasedUrls);
+    }
   }
 
+  const urls = [];
   const folderCandidates = getEntityFolderCandidates(entity);
   for (const mediaType of getNameBasedMediaTypes(type)) {
     for (const folder of folderCandidates) {
@@ -1230,10 +1243,15 @@ function getGallery(type, id, entity = {}) {
 }
 
 function resolveMedia(entity = {}) {
-  return {
-    mainImage: getMainImage(entity.type, entity.id, entity),
-    gallery: getGallery(entity.type, entity.id, entity)
-  };
+  const mainImage = getMainImage(entity.type, entity.id, entity);
+  const gallery = getGallery(entity.type, entity.id, entity);
+  console.log('RESOLVED MEDIA:', {
+    type: entity.type,
+    id: entity.id,
+    mainImage,
+    galleryCount: Array.isArray(gallery) ? gallery.length : 0
+  });
+  return { mainImage, gallery };
 }
 
 function withResolvedMedia(item, options = {}) {
