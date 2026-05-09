@@ -1,4 +1,4 @@
-﻿const http = require('http');
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
@@ -934,7 +934,7 @@ function collectSadarbibaLegacyGalleryCandidates() {
   const roots = [
     {
       abs: path.join(ROOT, 'uploads', 'gallery', '1'),
-      prefix: '/uploads/gallery/1'
+      prefix: 'https://ippon.fra1.digitaloceanspaces.com/uploads/gallery/1'
     },
     {
       abs: path.join(ROOT, 'legacy_import', 'images', '25', '1'),
@@ -2047,7 +2047,7 @@ function resolveGalleryImagePath(imgRow) {
   if (itemId && fileName) {
     const uploadedAbs = path.join(GALLERY_UPLOADS_DIR, String(itemId), fileName);
     if (fs.existsSync(uploadedAbs)) {
-      return `/uploads/gallery/${itemId}/${fileName}`;
+      return `https://ippon.fra1.digitaloceanspaces.com/uploads/gallery/${itemId}/${fileName}`;
     }
   }
 
@@ -2775,8 +2775,8 @@ function handleApi(req, res, reqUrl) {
         }
 
         fs.writeFileSync(targetPath, buffer);
-        const relativeUrl = `/uploads/${publicDir}/${fileName}`;
-        const absoluteUrl = `http://${req.headers.host}${relativeUrl}`;
+        const relativeUrl = `https://ippon.fra1.digitaloceanspaces.com/uploads/${publicDir}/${fileName}`;
+        const absoluteUrl = relativeUrl;
         sendJson(res, 201, { url: absoluteUrl, relativeUrl });
       })
       .catch((error) => sendJson(res, 400, { error: error.message }));
@@ -2811,8 +2811,8 @@ function handleApi(req, res, reqUrl) {
         }
 
         fs.writeFileSync(targetPath, buffer);
-        const relativeUrl = `/uploads/rules/${fileName}`;
-        const absoluteUrl = `http://${req.headers.host}${relativeUrl}`;
+        const relativeUrl = `https://ippon.fra1.digitaloceanspaces.com/uploads/rules/${fileName}`;
+        const absoluteUrl = relativeUrl;
         sendJson(res, 201, { url: absoluteUrl, relativeUrl, mime: parsed.mime });
       })
       .catch((error) => sendJson(res, 400, { error: error.message }));
