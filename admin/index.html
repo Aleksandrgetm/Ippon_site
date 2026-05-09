@@ -1060,6 +1060,73 @@
       video_galerija: 'Video galerija',
       raksti_prese: 'Raksti presē'
     };
+
+    function getUploadCategoryForTable(tableName = currentTable) {
+      if (tableName === NEWS_TABLE) return 'news';
+      if (tableName === RAKSTI_PRESE_TABLE) return 'raksti-prese';
+      if (tableName === TRAINERS_TABLE) return 'trainers';
+      if (tableName === 'ippon_sportists') return 'sportists';
+      if (tableName === RULES_TABLE) return 'rules';
+      if (tableName === REZULTATI_TABLE) return 'results';
+      if (tableName === KALENDARS_TABLE) return 'calendar';
+      if (NODARBIBAS_TABLES.has(tableName)) return 'nodarbibas';
+      if (HALL_TABLES.has(tableName)) return 'halls';
+      if (SADARBIBA_TABLES.has(tableName)) return 'sadarbiba';
+      return String(tableName || 'misc');
+    }
+
+    function getUploadEntityIdForTable(tableName = currentTable) {
+      if (selectedRow && selectedRow[currentPk] != null) {
+        return String(selectedRow[currentPk]);
+      }
+      if (tableName === REZULTATI_TABLE) {
+        if (rezSelectedManual && rezSelectedManual.source_id != null) return `manual-${rezSelectedManual.source_id}`;
+        if (rezSelectedSource && rezSelectedSource.source_id != null) return `${rezSelectedSource.source_table || 'source'}-${rezSelectedSource.source_id}`;
+      }
+      if (tableName === KALENDARS_TABLE) {
+        if (kalSelectedManual && kalSelectedManual.source_id != null) return `manual-${kalSelectedManual.source_id}`;
+        if (kalSelectedSource && kalSelectedSource.source_id != null) return `${kalSelectedSource.source_table || 'source'}-${kalSelectedSource.source_id}`;
+      }
+      return 'draft';
+    }
+
+    function buildUploadRequestBody(file, dataUrl, extra = {}) {
+      return {
+        filename: file.name,
+        dataUrl,
+        category: extra.category || getUploadCategoryForTable(extra.tableName),
+        entityId: extra.entityId || getUploadEntityIdForTable(extra.tableName),
+        subPath: extra.subPath || undefined
+      };
+    }
+
+    function hasPendingUploadsForCurrentTable() {
+      if (isNewsImageTable(currentTable)) {
+        const imageInput = document.getElementById(currentTable === RAKSTI_PRESE_TABLE ? 'rakstiPreseImageFile' : 'newsImageFile');
+        return Boolean(
+          (imageInput && imageInput.files && imageInput.files[0])
+          || selectedNewsGalleryFiles.length
+          || selectedRakstiPreseFile
+        );
+      }
+      if (isTrainerMediaTable(currentTable)) {
+        return Boolean(selectedTrainerMainFile || selectedTrainerGalleryFiles.length);
+      }
+      if (currentTable === RULES_TABLE) {
+        const fileInput = document.getElementById('rulesFileInput');
+        return Boolean((fileInput && fileInput.files && fileInput.files[0]) || selectedRulesFile);
+      }
+      if (NODARBIBAS_TABLES.has(currentTable)) {
+        return Boolean(selectedNodarbibasFile);
+      }
+      if (HALL_TABLES.has(currentTable)) {
+        return Boolean(selectedHallMainFile || selectedHallGalleryFiles.length);
+      }
+      if (SADARBIBA_TABLES.has(currentTable)) {
+        return Boolean(selectedTrainerMainFile || selectedTrainerGalleryFiles.length);
+      }
+      return false;
+    }
     const NEWS_HIDDEN_FIELDS = new Set(['slug', 'created_at', 'updated_at']);
     const TRAINERS_HIDDEN_FIELDS = new Set(['slug', 'created_at', 'updated_at']);
     const RULES_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
@@ -1473,11 +1540,7 @@
       });
       const data = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify({
-          filename: file.name,
-          dataUrl,
-          scope: 'rezultati'
-        })
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable === KALENDARS_TABLE ? KALENDARS_TABLE : REZULTATI_TABLE }))
       });
       return data.relativeUrl || data.url || '';
     }
@@ -3009,10 +3072,7 @@
       try {
         const uploaded = await api('/api/upload-image', {
           method: 'POST',
-          body: JSON.stringify({
-            filename: file.name,
-            dataUrl
-          })
+          body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable }))
         });
         return uploaded.relativeUrl || uploaded.url;
       } catch (error) {
@@ -3089,10 +3149,7 @@
       try {
         const uploaded = await api('/api/upload-file', {
           method: 'POST',
-          body: JSON.stringify({
-            filename: file.name,
-            dataUrl
-          })
+          body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: RULES_TABLE }))
         });
         return uploaded.relativeUrl || uploaded.url;
       } catch (error) {
@@ -4343,11 +4400,7 @@
 
       const uploaded = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify({
-          filename: file.name,
-          dataUrl,
-          scope: 'halls'
-        })
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable }))
       });
       return uploaded.relativeUrl || uploaded.url;
     }
@@ -4459,11 +4512,7 @@
 
       const uploaded = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify({
-          filename: file.name,
-          dataUrl,
-          scope: SADARBIBA_TABLES.has(currentTable) ? 'sadarbiba' : 'treneri'
-        })
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable }))
       });
       return uploaded.relativeUrl || uploaded.url;
     }
@@ -4558,11 +4607,7 @@
 
       const uploaded = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify({
-          filename: selectedNodarbibasFile.name,
-          dataUrl,
-          scope: 'nodarbibas'
-        })
+        body: JSON.stringify(buildUploadRequestBody(selectedNodarbibasFile, dataUrl, { tableName: currentTable }))
       });
       const valueInput = document.getElementById('f_attels');
       if (valueInput) {
@@ -4873,6 +4918,35 @@
       const m = String(parsed.getMonth() + 1).padStart(2, '0');
       const d = String(parsed.getDate()).padStart(2, '0');
       return `${y}-${m}-${d}`;
+    }
+
+    function normalizePayloadForSave(payload) {
+      if (currentTable === 'ippon_sportists') {
+        payload.name_lv = String(payload.name_lv || '').trim();
+        payload.date = normalizeSportistiDate(payload.date);
+        payload.o_sebe_lv = payload.o_sebe_lv == null ? '' : String(payload.o_sebe_lv);
+        payload.dostizhenija_lv = payload.dostizhenija_lv == null ? '' : String(payload.dostizhenija_lv);
+
+        if (!selectedRow) {
+          payload.area_id = 15;
+          payload.galery_id = 0;
+          payload.name_ru = '';
+          payload.name_en = '';
+          payload.o_sebe_ru = '';
+          payload.o_sebe_en = '';
+          payload.dostizhenija_ru = '';
+          payload.dostizhenija_en = '';
+          payload.image = 0;
+          payload.public = 1;
+          payload.special = 0;
+          payload.ordering = 0;
+          payload.c_time = Math.floor(Date.now() / 1000);
+          payload.m_time = Math.floor(Date.now() / 1000);
+          payload.remove_date = 0;
+          payload.remove_user = 0;
+        }
+      }
+      return payload;
     }
 
     function titleForRow(row) {
@@ -5197,12 +5271,10 @@
       if (!currentTable) return;
 
       try {
-        if (isNewsImageTable(currentTable)) {
-          await uploadSelectedNewsImageIfNeeded();
-        } else if (isTrainerMediaTable(currentTable)) {
-          await uploadSelectedTrainerMediaIfNeeded();
-        } else if (currentTable === RULES_TABLE) {
-          await uploadSelectedRulesFileIfNeeded();
+        if (currentTable === RAKSTI_PRESE_TABLE) {
+          syncRakstiPreseEditorsToHidden();
+        } else if (currentTable === REZULTATI_TABLE) {
+          syncRezultatiEditorToHidden();
         } else if (NODARBIBAS_TABLES.has(currentTable)) {
           if (
             currentTable === 'nodarbibas_izlases_grupas'
@@ -5210,46 +5282,42 @@
           ) {
             syncHallIevadsEditorToHidden();
           }
-          await uploadSelectedNodarbibasImageIfNeeded();
         } else if (HALL_TABLES.has(currentTable)) {
           syncHallIevadsEditorToHidden();
-          await uploadSelectedHallMediaIfNeeded();
         } else if (SADARBIBA_TABLES.has(currentTable)) {
           syncSadarbibaSatursEditorToHidden();
           syncMusuPartneriInformacijaEditorToHidden();
-          await uploadSelectedTrainerMediaIfNeeded();
-        } else if (currentTable === RAKSTI_PRESE_TABLE) {
-          syncRakstiPreseEditorsToHidden();
         }
-        if (currentTable === REZULTATI_TABLE) {
-          syncRezultatiEditorToHidden();
-        }
-        const payload = collectFormData();
-        if (currentTable === 'ippon_sportists') {
-          payload.name_lv = String(payload.name_lv || '').trim();
-          payload.date = normalizeSportistiDate(payload.date);
-          payload.o_sebe_lv = payload.o_sebe_lv == null ? '' : String(payload.o_sebe_lv);
-          payload.dostizhenija_lv = payload.dostizhenija_lv == null ? '' : String(payload.dostizhenija_lv);
 
-          if (!selectedRow) {
-            payload.area_id = 15;
-            payload.galery_id = 0;
-            payload.name_ru = '';
-            payload.name_en = '';
-            payload.o_sebe_ru = '';
-            payload.o_sebe_en = '';
-            payload.dostizhenija_ru = '';
-            payload.dostizhenija_en = '';
-            payload.image = 0;
-            payload.public = 1;
-            payload.special = 0;
-            payload.ordering = 0;
-            payload.c_time = Math.floor(Date.now() / 1000);
-            payload.m_time = Math.floor(Date.now() / 1000);
-            payload.remove_date = 0;
-            payload.remove_user = 0;
-          }
+        const needsStableUploadId =
+          !selectedRow
+          && currentTable !== FOTO_GALERIJA_TABLE
+          && hasPendingUploadsForCurrentTable();
+
+        if (needsStableUploadId) {
+          const initialPayload = normalizePayloadForSave(collectFormData());
+          const created = await api(`/api/table/${currentTable}`, {
+            method: 'POST',
+            body: JSON.stringify(initialPayload)
+          });
+          selectedRow = created.row;
+          setStatus(`Izveidots melnraksts ID ${created.row[currentPk]} failu augšupielādei.`, 'ok');
         }
+
+        if (isNewsImageTable(currentTable)) {
+          await uploadSelectedNewsImageIfNeeded();
+        } else if (isTrainerMediaTable(currentTable)) {
+          await uploadSelectedTrainerMediaIfNeeded();
+        } else if (currentTable === RULES_TABLE) {
+          await uploadSelectedRulesFileIfNeeded();
+        } else if (NODARBIBAS_TABLES.has(currentTable)) {
+          await uploadSelectedNodarbibasImageIfNeeded();
+        } else if (HALL_TABLES.has(currentTable)) {
+          await uploadSelectedHallMediaIfNeeded();
+        } else if (SADARBIBA_TABLES.has(currentTable)) {
+          await uploadSelectedTrainerMediaIfNeeded();
+        }
+        const payload = normalizePayloadForSave(collectFormData());
 
         let savedId = null;
         if (selectedRow && selectedRow[currentPk] != null) {

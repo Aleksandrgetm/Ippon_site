@@ -18,6 +18,7 @@ loadEnvFile(ENV_PATH);
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const DB_DIR = path.dirname(DB_PATH);
+const SPACES_PUBLIC_BASE = String(process.env.SPACES_PUBLIC_BASE || 'https://ippon.fra1.digitaloceanspaces.com').replace(/\/+$/, '');
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const NEWS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'news');
 const RULES_UPLOADS_DIR = path.join(UPLOADS_DIR, 'rules');
@@ -156,6 +157,118 @@ function slugify(input) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 120);
+}
+
+const UPLOAD_SCOPE_TO_CATEGORY = {
+  news: 'news',
+  halls: 'halls',
+  nodarbibas: 'nodarbibas',
+  treneri: 'trainers',
+  trainers: 'trainers',
+  sadarbiba: 'sadarbiba',
+  gallery: 'gallery',
+  rezultati: 'results',
+  results: 'results',
+  rules: 'rules',
+  raksti_prese: 'raksti-prese'
+};
+
+function sanitizeStorageSegment(input, fallback = 'item') {
+  const value = String(input || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[\\/]+/g, '-')
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-._]+|[-._]+$/g, '')
+    .slice(0, 120);
+  return value || fallback;
+}
+
+function normalizeUploadCategory(rawCategory, rawScope) {
+  const direct = sanitizeStorageSegment(rawCategory, '').replace(/\.+/g, '-');
+  if (direct) return direct;
+  const scope = sanitizeStorageSegment(rawScope, '');
+  return UPLOAD_SCOPE_TO_CATEGORY[scope] || scope || 'misc';
+}
+
+function normalizeEntityId(rawEntityId) {
+  const value = String(rawEntityId ?? '').trim();
+  if (!value) {
+    return 'draft';
+  }
+  return sanitizeStorageSegment(value, 'item');
+}
+
+function normalizeUploadSubPath(rawSubPath) {
+  const input = Array.isArray(rawSubPath)
+    ? rawSubPath
+    : String(rawSubPath || '').split(/[\\/]+/);
+  return input
+    .map((segment) => sanitizeStorageSegment(segment, ''))
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function normalizeFileExtension(rawExt) {
+  const ext = String(rawExt || '').toLowerCase().replace(/^\.+/, '');
+  if (!ext) return '';
+  if (ext === 'jpeg') return 'jpg';
+  return ext.replace(/[^a-z0-9]+/g, '').slice(0, 10);
+}
+
+function stripExtensionArtifacts(baseName, normalizedExt) {
+  let next = String(baseName || '').trim();
+  if (!next) return next;
+  const escapedExt = normalizedExt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const duplicateExtPattern = new RegExp(`(?:\\.${escapedExt}(?:-\\d+)?)$`, 'i');
+  while (duplicateExtPattern.test(next)) {
+    next = next.replace(duplicateExtPattern, '');
+  }
+  while (/\.[a-z0-9]{1,10}$/i.test(next)) {
+    next = next.replace(/\.[a-z0-9]{1,10}$/i, '');
+  }
+  return next;
+}
+
+function sanitizeUploadFileName(originalName, preferredExt, fallbackStem = 'file') {
+  const rawName = path.basename(String(originalName || '').trim()) || fallbackStem;
+  const normalizedExt = normalizeFileExtension(preferredExt || path.extname(rawName));
+  const rawStem = rawName.slice(0, rawName.length - path.extname(rawName).length) || fallbackStem;
+  const cleanedStem = sanitizeStorageSegment(stripExtensionArtifacts(rawStem, normalizedExt), fallbackStem)
+    .replace(/\.+/g, '-');
+  return normalizedExt ? `${cleanedStem}.${normalizedExt}` : cleanedStem;
+}
+
+function buildUploadStorageKey({ category, entityId, subPath = [], fileName }) {
+  return ['uploads', category, entityId, ...subPath, fileName].join('/');
+}
+
+function buildPublicUploadUrl(storageKey) {
+  return `${SPACES_PUBLIC_BASE}/${String(storageKey || '').replace(/^\/+/, '')}`;
+}
+
+function uploadKeyToLocalPath(storageKey) {
+  const parts = String(storageKey || '').replace(/^\/+/, '').split('/').filter(Boolean);
+  return path.join(ROOT, ...parts);
+}
+
+function resolveUploadTarget(options = {}) {
+  const category = normalizeUploadCategory(options.category, options.scope);
+  const entityId = normalizeEntityId(options.entityId ?? options.id ?? options.itemId);
+  const subPath = normalizeUploadSubPath(options.subPath ?? options.pathSegments ?? options.path);
+  const fileName = sanitizeUploadFileName(options.fileName, options.ext, options.fallbackStem);
+  const storageKey = buildUploadStorageKey({ category, entityId, subPath, fileName });
+  return {
+    category,
+    entityId,
+    subPath,
+    fileName,
+    storageKey,
+    localPath: uploadKeyToLocalPath(storageKey),
+    publicUrl: buildPublicUploadUrl(storageKey)
+  };
 }
 
 function uniqueNewsSlug(baseSlug, excludeId = null) {
@@ -890,19 +1003,34 @@ function ensureSportistiSasniegumiTable() {
 
 function parseGallery(value) {
   if (!value) return [];
-  if (Array.isArray(value)) return value.filter(Boolean);
+  if (Array.isArray(value)) return value.map((v) => normalizeStoredMediaUrl(v)).filter(Boolean);
   const text = String(value).trim();
   if (!text) return [];
   try {
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed)) {
-      return parsed.map((v) => String(v || '').trim()).filter(Boolean);
+      return parsed.map((v) => normalizeStoredMediaUrl(v)).filter(Boolean);
     }
   } catch {}
   return text
     .split(/[\n,;]/)
-    .map((v) => v.trim())
+    .map((v) => normalizeStoredMediaUrl(v))
     .filter(Boolean);
+}
+
+function normalizeStoredMediaUrl(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/^(?:https?:)?\/\//i.test(text) || text.startsWith('data:') || text.startsWith('/legacy_import/')) {
+    return text;
+  }
+  if (text.startsWith('/uploads/')) {
+    return buildPublicUploadUrl(text.slice(1));
+  }
+  if (text.startsWith('uploads/')) {
+    return buildPublicUploadUrl(text);
+  }
+  return text;
 }
 
 function isImageFileName(name) {
@@ -1013,7 +1141,7 @@ function mapHallRow(slug, row) {
     id: row.id,
     nosaukums: row.nosaukums,
     ievads: row.ievads,
-    attels: row.attels,
+    attels: normalizeStoredMediaUrl(row.attels),
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
@@ -1038,7 +1166,7 @@ function mapNewsRow(row) {
     id: row.id,
     datums: row.datums,
     nosaukums: row.nosaukums,
-    foto_attels: row.foto_attels,
+    foto_attels: normalizeStoredMediaUrl(row.foto_attels),
     galerija: parseGallery(row.galerija),
     ievads: row.ievads,
     zina: row.zina,
@@ -1055,7 +1183,7 @@ function mapSadarbibaRow(row) {
     id: row.id,
     nosaukums: String(row.nosaukums || '').trim(),
     saturs: String(row.saturs || ''),
-    foto_attels: String(row.foto_attels || '').trim() || null,
+    foto_attels: normalizeStoredMediaUrl(row.foto_attels) || null,
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
@@ -1068,7 +1196,7 @@ function mapTrainerRow(row) {
     id: row.id,
     vards_uzvards: row.vards_uzvards || '',
     dzimsanas_datums: row.dzimsanas_datums || '',
-    foto_attels: row.foto_attels || null,
+    foto_attels: normalizeStoredMediaUrl(row.foto_attels) || null,
     galerija: parseGallery(row.galerija),
     izglitiba: row.izglitiba || '',
     josta: row.josta || '',
@@ -1102,7 +1230,7 @@ function mapRezultatiRow(row) {
     vieta: location,
     description: info,
     statuss: row.status_id != null ? String(row.status_id) : '',
-    foto_attels: row.foto_attels || ((row.image ? mapLegacyImageById(row.image)?.url : null) || null),
+    foto_attels: normalizeStoredMediaUrl(row.foto_attels) || ((row.image ? mapLegacyImageById(row.image)?.url : null) || null),
     structured_data: structuredData,
     custom_html: row.custom_html || '',
     created_at: row.created_at ?? row.c_time ?? null,
@@ -1406,7 +1534,7 @@ function mapRezultatiManualRow(row) {
 
 function mapRezultatiSacensibasSource(row, overrideRow = null) {
   const title = safeText(row.name_lv || row.name_ru || row.name_en);
-  const defaultImage = safeText(row.foto_attels) || ((row.image ? mapLegacyImageById(row.image)?.url : '') || '');
+  const defaultImage = normalizeStoredMediaUrl(row.foto_attels) || ((row.image ? mapLegacyImageById(row.image)?.url : '') || '');
   const overrideRecordType = normalizeRezultatiRecordType(overrideRow?.record_type || 'sacensibas');
   const recordType = overrideRecordType === 'sacensibas' ? 'sacensibas' : 'sacensibas';
   const layoutType = normalizeRezultatiLayoutType(
@@ -1430,8 +1558,8 @@ function mapRezultatiSacensibasSource(row, overrideRow = null) {
       overrideRow?.slug_override || row.slug || title || `sacensibas-${row.id}`,
       'sacensibas'
     ),
-    image: safeText(overrideRow?.image_override) || defaultImage || null,
-    foto_attels: safeText(overrideRow?.image_override) || defaultImage || null,
+    image: normalizeStoredMediaUrl(overrideRow?.image_override) || defaultImage || null,
+    foto_attels: normalizeStoredMediaUrl(overrideRow?.image_override) || defaultImage || null,
     galerija: parseGallery(row.galerija),
     is_manual: false,
     structured_data: structuredData,
@@ -2035,6 +2163,12 @@ function parseFotoGalerijaSlug(slug) {
 
 function resolveGalleryImagePath(imgRow) {
   const rawPath = String(imgRow?.path || '').replace(/^\/+/, '').trim();
+  if (/^https?:\/\//i.test(rawPath)) {
+    return rawPath;
+  }
+  if (rawPath.startsWith('uploads/')) {
+    return buildPublicUploadUrl(rawPath);
+  }
   if (rawPath) {
     const legacyAbs = path.join(ROOT, 'legacy_import', 'images', rawPath);
     if (fs.existsSync(legacyAbs)) {
@@ -2045,9 +2179,14 @@ function resolveGalleryImagePath(imgRow) {
   const itemId = Number(imgRow?.item_id || 0);
   const fileName = String(imgRow?.filename || '').trim();
   if (itemId && fileName) {
-    const uploadedAbs = path.join(GALLERY_UPLOADS_DIR, String(itemId), fileName);
+    const storageKey = buildUploadStorageKey({
+      category: 'gallery',
+      entityId: itemId,
+      fileName
+    });
+    const uploadedAbs = uploadKeyToLocalPath(storageKey);
     if (fs.existsSync(uploadedAbs)) {
-      return `https://ippon.fra1.digitaloceanspaces.com/uploads/gallery/${itemId}/${fileName}`;
+      return buildPublicUploadUrl(storageKey);
     }
   }
 
@@ -2732,41 +2871,15 @@ function handleApi(req, res, reqUrl) {
           return;
         }
 
-        const safeName = String(body.filename || 'news-image')
-          .toLowerCase()
-          .replace(/[^a-z0-9._-]+/g, '-')
-          .replace(/^-+|-+$/g, '')
-          .slice(0, 80) || 'news-image';
-        const stem = safeName.replace(/\.[a-z0-9]+$/i, '') || 'news-image';
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${stem}.${parsed.ext}`;
-        const scope = String(body.scope || '').toLowerCase();
-        const uploadDir = scope === 'halls'
-          ? HALLS_UPLOADS_DIR
-          : scope === 'nodarbibas'
-            ? NODARBIBAS_UPLOADS_DIR
-            : scope === 'treneri'
-              ? TRAINERS_UPLOADS_DIR
-              : scope === 'sadarbiba'
-                ? SADARBIBA_UPLOADS_DIR
-              : scope === 'gallery'
-                ? GALLERY_UPLOADS_DIR
-              : scope === 'rezultati'
-                ? RESULTS_UPLOADS_DIR
-            : NEWS_UPLOADS_DIR;
-        const publicDir = scope === 'halls'
-          ? 'halls'
-          : scope === 'nodarbibas'
-            ? 'nodarbibas'
-            : scope === 'treneri'
-              ? 'trainers'
-              : scope === 'sadarbiba'
-                ? 'sadarbiba'
-              : scope === 'gallery'
-                ? 'gallery'
-              : scope === 'rezultati'
-                ? 'results'
-            : 'news';
-        const targetPath = path.join(uploadDir, fileName);
+        const target = resolveUploadTarget({
+          category: body.category,
+          scope: body.scope,
+          entityId: body.entityId,
+          subPath: body.subPath,
+          fileName: body.filename || 'image',
+          ext: parsed.ext,
+          fallbackStem: 'image'
+        });
 
         const buffer = Buffer.from(parsed.base64, 'base64');
         if (buffer.length > 8 * 1024 * 1024) {
@@ -2774,10 +2887,16 @@ function handleApi(req, res, reqUrl) {
           return;
         }
 
-        fs.writeFileSync(targetPath, buffer);
-        const relativeUrl = `https://ippon.fra1.digitaloceanspaces.com/uploads/${publicDir}/${fileName}`;
-        const absoluteUrl = relativeUrl;
-        sendJson(res, 201, { url: absoluteUrl, relativeUrl });
+        ensureDir(path.dirname(target.localPath));
+        fs.writeFileSync(target.localPath, buffer);
+        sendJson(res, 201, {
+          url: target.publicUrl,
+          relativeUrl: target.publicUrl,
+          fileName: target.fileName,
+          path: target.storageKey,
+          category: target.category,
+          entityId: target.entityId
+        });
       })
       .catch((error) => sendJson(res, 400, { error: error.message }));
     return true;
@@ -2793,16 +2912,16 @@ function handleApi(req, res, reqUrl) {
         }
 
         const originalName = String(body.filename || 'file').trim();
-        const safeName = originalName
-          .toLowerCase()
-          .replace(/[^a-z0-9._-]+/g, '-')
-          .replace(/^-+|-+$/g, '')
-          .slice(0, 120) || 'file';
-
-        const stem = (safeName.replace(/\.[a-z0-9]+$/i, '') || 'file').slice(0, 80);
-        const extFromName = (safeName.match(/\.([a-z0-9]{1,10})$/i) || [])[1] || 'bin';
-        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${stem}.${extFromName}`;
-        const targetPath = path.join(RULES_UPLOADS_DIR, fileName);
+        const extFromName = normalizeFileExtension(path.extname(originalName)) || 'bin';
+        const target = resolveUploadTarget({
+          category: body.category || 'rules',
+          scope: body.scope || 'rules',
+          entityId: body.entityId,
+          subPath: body.subPath,
+          fileName: originalName || 'file',
+          ext: extFromName,
+          fallbackStem: 'file'
+        });
 
         const buffer = Buffer.from(parsed.base64, 'base64');
         if (buffer.length > 25 * 1024 * 1024) {
@@ -2810,10 +2929,17 @@ function handleApi(req, res, reqUrl) {
           return;
         }
 
-        fs.writeFileSync(targetPath, buffer);
-        const relativeUrl = `https://ippon.fra1.digitaloceanspaces.com/uploads/rules/${fileName}`;
-        const absoluteUrl = relativeUrl;
-        sendJson(res, 201, { url: absoluteUrl, relativeUrl, mime: parsed.mime });
+        ensureDir(path.dirname(target.localPath));
+        fs.writeFileSync(target.localPath, buffer);
+        sendJson(res, 201, {
+          url: target.publicUrl,
+          relativeUrl: target.publicUrl,
+          mime: parsed.mime,
+          fileName: target.fileName,
+          path: target.storageKey,
+          category: target.category,
+          entityId: target.entityId
+        });
       })
       .catch((error) => sendJson(res, 400, { error: error.message }));
     return true;
@@ -2892,7 +3018,7 @@ function handleApi(req, res, reqUrl) {
       id: row.id,
       nosaukums: String(row.nosaukums || '').trim(),
       links: String(row.links || '').trim() || null,
-      foto_attels: String(row.foto_attels || '').trim() || null,
+      foto_attels: normalizeStoredMediaUrl(row.foto_attels) || null,
       informacija: String(row.informacija || ''),
       created_at: row.created_at,
       updated_at: row.updated_at
@@ -2968,7 +3094,7 @@ function handleApi(req, res, reqUrl) {
         id: Number(row.id || 0),
         datums: String(row.datums || '').trim(),
         nosaukums: String(row.nosaukums || '').trim(),
-        attels: String(row.attels || '').trim() || null,
+        attels: normalizeStoredMediaUrl(row.attels) || null,
         ievads: String(row.ievads || ''),
         zina: String(row.zina || ''),
         saite: normalizeExternalUrl(row.saite),
@@ -2993,7 +3119,7 @@ function handleApi(req, res, reqUrl) {
         id: Number(row.id || 0),
         datums: String(row.datums || '').trim(),
         nosaukums: String(row.nosaukums || '').trim(),
-        attels: String(row.attels || '').trim() || null,
+        attels: normalizeStoredMediaUrl(row.attels) || null,
         ievads: String(row.ievads || ''),
         zina: String(row.zina || ''),
         saite: normalizeExternalUrl(row.saite),
@@ -3078,8 +3204,6 @@ function handleApi(req, res, reqUrl) {
           sendJson(res, 400, { error: 'Nav augšupielādējamu failu' });
           return;
         }
-        const albumDir = path.join(GALLERY_UPLOADS_DIR, String(albumId));
-        fs.mkdirSync(albumDir, { recursive: true });
         const ts = nowTs();
         const inserted = [];
         let currentOrder = Number(
@@ -3092,16 +3216,15 @@ function handleApi(req, res, reqUrl) {
         for (const file of files) {
           const parsed = parseDataUrlImage(file?.dataUrl);
           if (!parsed) continue;
-          const safeName = String(file?.filename || `gallery-${Date.now()}`)
-            .toLowerCase()
-            .replace(/[^a-z0-9._-]+/g, '-')
-            .replace(/^-+|-+$/g, '')
-            .slice(0, 80) || 'gallery-image';
-          const stem = safeName.replace(/\.[a-z0-9]+$/i, '') || 'gallery-image';
-          const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${stem}.${parsed.ext}`;
-          const targetPath = path.join(albumDir, fileName);
-          fs.writeFileSync(targetPath, Buffer.from(parsed.base64, 'base64'));
-          const legacyPath = `25/${albumId}/${fileName}`;
+          const target = resolveUploadTarget({
+            category: 'gallery',
+            entityId: albumId,
+            fileName: file?.filename || 'gallery-image',
+            ext: parsed.ext,
+            fallbackStem: 'gallery-image'
+          });
+          ensureDir(path.dirname(target.localPath));
+          fs.writeFileSync(target.localPath, Buffer.from(parsed.base64, 'base64'));
           currentOrder += 1;
           let createdId = 0;
           if (useManualImageId) {
@@ -3115,9 +3238,9 @@ function handleApi(req, res, reqUrl) {
               createdId,
               25,
               albumId,
-              fileName,
-              legacyPath,
-              String(file?.filename || fileName),
+              target.fileName,
+              target.storageKey,
+              String(file?.filename || target.fileName),
               currentOrder,
               ts,
               '',
@@ -3130,7 +3253,7 @@ function handleApi(req, res, reqUrl) {
                 area_id, item_id, filename, path, o_name, ordering, c_time,
                 comment_ru, comment_lv, comment_en
               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(25, albumId, fileName, legacyPath, String(file?.filename || fileName), currentOrder, ts, '', '', '');
+            `).run(25, albumId, target.fileName, target.storageKey, String(file?.filename || target.fileName), currentOrder, ts, '', '', '');
             createdId = Number(info.lastInsertRowid || 0);
           }
           const created = db.prepare('SELECT * FROM ippon_images WHERE id = ? LIMIT 1').get(createdId);
@@ -3890,7 +4013,7 @@ function handleApi(req, res, reqUrl) {
     const items = rows.map((row, idx) => {
       const fullName = pickLang(row, 'name_lv', 'name_ru', 'name_en');
       const image = mapLegacyImageById(row.image);
-      const fotoAttels = row.foto_attels ? String(row.foto_attels).trim() : '';
+      const fotoAttels = normalizeStoredMediaUrl(row.foto_attels);
       return {
         id: row.id,
         slug: makeSportistSlug(fullName, row.id),
@@ -4190,7 +4313,7 @@ function handleApi(req, res, reqUrl) {
         slug: makeSportistSlug(name, row.id),
         vards_uzvards: name,
         dzimsanas_datums: row.date || '',
-        foto: (row.foto_attels ? String(row.foto_attels).trim() : '') || mapLegacyImageById(row.image)?.url || null,
+        foto: normalizeStoredMediaUrl(row.foto_attels) || mapLegacyImageById(row.image)?.url || null,
         galerija: parseGallery(row.galerija),
         par_sevi_html: row.o_sebe_lv || row.o_sebe_ru || row.o_sebe_en || '',
         par_sevi_text: stripHtml(row.o_sebe_lv || row.o_sebe_ru || row.o_sebe_en || ''),
