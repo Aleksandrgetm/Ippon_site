@@ -163,13 +163,17 @@ const UPLOAD_SCOPE_TO_CATEGORY = {
   news: 'news',
   halls: 'halls',
   nodarbibas: 'nodarbibas',
+  sportists: 'athletes',
+  athletes: 'athletes',
   treneri: 'trainers',
   trainers: 'trainers',
   sadarbiba: 'sadarbiba',
   gallery: 'gallery',
+  events: 'events',
   rezultati: 'results',
   results: 'results',
   rules: 'rules',
+  calendar: 'events',
   raksti_prese: 'raksti-prese'
 };
 
@@ -188,15 +192,16 @@ function sanitizeStorageSegment(input, fallback = 'item') {
 
 function normalizeUploadCategory(rawCategory, rawScope) {
   const direct = sanitizeStorageSegment(rawCategory, '').replace(/\.+/g, '-');
-  if (direct) return direct;
-  const scope = sanitizeStorageSegment(rawScope, '');
-  return UPLOAD_SCOPE_TO_CATEGORY[scope] || scope || 'misc';
+  if (!direct) {
+    throw new Error('Upload category is required');
+  }
+  return UPLOAD_SCOPE_TO_CATEGORY[direct] || direct;
 }
 
 function normalizeEntityId(rawEntityId) {
   const value = String(rawEntityId ?? '').trim();
   if (!value) {
-    return 'draft';
+    throw new Error('Upload entityId is required');
   }
   return sanitizeStorageSegment(value, 'item');
 }
@@ -2873,7 +2878,6 @@ function handleApi(req, res, reqUrl) {
 
         const target = resolveUploadTarget({
           category: body.category,
-          scope: body.scope,
           entityId: body.entityId,
           subPath: body.subPath,
           fileName: body.filename || 'image',
@@ -2914,8 +2918,7 @@ function handleApi(req, res, reqUrl) {
         const originalName = String(body.filename || 'file').trim();
         const extFromName = normalizeFileExtension(path.extname(originalName)) || 'bin';
         const target = resolveUploadTarget({
-          category: body.category || 'rules',
-          scope: body.scope || 'rules',
+          category: body.category,
           entityId: body.entityId,
           subPath: body.subPath,
           fileName: originalName || 'file',

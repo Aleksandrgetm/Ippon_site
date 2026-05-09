@@ -1065,10 +1065,10 @@
       if (tableName === NEWS_TABLE) return 'news';
       if (tableName === RAKSTI_PRESE_TABLE) return 'raksti-prese';
       if (tableName === TRAINERS_TABLE) return 'trainers';
-      if (tableName === 'ippon_sportists') return 'sportists';
+      if (tableName === 'ippon_sportists') return 'athletes';
       if (tableName === RULES_TABLE) return 'rules';
-      if (tableName === REZULTATI_TABLE) return 'results';
-      if (tableName === KALENDARS_TABLE) return 'calendar';
+      if (tableName === REZULTATI_TABLE) return 'events';
+      if (tableName === KALENDARS_TABLE) return 'events';
       if (NODARBIBAS_TABLES.has(tableName)) return 'nodarbibas';
       if (HALL_TABLES.has(tableName)) return 'halls';
       if (SADARBIBA_TABLES.has(tableName)) return 'sadarbiba';
@@ -1087,15 +1087,23 @@
         if (kalSelectedManual && kalSelectedManual.source_id != null) return `manual-${kalSelectedManual.source_id}`;
         if (kalSelectedSource && kalSelectedSource.source_id != null) return `${kalSelectedSource.source_table || 'source'}-${kalSelectedSource.source_id}`;
       }
-      return 'draft';
+      return '';
     }
 
     function buildUploadRequestBody(file, dataUrl, extra = {}) {
+      const category = extra.category || getUploadCategoryForTable(extra.tableName);
+      const entityId = extra.entityId || getUploadEntityIdForTable(extra.tableName);
+      if (!category) {
+        throw new Error('Upload category is required.');
+      }
+      if (!entityId) {
+        throw new Error('Vispirms saglabā ierakstu, lai iegūtu entityId augšupielādei.');
+      }
       return {
         filename: file.name,
         dataUrl,
-        category: extra.category || getUploadCategoryForTable(extra.tableName),
-        entityId: extra.entityId || getUploadEntityIdForTable(extra.tableName),
+        category,
+        entityId,
         subPath: extra.subPath || undefined
       };
     }
@@ -1531,7 +1539,7 @@
       await loadFotoGalerijaPhotos(selectedRow[currentPk]);
     }
 
-    async function uploadRezultatiImageFile(file) {
+    async function uploadRezultatiImageFile(file, extra = {}) {
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
@@ -1540,7 +1548,10 @@
       });
       const data = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable === KALENDARS_TABLE ? KALENDARS_TABLE : REZULTATI_TABLE }))
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, {
+          tableName: currentTable === KALENDARS_TABLE ? KALENDARS_TABLE : REZULTATI_TABLE,
+          subPath: extra.subPath
+        }))
       });
       return data.relativeUrl || data.url || '';
     }
@@ -3061,7 +3072,7 @@
       preview.style.display = 'block';
     }
 
-    async function uploadNewsImageFile(file) {
+    async function uploadNewsImageFile(file, extra = {}) {
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -3069,17 +3080,11 @@
         reader.readAsDataURL(file);
       });
 
-      try {
-        const uploaded = await api('/api/upload-image', {
-          method: 'POST',
-          body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable }))
-        });
-        return uploaded.relativeUrl || uploaded.url;
-      } catch (error) {
-        // Fallback mode for old API instances: store image as data URL directly in DB.
-        setStatus('Serverim nav upload API, saglabāšu attēlu tieši DB (rezerves režīms).', 'ok');
-        return dataUrl;
-      }
+      const uploaded = await api('/api/upload-image', {
+        method: 'POST',
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable, subPath: extra.subPath }))
+      });
+      return uploaded.relativeUrl || uploaded.url;
     }
 
     async function uploadSelectedNewsImageIfNeeded() {
@@ -3104,7 +3109,7 @@
           if (selectedNewsGalleryFiles.length > 0) {
             const uploaded = [];
             for (const galleryFile of selectedNewsGalleryFiles) {
-              uploaded.push(await uploadNewsImageFile(galleryFile));
+              uploaded.push(await uploadNewsImageFile(galleryFile, { subPath: 'gallery' }));
             }
             setNewsGalleryValue(uploaded);
             selectedNewsGalleryFiles = [];
@@ -3146,16 +3151,11 @@
         reader.readAsDataURL(file);
       });
 
-      try {
-        const uploaded = await api('/api/upload-file', {
-          method: 'POST',
-          body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: RULES_TABLE }))
-        });
-        return uploaded.relativeUrl || uploaded.url;
-      } catch (error) {
-        setStatus('Serverim nav upload API, saglabāju failu DB (rezerves režīms).', 'ok');
-        return dataUrl;
-      }
+      const uploaded = await api('/api/upload-file', {
+        method: 'POST',
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: RULES_TABLE }))
+      });
+      return uploaded.relativeUrl || uploaded.url;
     }
 
     async function uploadSelectedRulesFileIfNeeded() {
@@ -4390,7 +4390,7 @@
       renderHallGalleryPreview();
     }
 
-    async function uploadHallImageFile(file) {
+    async function uploadHallImageFile(file, extra = {}) {
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -4400,7 +4400,7 @@
 
       const uploaded = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable }))
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable, subPath: extra.subPath }))
       });
       return uploaded.relativeUrl || uploaded.url;
     }
@@ -4419,7 +4419,7 @@
       if (selectedHallGalleryFiles.length > 0 && galleryInput) {
         const uploaded = [];
         for (const file of selectedHallGalleryFiles) {
-          uploaded.push(await uploadHallImageFile(file));
+          uploaded.push(await uploadHallImageFile(file, { subPath: 'gallery' }));
         }
         setHallGalleryValue(uploaded);
       } else if (galleryInput) {
@@ -4502,7 +4502,7 @@
       renderTrainerGalleryPreview();
     }
 
-    async function uploadTrainerImageFile(file) {
+    async function uploadTrainerImageFile(file, extra = {}) {
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -4512,7 +4512,7 @@
 
       const uploaded = await api('/api/upload-image', {
         method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable }))
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable, subPath: extra.subPath }))
       });
       return uploaded.relativeUrl || uploaded.url;
     }
@@ -4531,7 +4531,7 @@
       if (selectedTrainerGalleryFiles.length > 0 && galleryInput) {
         const uploaded = [];
         for (const file of selectedTrainerGalleryFiles) {
-          uploaded.push(await uploadTrainerImageFile(file));
+          uploaded.push(await uploadTrainerImageFile(file, { subPath: 'gallery' }));
         }
         setTrainerGalleryValue(uploaded);
       } else if (galleryInput) {
@@ -5927,7 +5927,7 @@
         if (!files.length) return;
         try {
           for (const file of files) {
-            const uploaded = await uploadRezultatiImageFile(file);
+            const uploaded = await uploadRezultatiImageFile(file, { subPath: 'gallery' });
             if (uploaded) selectedRezGalleryItems.push(uploaded);
           }
           renderRezGalleryPreview();
