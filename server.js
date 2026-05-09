@@ -1042,6 +1042,88 @@ function isImageFileName(name) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
 }
 
+function listImageFilesInDir(dirPath, { recursive = false } = {}) {
+  if (!dirPath || !fs.existsSync(dirPath)) return [];
+  const out = [];
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const abs = path.join(dirPath, entry.name);
+      if (entry.isFile() && isImageFileName(entry.name)) {
+        out.push(abs);
+        continue;
+      }
+      if (recursive && entry.isDirectory()) {
+        out.push(...listImageFilesInDir(abs, { recursive: true }));
+      }
+    }
+  } catch {
+    return [];
+  }
+  return out.sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
+}
+
+function localPathToUploadsStorageKey(filePath) {
+  const relative = path.relative(ROOT, filePath).replace(/\\/g, '/');
+  if (!relative || relative.startsWith('..') || !relative.startsWith('uploads/')) return '';
+  return relative;
+}
+
+function getMainImage(category, id) {
+  const normalizedCategory = sanitizeStorageSegment(category, '');
+  const normalizedId = sanitizeStorageSegment(id, '');
+  if (!normalizedCategory || !normalizedId) return null;
+
+  const baseDir = path.join(ROOT, 'uploads', normalizedCategory, normalizedId);
+  const files = listImageFilesInDir(baseDir, { recursive: false });
+  if (!files.length) return null;
+
+  const preferred = files.find((filePath) => /^main\.[a-z0-9]+$/i.test(path.basename(filePath)))
+    || files.find((filePath) => /^profile\.[a-z0-9]+$/i.test(path.basename(filePath)))
+    || files[0];
+  const storageKey = localPathToUploadsStorageKey(preferred);
+  return storageKey ? buildPublicUploadUrl(storageKey) : null;
+}
+
+function getGallery(id) {
+  const normalizedId = sanitizeStorageSegment(id, '');
+  if (!normalizedId) return [];
+
+  const baseDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
+  const files = listImageFilesInDir(baseDir, { recursive: true });
+  return files
+    .map((filePath) => localPathToUploadsStorageKey(filePath))
+    .filter(Boolean)
+    .map((storageKey) => buildPublicUploadUrl(storageKey));
+}
+
+function withResolvedMedia(item, options = {}) {
+  if (!item || typeof item !== 'object') return item;
+  const id = options.id ?? item.id ?? item.source_id ?? null;
+  const category = options.category || '';
+  const fallbackMain = normalizeStoredMediaUrl(
+    options.fallbackMain
+    ?? item.mainImage
+    ?? item.foto_attels
+    ?? item.attels
+    ?? item.foto
+    ?? item.image
+    ?? ''
+  ) || null;
+  const mainImage = (category && id != null ? getMainImage(category, id) : null) || fallbackMain || null;
+  const gallery = id != null ? getGallery(id) : [];
+
+  return {
+    ...item,
+    mainImage,
+    gallery,
+    foto_attels: item.foto_attels !== undefined ? (mainImage || item.foto_attels || null) : item.foto_attels,
+    attels: item.attels !== undefined ? (mainImage || item.attels || null) : item.attels,
+    foto: item.foto !== undefined ? (mainImage || item.foto || null) : item.foto,
+    galerija: gallery
+  };
+}
+
 function pickUniqueGalleryImages(urls) {
   const groups = new Map();
   for (const rawUrl of urls || []) {
@@ -1141,7 +1223,7 @@ function resolveSadarbibaSportaZalesIreMedia(existingRow = null) {
 
 function mapHallRow(slug, row) {
   if (!row) return null;
-  return {
+  return withResolvedMedia({
     slug,
     id: row.id,
     nosaukums: row.nosaukums,
@@ -1150,7 +1232,7 @@ function mapHallRow(slug, row) {
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
-  };
+  }, { category: 'halls', id: row.id, fallbackMain: row.attels });
 }
 
 function isHallTable(table) {
@@ -1184,7 +1266,7 @@ function mapNewsRow(row) {
 
 function mapSadarbibaRow(row) {
   if (!row) return null;
-  return {
+  return withResolvedMedia({
     id: row.id,
     nosaukums: String(row.nosaukums || '').trim(),
     saturs: String(row.saturs || ''),
@@ -1192,12 +1274,12 @@ function mapSadarbibaRow(row) {
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
-  };
+  }, { category: 'sadarbiba', id: row.id, fallbackMain: row.foto_attels });
 }
 
 function mapTrainerRow(row) {
   if (!row) return null;
-  return {
+  return withResolvedMedia({
     id: row.id,
     vards_uzvards: row.vards_uzvards || '',
     dzimsanas_datums: row.dzimsanas_datums || '',
@@ -1212,7 +1294,7 @@ function mapTrainerRow(row) {
     slug: row.slug,
     created_at: row.created_at,
     updated_at: row.updated_at
-  };
+  }, { category: 'trainers', id: row.id, fallbackMain: row.foto_attels });
 }
 
 function mapRezultatiRow(row) {
@@ -1225,7 +1307,7 @@ function mapRezultatiRow(row) {
   const location = String(row.location_lv || row.location_ru || row.location_en || '').trim();
   const info = String(row.info_lv || row.info_ru || row.info_en || '').trim();
 
-  return {
+  return withResolvedMedia({
     id: row.id,
     slug: row.slug || uniqueRezultatiSlug(title || `rezultati-${row.id}`, row.id),
     record_type: recordType,
@@ -1249,7 +1331,7 @@ function mapRezultatiRow(row) {
       results_url: row.results_url,
       info_lv: info
     }
-  };
+  }, { category: 'events', id: row.id, fallbackMain: row.foto_attels });
 }
 
 function safeText(value) {
@@ -1395,7 +1477,7 @@ function mapKalendarsTextSource(row, overrideRow = null) {
   const contentHtml = safeText(overrideRow?.content_override || baseHtml);
   const defaultImage = row.image ? (mapLegacyImageById(row.image)?.url || '') : '';
   const image = safeText(overrideRow?.image_override) || defaultImage || null;
-  return {
+  return withResolvedMedia({
     id: row.area_id,
     source_table: 'ippon_text',
     source_id: row.area_id,
@@ -1410,14 +1492,14 @@ function mapKalendarsTextSource(row, overrideRow = null) {
     slug: buildKalendarsSourceSlug(row.area_id, overrideRow?.slug_override || title || `kalendars-${row.area_id}`),
     created_at: row.c_time ?? null,
     updated_at: overrideRow?.updated_at ?? row.m_time ?? null
-  };
+  }, { category: 'events', id: row.area_id, fallbackMain: image });
 }
 
 function mapKalendarsManualRow(row) {
   const title = safeText(row.title);
   const date = safeText(row.date);
   const image = safeText(row.image) || null;
-  return {
+  return withResolvedMedia({
     id: row.id,
     source_table: 'ippon_kalendars_records',
     source_id: row.id,
@@ -1432,7 +1514,7 @@ function mapKalendarsManualRow(row) {
     slug: buildKalendarsManualSlug(row.id, row.slug || title),
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null
-  };
+  }, { category: 'events', id: row.id, fallbackMain: image });
 }
 
 function queryKalendarsSourceItems(overrideMap) {
@@ -1516,7 +1598,7 @@ function mapRezultatiManualRow(row) {
   const recordType = normalizeRezultatiRecordType(row.record_type || 'reitings');
   const layoutType = normalizeRezultatiLayoutType(row.layout_type, recordType);
   const title = safeText(row.title);
-  return {
+  return withResolvedMedia({
     id: row.id,
     source_table: 'ippon_rezultati_records',
     source_id: row.id,
@@ -1534,7 +1616,7 @@ function mapRezultatiManualRow(row) {
     custom_html: safeText(row.custom_html),
     created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null
-  };
+  }, { category: 'events', id: row.id, fallbackMain: row.image });
 }
 
 function mapRezultatiSacensibasSource(row, overrideRow = null) {
@@ -1547,7 +1629,7 @@ function mapRezultatiSacensibasSource(row, overrideRow = null) {
     recordType
   );
   const structuredData = parseManualStructuredData(overrideRow?.structured_data || row.structured_data);
-  return {
+  return withResolvedMedia({
     id: row.id,
     source_table: 'ippon_sorevnovanija',
     source_id: row.id,
@@ -1574,7 +1656,7 @@ function mapRezultatiSacensibasSource(row, overrideRow = null) {
     statuss: row.status_id != null ? String(row.status_id) : '',
     created_at: row.created_at ?? row.c_time ?? null,
     updated_at: overrideRow?.updated_at ?? row.updated_at ?? row.m_time ?? null
-  };
+  }, { category: 'events', id: row.id, fallbackMain: defaultImage });
 }
 
 function mapRezultatiLegacyHtmlSource(row, overrideRow = null, forcedType = null) {
@@ -1587,7 +1669,7 @@ function mapRezultatiLegacyHtmlSource(row, overrideRow = null, forcedType = null
   );
   const defaultImage = row.image ? (mapLegacyImageById(row.image)?.url || '') : '';
   const baseHtml = safeText(row.content_lv || row.content_ru || row.content_en);
-  return {
+  return withResolvedMedia({
     id: row.id,
     source_table: 'ippon_galery',
     source_id: row.id,
@@ -1611,7 +1693,7 @@ function mapRezultatiLegacyHtmlSource(row, overrideRow = null, forcedType = null
     description: safeText(stripHtml(baseHtml)),
     created_at: row.c_time ?? null,
     updated_at: overrideRow?.updated_at ?? row.m_time ?? null
-  };
+  }, { category: 'events', id: row.id, fallbackMain: safeText(overrideRow?.image_override) || defaultImage || null });
 }
 
 function mapRezultatiTextSource(row, overrideRow = null, forcedType = null) {
@@ -1625,7 +1707,7 @@ function mapRezultatiTextSource(row, overrideRow = null, forcedType = null) {
   const defaultImage = row.image ? (mapLegacyImageById(row.image)?.url || '') : '';
   const baseHtml = safeText(row.content);
   const baseDate = unixToIsoDate(row.c_time);
-  return {
+  return withResolvedMedia({
     id: row.area_id,
     source_table: 'ippon_text',
     source_id: row.area_id,
@@ -1649,7 +1731,7 @@ function mapRezultatiTextSource(row, overrideRow = null, forcedType = null) {
     description: safeText(stripHtml(baseHtml)),
     created_at: row.c_time ?? null,
     updated_at: overrideRow?.updated_at ?? row.m_time ?? null
-  };
+  }, { category: 'events', id: row.area_id, fallbackMain: safeText(overrideRow?.image_override) || defaultImage || null });
 }
 
 function dateSortValue(dateText) {
@@ -2652,10 +2734,12 @@ function toIntValue(value, fallback = 0) {
 }
 
 function pickSportistRow(row) {
-  return {
+  return withResolvedMedia({
     id: row.id,
     galery_id: row.galery_id,
     date: row.date,
+    foto_attels: normalizeStoredMediaUrl(row.foto_attels) || null,
+    galerija: parseGallery(row.galerija),
     name_lv: row.name_lv,
     name_ru: row.name_ru,
     name_en: row.name_en,
@@ -2670,7 +2754,24 @@ function pickSportistRow(row) {
     special: row.special,
     ordering: row.ordering,
     remove_date: row.remove_date
-  };
+  }, {
+    category: 'athletes',
+    id: row.id,
+    fallbackMain: row.foto_attels
+  });
+}
+
+function mapNodarbibasRow(tableName, row) {
+  if (!row) return null;
+  return withResolvedMedia({
+    ...row,
+    attels: normalizeStoredMediaUrl(row.attels) || null,
+    galerija: parseGallery(row.galerija)
+  }, {
+    category: 'nodarbibas',
+    id: row.id,
+    fallbackMain: row.attels
+  });
 }
 
 function handleContentApi(req, res, reqUrl) {
@@ -2773,35 +2874,42 @@ function handleContentApi(req, res, reqUrl) {
       });
     }
 
-    const items = competitions.map((ev) => ({
-      id: ev.id,
-      area_id: ev.area_id,
-      date: ev.date,
-      name_lv: ev.name_lv,
-      name_ru: ev.name_ru,
-      name_en: ev.name_en,
-      location_lv: ev.location_lv,
-      location_ru: ev.location_ru,
-      location_en: ev.location_en,
-      info_lv: ev.info_lv,
-      info_ru: ev.info_ru,
-      info_en: ev.info_en,
-      status_id: ev.status_id,
-      galery_id: ev.galery_id,
-      image: ev.image,
-      public: ev.public,
-      ordering: ev.ordering,
-      results_url: ev.results_url,
-      galery: ev.galery_id
-        ? {
-            id: ev.galery_id,
-            name_lv: ev.galery_name_lv,
-            name_ru: ev.galery_name_ru,
-            name_en: ev.galery_name_en
-          }
-        : null,
-      results: byEvent.get(ev.id) || []
-    }));
+    const items = competitions.map((ev) => {
+      const item = {
+        id: ev.id,
+        area_id: ev.area_id,
+        date: ev.date,
+        name_lv: ev.name_lv,
+        name_ru: ev.name_ru,
+        name_en: ev.name_en,
+        location_lv: ev.location_lv,
+        location_ru: ev.location_ru,
+        location_en: ev.location_en,
+        info_lv: ev.info_lv,
+        info_ru: ev.info_ru,
+        info_en: ev.info_en,
+        status_id: ev.status_id,
+        galery_id: ev.galery_id,
+        image: ev.image,
+        public: ev.public,
+        ordering: ev.ordering,
+        results_url: ev.results_url,
+        galery: ev.galery_id
+          ? {
+              id: ev.galery_id,
+              name_lv: ev.galery_name_lv,
+              name_ru: ev.galery_name_ru,
+              name_en: ev.galery_name_en
+            }
+          : null,
+        results: byEvent.get(ev.id) || []
+      };
+      return withResolvedMedia(item, {
+        category: 'events',
+        id: ev.id,
+        fallbackMain: ev.foto_attels
+      });
+    });
 
     sendJson(res, 200, { total: items.length, items });
     return true;
@@ -2983,17 +3091,7 @@ function handleApi(req, res, reqUrl) {
     }
 
     sendJson(res, 200, {
-      item: normalizedRow
-        ? {
-            id: normalizedRow.id,
-            nosaukums: String(normalizedRow.nosaukums || '').trim(),
-            saturs: String(normalizedRow.saturs || ''),
-            foto_attels: String(normalizedRow.foto_attels || '').trim() || null,
-            galerija: parseGallery(normalizedRow.galerija),
-            created_at: normalizedRow.created_at,
-            updated_at: normalizedRow.updated_at
-          }
-        : null
+      item: normalizedRow ? mapSadarbibaRow(normalizedRow) : null
     });
     return true;
   }
@@ -3017,7 +3115,7 @@ function handleApi(req, res, reqUrl) {
       ORDER BY id DESC
     `).all();
 
-    const items = rows.map((row) => ({
+    const items = rows.map((row) => withResolvedMedia({
       id: row.id,
       nosaukums: String(row.nosaukums || '').trim(),
       links: String(row.links || '').trim() || null,
@@ -3025,7 +3123,7 @@ function handleApi(req, res, reqUrl) {
       informacija: String(row.informacija || ''),
       created_at: row.created_at,
       updated_at: row.updated_at
-    }));
+    }, { category: 'sadarbiba', id: row.id, fallbackMain: row.foto_attels }));
 
     sendJson(res, 200, { items });
     return true;
@@ -3972,7 +4070,7 @@ function handleApi(req, res, reqUrl) {
       sendJson(res, 404, { error: 'Saraksts not found' });
       return true;
     }
-    sendJson(res, 200, { item: row });
+    sendJson(res, 200, { item: mapNodarbibasRow('nodarbibas_saraksts', row) });
     return true;
   }
 
@@ -3986,7 +4084,7 @@ function handleApi(req, res, reqUrl) {
       sendJson(res, 404, { error: 'Izlases grupas not found' });
       return true;
     }
-    sendJson(res, 200, { item: row });
+    sendJson(res, 200, { item: mapNodarbibasRow('nodarbibas_izlases_grupas', row) });
     return true;
   }
 
@@ -4000,7 +4098,7 @@ function handleApi(req, res, reqUrl) {
       sendJson(res, 404, { error: 'Individualas nodarbibas not found' });
       return true;
     }
-    sendJson(res, 200, { item: row });
+    sendJson(res, 200, { item: mapNodarbibasRow('nodarbibas_individualas_nodarbibas', row) });
     return true;
   }
 
@@ -4017,7 +4115,7 @@ function handleApi(req, res, reqUrl) {
       const fullName = pickLang(row, 'name_lv', 'name_ru', 'name_en');
       const image = mapLegacyImageById(row.image);
       const fotoAttels = normalizeStoredMediaUrl(row.foto_attels);
-      return {
+      return withResolvedMedia({
         id: row.id,
         slug: makeSportistSlug(fullName, row.id),
         index: idx + 1,
@@ -4031,7 +4129,7 @@ function handleApi(req, res, reqUrl) {
           name_ru: row.name_ru,
           name_en: row.name_en
         }
-      };
+      }, { category: 'athletes', id: row.id, fallbackMain: fotoAttels || image?.url || null });
     });
 
     sendJson(res, 200, { total: items.length, items });
@@ -4311,7 +4409,7 @@ function handleApi(req, res, reqUrl) {
         );
 
     sendJson(res, 200, {
-      item: {
+      item: withResolvedMedia({
         id: row.id,
         slug: makeSportistSlug(name, row.id),
         vards_uzvards: name,
@@ -4323,7 +4421,7 @@ function handleApi(req, res, reqUrl) {
         sasniegumi_html: row.dostizhenija_lv || row.dostizhenija_ru || row.dostizhenija_en || '',
         sasniegumi_text: stripHtml(row.dostizhenija_lv || row.dostizhenija_ru || row.dostizhenija_en || ''),
         achievements
-      }
+      }, { category: 'athletes', id: row.id, fallbackMain: row.foto_attels || mapLegacyImageById(row.image)?.url || null })
     });
     return true;
   }
