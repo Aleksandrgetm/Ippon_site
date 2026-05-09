@@ -1069,38 +1069,110 @@ function localPathToUploadsStorageKey(filePath) {
   return relative;
 }
 
-function getMainImage(category, id) {
-  const normalizedCategory = sanitizeStorageSegment(category, '');
-  const normalizedId = sanitizeStorageSegment(id, '');
-  if (!normalizedCategory || !normalizedId) return null;
-
-  const baseDir = path.join(ROOT, 'uploads', normalizedCategory, normalizedId);
-  const files = listImageFilesInDir(baseDir, { recursive: false });
-  if (!files.length) return null;
-
-  const preferred = files.find((filePath) => /^main\.[a-z0-9]+$/i.test(path.basename(filePath)))
-    || files.find((filePath) => /^profile\.[a-z0-9]+$/i.test(path.basename(filePath)))
-    || files[0];
-  const storageKey = localPathToUploadsStorageKey(preferred);
-  return storageKey ? buildPublicUploadUrl(storageKey) : null;
+function getLegacyMediaTypes(type) {
+  const normalizedType = sanitizeStorageSegment(type, '');
+  const aliases = {
+    athletes: ['athletes', 'sportists'],
+    sportists: ['sportists', 'athletes'],
+    events: ['events', 'results'],
+    results: ['results', 'events'],
+    nodarbibas: ['nodarbibas', 'izlas'],
+    izlas: ['izlas', 'nodarbibas'],
+    sadarbiba: ['sadarbiba'],
+    halls: ['halls'],
+    trainers: ['trainers'],
+    news: ['news']
+  };
+  return aliases[normalizedType] || (normalizedType ? [normalizedType] : []);
 }
 
-function getGallery(id) {
-  const normalizedId = sanitizeStorageSegment(id, '');
-  if (!normalizedId) return [];
-
-  const baseDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
-  const files = listImageFilesInDir(baseDir, { recursive: true });
-  return files
+function filePathsToUrls(filePaths) {
+  return filePaths
     .map((filePath) => localPathToUploadsStorageKey(filePath))
     .filter(Boolean)
     .map((storageKey) => buildPublicUploadUrl(storageKey));
+}
+
+function uniqueUrls(urls) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of urls || []) {
+    const url = String(raw || '').trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+function pickPreferredMainImage(filePaths) {
+  if (!Array.isArray(filePaths) || !filePaths.length) return null;
+  return filePaths.find((filePath) => /^main\.[a-z0-9]+$/i.test(path.basename(filePath)))
+    || filePaths.find((filePath) => /^profile\.[a-z0-9]+$/i.test(path.basename(filePath)))
+    || filePaths[0];
+}
+
+function getMainImage(type, id) {
+  const legacyTypes = getLegacyMediaTypes(type);
+  const normalizedId = sanitizeStorageSegment(id, '');
+
+  if (normalizedId) {
+    for (const mediaType of legacyTypes) {
+      const baseDir = path.join(ROOT, 'uploads', mediaType, normalizedId);
+      const files = listImageFilesInDir(baseDir, { recursive: false });
+      const picked = pickPreferredMainImage(files);
+      if (picked) {
+        const storageKey = localPathToUploadsStorageKey(picked);
+        if (storageKey) return buildPublicUploadUrl(storageKey);
+      }
+    }
+  }
+
+  for (const mediaType of legacyTypes) {
+    const flatDir = path.join(ROOT, 'uploads', mediaType);
+    const files = listImageFilesInDir(flatDir, { recursive: false });
+    const picked = pickPreferredMainImage(files);
+    if (picked) {
+      const storageKey = localPathToUploadsStorageKey(picked);
+      if (storageKey) return buildPublicUploadUrl(storageKey);
+    }
+  }
+
+  return null;
+}
+
+function getGallery(type, id) {
+  const urls = [];
+  const normalizedId = sanitizeStorageSegment(id, '');
+
+  if (normalizedId) {
+    const idBasedDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
+    urls.push(...filePathsToUrls(listImageFilesInDir(idBasedDir, { recursive: true })));
+  }
+
+  for (const mediaType of getLegacyMediaTypes(type)) {
+    const flatDir = path.join(ROOT, 'uploads', mediaType);
+    urls.push(...filePathsToUrls(listImageFilesInDir(flatDir, { recursive: false })));
+  }
+
+  return uniqueUrls(urls);
+}
+
+function resolveMedia(type, id) {
+  return {
+    mainImage: getMainImage(type, id),
+    gallery: getGallery(type, id)
+  };
 }
 
 function withResolvedMedia(item, options = {}) {
   if (!item || typeof item !== 'object') return item;
   const id = options.id ?? item.id ?? item.source_id ?? null;
   const category = options.category || '';
+  const existingGallery = uniqueUrls([
+    ...(Array.isArray(item.gallery) ? item.gallery.map((v) => normalizeStoredMediaUrl(v)) : []),
+    ...(Array.isArray(item.galerija) ? item.galerija.map((v) => normalizeStoredMediaUrl(v)) : [])
+  ]);
   const fallbackMain = normalizeStoredMediaUrl(
     options.fallbackMain
     ?? item.mainImage
@@ -1110,8 +1182,9 @@ function withResolvedMedia(item, options = {}) {
     ?? item.image
     ?? ''
   ) || null;
-  const mainImage = (category && id != null ? getMainImage(category, id) : null) || fallbackMain || null;
-  const gallery = id != null ? getGallery(id) : [];
+  const resolved = category ? resolveMedia(category, id) : { mainImage: null, gallery: [] };
+  const mainImage = resolved.mainImage || fallbackMain || null;
+  const gallery = uniqueUrls([...(resolved.gallery || []), ...existingGallery]);
 
   return {
     ...item,
