@@ -1086,6 +1086,47 @@ function getLegacyMediaTypes(type) {
   return aliases[normalizedType] || (normalizedType ? [normalizedType] : []);
 }
 
+function getNameBasedMediaTypes(type) {
+  const normalizedType = sanitizeStorageSegment(type, '');
+  const aliases = {
+    halls: ['sadarbiba', 'halls'],
+    sadarbiba: ['sadarbiba'],
+    nodarbibas: ['nodarbibas', 'izlas'],
+    izlas: ['izlas', 'nodarbibas'],
+    athletes: ['athletes', 'sportists'],
+    sportists: ['sportists', 'athletes'],
+    trainers: ['trainers'],
+    events: ['events', 'results'],
+    results: ['results', 'events']
+  };
+  return aliases[normalizedType] || getLegacyMediaTypes(type);
+}
+
+function normalizeFolderCandidate(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  const candidates = new Set();
+  candidates.add(sanitizeStorageSegment(raw, '').replace(/\.+/g, '-'));
+  candidates.add(slugify(raw));
+  candidates.add(slugify(translitLv(raw)));
+  return Array.from(candidates).filter(Boolean);
+}
+
+function getEntityFolderCandidates(entity = {}) {
+  const values = [
+    entity.folder,
+    entity.slug,
+    entity.name,
+    entity.nosaukums,
+    entity.title
+  ];
+  const out = [];
+  for (const value of values) {
+    out.push(...normalizeFolderCandidate(value));
+  }
+  return Array.from(new Set(out)).filter(Boolean);
+}
+
 function filePathsToUrls(filePaths) {
   return filePaths
     .map((filePath) => localPathToUploadsStorageKey(filePath))
@@ -1112,14 +1153,36 @@ function pickPreferredMainImage(filePaths) {
     || filePaths[0];
 }
 
-function getMainImage(type, id) {
+function getMainImage(type, id, entity = {}) {
   const legacyTypes = getLegacyMediaTypes(type);
+  const nameTypes = getNameBasedMediaTypes(type);
   const normalizedId = sanitizeStorageSegment(id, '');
 
   if (normalizedId) {
+    const galleryDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
+    const galleryFiles = listImageFilesInDir(galleryDir, { recursive: false });
+    const galleryPicked = pickPreferredMainImage(galleryFiles);
+    if (galleryPicked) {
+      const storageKey = localPathToUploadsStorageKey(galleryPicked);
+      if (storageKey) return buildPublicUploadUrl(storageKey);
+    }
+
     for (const mediaType of legacyTypes) {
       const baseDir = path.join(ROOT, 'uploads', mediaType, normalizedId);
       const files = listImageFilesInDir(baseDir, { recursive: false });
+      const picked = pickPreferredMainImage(files);
+      if (picked) {
+        const storageKey = localPathToUploadsStorageKey(picked);
+        if (storageKey) return buildPublicUploadUrl(storageKey);
+      }
+    }
+  }
+
+  const folderCandidates = getEntityFolderCandidates(entity);
+  for (const mediaType of nameTypes) {
+    for (const folder of folderCandidates) {
+      const namedDir = path.join(ROOT, 'uploads', mediaType, folder);
+      const files = listImageFilesInDir(namedDir, { recursive: false });
       const picked = pickPreferredMainImage(files);
       if (picked) {
         const storageKey = localPathToUploadsStorageKey(picked);
@@ -1141,13 +1204,21 @@ function getMainImage(type, id) {
   return null;
 }
 
-function getGallery(type, id) {
+function getGallery(type, id, entity = {}) {
   const urls = [];
   const normalizedId = sanitizeStorageSegment(id, '');
 
   if (normalizedId) {
     const idBasedDir = path.join(ROOT, 'uploads', 'gallery', normalizedId);
     urls.push(...filePathsToUrls(listImageFilesInDir(idBasedDir, { recursive: true })));
+  }
+
+  const folderCandidates = getEntityFolderCandidates(entity);
+  for (const mediaType of getNameBasedMediaTypes(type)) {
+    for (const folder of folderCandidates) {
+      const namedDir = path.join(ROOT, 'uploads', mediaType, folder);
+      urls.push(...filePathsToUrls(listImageFilesInDir(namedDir, { recursive: true })));
+    }
   }
 
   for (const mediaType of getLegacyMediaTypes(type)) {
@@ -1158,10 +1229,10 @@ function getGallery(type, id) {
   return uniqueUrls(urls);
 }
 
-function resolveMedia(type, id) {
+function resolveMedia(entity = {}) {
   return {
-    mainImage: getMainImage(type, id),
-    gallery: getGallery(type, id)
+    mainImage: getMainImage(entity.type, entity.id, entity),
+    gallery: getGallery(entity.type, entity.id, entity)
   };
 }
 
@@ -1182,7 +1253,15 @@ function withResolvedMedia(item, options = {}) {
     ?? item.image
     ?? ''
   ) || null;
-  const resolved = category ? resolveMedia(category, id) : { mainImage: null, gallery: [] };
+  const resolved = category ? resolveMedia({
+    type: category,
+    id,
+    slug: options.slug ?? item.slug,
+    name: options.name ?? item.name,
+    nosaukums: options.nosaukums ?? item.nosaukums,
+    title: options.title ?? item.title,
+    folder: options.folder
+  }) : { mainImage: null, gallery: [] };
   const mainImage = resolved.mainImage || fallbackMain || null;
   const gallery = uniqueUrls([...(resolved.gallery || []), ...existingGallery]);
 
@@ -1305,7 +1384,15 @@ function mapHallRow(slug, row) {
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
-  }, { category: 'halls', id: row.id, fallbackMain: row.attels });
+  }, {
+    category: 'halls',
+    id: row.id,
+    slug,
+    name: row.nosaukums,
+    nosaukums: row.nosaukums,
+    folder: slug,
+    fallbackMain: row.attels
+  });
 }
 
 function isHallTable(table) {
@@ -1347,7 +1434,13 @@ function mapSadarbibaRow(row) {
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
-  }, { category: 'sadarbiba', id: row.id, fallbackMain: row.foto_attels });
+  }, {
+    category: 'sadarbiba',
+    id: row.id,
+    name: row.nosaukums,
+    nosaukums: row.nosaukums,
+    fallbackMain: row.foto_attels
+  });
 }
 
 function mapTrainerRow(row) {
@@ -2836,6 +2929,11 @@ function pickSportistRow(row) {
 
 function mapNodarbibasRow(tableName, row) {
   if (!row) return null;
+  const legacyFolder = tableName === 'nodarbibas_izlases_grupas'
+    ? 'izlas'
+    : tableName === 'nodarbibas_individualas_nodarbibas'
+      ? 'nodarbibas'
+      : 'nodarbibas';
   return withResolvedMedia({
     ...row,
     attels: normalizeStoredMediaUrl(row.attels) || null,
@@ -2843,6 +2941,9 @@ function mapNodarbibasRow(tableName, row) {
   }, {
     category: 'nodarbibas',
     id: row.id,
+    name: row.nosaukums || row.ievads || legacyFolder,
+    nosaukums: row.nosaukums || legacyFolder,
+    folder: legacyFolder,
     fallbackMain: row.attels
   });
 }
