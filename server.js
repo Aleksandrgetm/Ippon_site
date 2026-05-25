@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3');
 
 
 const ROOT = __dirname;
@@ -19,6 +20,11 @@ const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const DB_DIR = path.dirname(DB_PATH);
 const SPACES_PUBLIC_BASE = String(process.env.SPACES_PUBLIC_BASE || 'https://ippon.fra1.digitaloceanspaces.com').replace(/\/+$/, '');
+const SPACES_BUCKET = String(process.env.SPACES_BUCKET || 'ippon').trim();
+const SPACES_REGION = String(process.env.SPACES_REGION || 'fra1').trim();
+const SPACES_ENDPOINT = String(process.env.SPACES_ENDPOINT || `https://${SPACES_REGION}.digitaloceanspaces.com`).replace(/\/+$/, '');
+const SPACES_ACCESS_KEY_ID = String(process.env.SPACES_KEY || process.env.AWS_ACCESS_KEY_ID || '').trim();
+const SPACES_SECRET_ACCESS_KEY = String(process.env.SPACES_SECRET || process.env.AWS_SECRET_ACCESS_KEY || '').trim();
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const NEWS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'news');
 const RULES_UPLOADS_DIR = path.join(UPLOADS_DIR, 'rules');
@@ -252,6 +258,20 @@ function buildUploadStorageKey({ category, entityId, subPath = [], fileName }) {
 
 function buildPublicUploadUrl(storageKey) {
   return `${SPACES_PUBLIC_BASE}/${String(storageKey || '').replace(/^\/+/, '')}`;
+}
+
+function encodeUrlPath(pathname) {
+  return String(pathname || '')
+    .split('/')
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+function buildSpacesObjectUrl(storageKey) {
+  const normalizedKey = String(storageKey || '').replace(/^\/+/, '');
+  if (!normalizedKey) return '';
+  return `${SPACES_PUBLIC_BASE}/${encodeUrlPath(normalizedKey)}`;
 }
 
 function uploadKeyToLocalPath(storageKey) {
@@ -1040,6 +1060,60 @@ function normalizeStoredMediaUrl(value) {
 
 function isImageFileName(name) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
+}
+
+let spacesS3Client = null;
+
+function getSpacesS3Client() {
+  if (spacesS3Client) return spacesS3Client;
+  if (!SPACES_BUCKET || !SPACES_REGION || !SPACES_ENDPOINT || !SPACES_ACCESS_KEY_ID || !SPACES_SECRET_ACCESS_KEY) {
+    throw new Error('Spaces is not configured');
+  }
+
+  spacesS3Client = new S3Client({
+    region: SPACES_REGION,
+    endpoint: SPACES_ENDPOINT,
+    credentials: {
+      accessKeyId: SPACES_ACCESS_KEY_ID,
+      secretAccessKey: SPACES_SECRET_ACCESS_KEY
+    }
+  });
+  return spacesS3Client;
+}
+
+async function listGalleryPhotosFromSpaces(galleryId) {
+  const id = Number(galleryId);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error('Invalid gallery id');
+  }
+
+  const client = getSpacesS3Client();
+  const prefix = `uploads/gallery/${id}/`;
+  const photos = [];
+  let continuationToken;
+
+  do {
+    const result = await client.send(new ListObjectsV2Command({
+      Bucket: SPACES_BUCKET,
+      Prefix: prefix,
+      ContinuationToken: continuationToken
+    }));
+
+    for (const object of result.Contents || []) {
+      const key = String(object?.Key || '').trim();
+      if (!key || key.endsWith('/')) continue;
+      if (!isImageFileName(key)) continue;
+      photos.push({
+        key,
+        url: buildSpacesObjectUrl(key)
+      });
+    }
+
+    continuationToken = result.IsTruncated ? result.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  photos.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true, sensitivity: 'base' }));
+  return photos;
 }
 
 function buildGalleryUrlsFromDir(dirPath) {
@@ -3223,7 +3297,7 @@ function handleContentApi(req, res, reqUrl) {
   return false;
 }
 
-function handleApi(req, res, reqUrl) {
+async function handleApi(req, res, reqUrl) {
   const { pathname, searchParams } = reqUrl;
 
   if (pathname.startsWith('/api/content/')) {
@@ -3638,6 +3712,27 @@ function handleApi(req, res, reqUrl) {
     const top = db.prepare('SELECT id FROM ippon_images WHERE item_id = ? ORDER BY ordering DESC, id DESC LIMIT 1').get(albumId);
     db.prepare('UPDATE ippon_galery SET image = ?, m_time = ? WHERE id = ?').run(top ? Number(top.id) : 0, nowTs(), albumId);
     sendJson(res, 200, { success: true });
+    return true;
+  }
+
+  const galleryPhotosMatch = pathname.match(/^\/api\/gallery\/(\d+)\/photos$/i);
+  if (galleryPhotosMatch && req.method === 'GET') {
+    const galleryId = Number(galleryPhotosMatch[1]);
+    if (!Number.isInteger(galleryId) || galleryId <= 0) {
+      sendJson(res, 400, { error: 'Nederigs galerijas ID' });
+      return true;
+    }
+
+    try {
+      const photos = await listGalleryPhotosFromSpaces(galleryId);
+      sendJson(res, 200, { photos });
+    } catch (error) {
+      console.error(`[spaces] failed to list gallery ${galleryId} photos:`, error);
+      const message = error && error.message === 'Spaces is not configured'
+        ? 'Spaces nav nokonfigurets'
+        : 'Neizdevas ieladet galerijas foto';
+      sendJson(res, 500, { error: message, photos: [] });
+    }
     return true;
   }
 
@@ -5753,7 +5848,7 @@ try {
   process.exit(1);
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url, `http://${req.headers.host || `localhost:${PORT}`}`);
   const pathname = decodeURIComponent(reqUrl.pathname);
   if (pathname.startsWith('/uploads/')) {
@@ -5826,9 +5921,14 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    const handled = handleApi(req, res, reqUrl);
-    if (!handled) {
-      sendJson(res, 404, { error: 'API route not found' });
+    try {
+      const handled = await handleApi(req, res, reqUrl);
+      if (!handled) {
+        sendJson(res, 404, { error: 'API route not found' });
+      }
+    } catch (error) {
+      console.error('[api] unhandled error:', error);
+      sendJson(res, 500, { error: 'Server error' });
     }
     return;
   }
