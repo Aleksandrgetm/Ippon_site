@@ -411,6 +411,7 @@ h1, h2, h3, h4, h5, h6,
   const listEl = document.getElementById('fgList');
   const searchEl = document.getElementById('fgSearch');
   let items = [];
+  const GALLERY_COVER_BATCH_SIZE = 6;
 
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -431,7 +432,7 @@ h1, h2, h3, h4, h5, h6,
     const title = item.nosaukums || 'Foto galerija';
     const date = item.datums_display || item.datums || '';
     const desc = norm(item.apraksts || '').slice(0, 180);
-    const cover = item.foto_attels || '';
+    const cover = item.coverPreview || item.foto_attels || '';
     return `
       <a class="fg-card" href="/foto-galerija/${encodeURIComponent(item.slug)}">
         ${cover ? `<img class="fg-cover" src="${esc(cover)}" alt="${esc(title)}" loading="lazy">` : `<div class="fg-cover"></div>`}
@@ -465,6 +466,44 @@ h1, h2, h3, h4, h5, h6,
     listEl.hidden = false;
   }
 
+  async function fetchGalleryCover(item) {
+    const galleryId = Number(item && item.id);
+    if (!Number.isInteger(galleryId) || galleryId <= 0) return '';
+
+    try {
+      const res = await fetch(`/api/gallery/${encodeURIComponent(galleryId)}/photos`);
+      if (!res.ok) return '';
+      const data = await res.json();
+      const photos = Array.isArray(data && data.photos) ? data.photos : [];
+      return photos[0] && photos[0].url ? String(photos[0].url) : '';
+    } catch (error) {
+      console.error(`Neizdevas ieladet galerijas ${galleryId} preview foto.`, error);
+      return '';
+    }
+  }
+
+  async function loadGalleryCovers(collection) {
+    const pending = Array.isArray(collection)
+      ? collection.filter((item) => item && !item.coverPreview && !item.foto_attels)
+      : [];
+
+    for (let i = 0; i < pending.length; i += GALLERY_COVER_BATCH_SIZE) {
+      const batch = pending.slice(i, i + GALLERY_COVER_BATCH_SIZE);
+      const coverUrls = await Promise.all(batch.map((item) => fetchGalleryCover(item)));
+
+      let changed = false;
+      batch.forEach((item, index) => {
+        const coverUrl = coverUrls[index];
+        if (coverUrl) {
+          item.coverPreview = coverUrl;
+          changed = true;
+        }
+      });
+
+      if (changed) render();
+    }
+  }
+
   async function init() {
     try {
       const res = await fetch('/api/foto-galerija?limit=500&page=1');
@@ -472,6 +511,7 @@ h1, h2, h3, h4, h5, h6,
       const data = await res.json();
       items = Array.isArray(data.items) ? data.items : [];
       render();
+      await loadGalleryCovers(items);
     } catch (error) {
       stateEl.hidden = false;
       listEl.hidden = true;
@@ -490,11 +530,11 @@ h1, h2, h3, h4, h5, h6,
 				<div class="elementor-element elementor-element-0836316 elementor-widget elementor-widget-image" data-id="0836316" data-element_type="widget" data-e-type="widget" data-widget_type="image.default">
 <img width="300" height="102" src="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png" class="attachment-medium size-medium wp-image-637 w-24 md:w-auto" alt="IPPON.LV sporta klubs R?ga logo" srcset="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 300w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 768w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 1024w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 1536w" sizes="(max-width: 300px) 100vw, 300px">															</div>
 				<div class="elementor-element elementor-element-774392a elementor-widget elementor-widget-heading" data-id="774392a" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default text-sm md:text-base">Liguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default text-sm md:text-base">Līguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
 				</div>
 		<div class="elementor-element elementor-element-6e50c3d e-con-full e-flex e-con e-child w-full flex flex-col items-center text-center md:w-auto md:items-end md:text-right" data-id="6e50c3d" data-element_type="container" data-e-type="container">
 				<div class="elementor-element elementor-element-d5198fa elementor-widget elementor-widget-heading" data-id="d5198fa" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default text-sm md:text-base">SOCIALIE MEDIJI</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default text-sm md:text-base">SOCIĀLIE MEDIJI</h2>				</div>
 				<div class="elementor-element elementor-element-e05c08e elementor-shape-square e-grid-align-right elementor-grid-0 elementor-widget elementor-widget-social-icons" data-id="e05c08e" data-element_type="widget" data-e-type="widget" data-widget_type="social-icons.default">
 							<div class="elementor-social-icons-wrapper elementor-grid gap-2 md:gap-4" role="list">
 							<span class="elementor-grid-item" role="listitem">
