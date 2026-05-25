@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { S3Client, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const { S3Client, ListObjectsV2Command, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 
 const ROOT = __dirname;
@@ -1139,6 +1139,28 @@ function getSpacesS3Client() {
     }
   });
   return spacesS3Client;
+}
+
+function shouldUploadCategoryToSpaces(category) {
+  return String(category || '').trim().toLowerCase() === 'raksti-prese';
+}
+
+async function uploadBufferToSpaces(storageKey, buffer, contentType) {
+  const normalizedKey = String(storageKey || '').replace(/^\/+/, '').trim();
+  if (!normalizedKey) {
+    throw new Error('Storage key is required');
+  }
+
+  const client = getSpacesS3Client();
+  await client.send(new PutObjectCommand({
+    Bucket: SPACES_BUCKET,
+    Key: normalizedKey,
+    Body: buffer,
+    ContentType: contentType || 'application/octet-stream',
+    CacheControl: 'public, max-age=31536000, immutable'
+  }));
+
+  return buildSpacesObjectUrl(normalizedKey);
 }
 
 async function listGalleryPhotosFromSpaces(galleryId) {
@@ -3368,7 +3390,7 @@ async function handleApi(req, res, reqUrl) {
 
   if (pathname === '/api/upload-image' && req.method === 'POST') {
     parseBody(req)
-      .then((body) => {
+      .then(async (body) => {
         const parsed = parseDataUrlImage(body.dataUrl);
         if (!parsed) {
           sendJson(res, 400, { error: 'Invalid image format. Use png/jpg/webp/gif.' });
@@ -3390,11 +3412,17 @@ async function handleApi(req, res, reqUrl) {
           return;
         }
 
-        ensureDir(path.dirname(target.localPath));
-        fs.writeFileSync(target.localPath, buffer);
+        let publicUrl = target.publicUrl;
+        if (shouldUploadCategoryToSpaces(target.category)) {
+          publicUrl = await uploadBufferToSpaces(target.storageKey, buffer, parsed.mime);
+        } else {
+          ensureDir(path.dirname(target.localPath));
+          fs.writeFileSync(target.localPath, buffer);
+        }
+
         sendJson(res, 201, {
-          url: target.publicUrl,
-          relativeUrl: target.publicUrl,
+          url: publicUrl,
+          relativeUrl: publicUrl,
           fileName: target.fileName,
           path: target.storageKey,
           category: target.category,
