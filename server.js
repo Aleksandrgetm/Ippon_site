@@ -120,6 +120,66 @@ function loadEnvFile(filePath) {
   }
 }
 
+const MOJIBAKE_PATTERN = /(?:Ã.|Â.|Ä.|Å.|Ð.|Ñ.|â.|�)/;
+
+function mojibakeScore(value) {
+  const text = String(value || '');
+  const matches = text.match(/(?:Ã.|Â.|Ä.|Å.|Ð.|Ñ.|â.|�)/g);
+  return matches ? matches.length : 0;
+}
+
+function latvianLetterScore(value) {
+  const text = String(value || '');
+  const matches = text.match(/[ĀāČčĒēĢģĪīĶķĻļŅņŠšŪūŽž]/g);
+  return matches ? matches.length : 0;
+}
+
+function repairMojibakeString(value) {
+  let current = String(value ?? '');
+  if (!current || !MOJIBAKE_PATTERN.test(current)) return current;
+
+  for (let i = 0; i < 3; i += 1) {
+    if (!MOJIBAKE_PATTERN.test(current)) break;
+
+    let decoded = current;
+    try {
+      decoded = Buffer.from(current, 'latin1').toString('utf8');
+    } catch {
+      break;
+    }
+
+    if (!decoded || decoded === current) break;
+
+    const currentScore = mojibakeScore(current);
+    const decodedScore = mojibakeScore(decoded);
+    const currentLv = latvianLetterScore(current);
+    const decodedLv = latvianLetterScore(decoded);
+    const looksBetter = decodedScore < currentScore || (decodedScore === currentScore && decodedLv > currentLv);
+    if (!looksBetter) break;
+
+    current = decoded;
+  }
+
+  return current;
+}
+
+function repairMojibakeDeep(value) {
+  if (typeof value === 'string') {
+    return repairMojibakeString(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => repairMojibakeDeep(item));
+  }
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const output = {};
+    for (const [key, item] of Object.entries(value)) {
+      output[key] = repairMojibakeDeep(item);
+    }
+    return output;
+  }
+  return value;
+}
+
 function logSqliteError(context, error) {
   const details = error && error.message ? error.message : String(error);
   console.error(`[sqlite] ${context}: ${details}`);
@@ -2696,13 +2756,14 @@ function safeResolve(base, target) {
 }
 
 function sendJson(res, statusCode, payload) {
+  const normalizedPayload = repairMojibakeDeep(payload);
   res.writeHead(statusCode, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
   });
-  res.end(JSON.stringify(payload));
+  res.end(JSON.stringify(normalizedPayload));
 }
 
 function sendFile(res, filePath) {
@@ -2724,8 +2785,9 @@ function serveStatic(filePath, res) {
   const ext = path.extname(filePath).toLowerCase();
 
   const contentTypeMap = {
-    '.css': 'text/css',
-    '.js': 'application/javascript',
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
