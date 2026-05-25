@@ -412,6 +412,7 @@ h1, h2, h3, h4, h5, h6,
   const searchEl = document.getElementById('fgSearch');
   let items = [];
   const GALLERY_COVER_BATCH_SIZE = 6;
+  const SPACES_PUBLIC_BASE = 'https://ippon.fra1.digitaloceanspaces.com';
 
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -428,14 +429,42 @@ h1, h2, h3, h4, h5, h6,
     .replace(/\s+/g, ' ')
     .trim();
 
+  function resolveImageUrl(value, placeholder = '') {
+    const text = String(value || '').trim();
+    if (!text) return placeholder;
+    if (/^https?:\/\//i.test(text) || text.startsWith('blob:') || text.startsWith('data:')) return text;
+    if (text.startsWith('/uploads/')) return `${SPACES_PUBLIC_BASE}${text}`;
+    return text;
+  }
+
+  function imageFallbackAttrs(value) {
+    const raw = String(value || '').trim();
+    return raw.startsWith('/uploads/')
+      ? ` data-local-fallback="${esc(raw)}" onerror="window.handleResolvedImageError && window.handleResolvedImageError(this)"`
+      : '';
+  }
+
+  window.handleResolvedImageError = function handleResolvedImageError(img) {
+    if (!img) return;
+    const fallback = img.getAttribute('data-local-fallback');
+    if (fallback && img.dataset.fallbackApplied !== '1') {
+      img.dataset.fallbackApplied = '1';
+      img.src = fallback;
+      return;
+    }
+    img.removeAttribute('data-local-fallback');
+    img.removeAttribute('onerror');
+  };
+
   function buildCard(item) {
     const title = item.nosaukums || 'Foto galerija';
     const date = item.datums_display || item.datums || '';
     const desc = norm(item.apraksts || '').slice(0, 180);
     const cover = item.coverPreview || item.foto_attels || '';
+    const coverUrl = resolveImageUrl(cover, '');
     return `
       <a class="fg-card" href="/foto-galerija/${encodeURIComponent(item.slug)}">
-        ${cover ? `<img class="fg-cover" src="${esc(cover)}" alt="${esc(title)}" loading="lazy">` : `<div class="fg-cover"></div>`}
+        ${coverUrl ? `<img class="fg-cover" src="${esc(coverUrl)}" alt="${esc(title)}" loading="lazy"${imageFallbackAttrs(cover)}>` : `<div class="fg-cover"></div>`}
         <div class="fg-content">
           ${date ? `<p class="fg-date">${esc(date)}</p>` : ''}
           <h2 class="fg-name">${esc(title)}</h2>

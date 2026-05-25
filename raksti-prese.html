@@ -429,6 +429,7 @@ h1, h2, h3, h4, h5, h6,
   const listEl = document.getElementById('fgList');
   const searchEl = document.getElementById('fgSearch');
   let items = [];
+  const SPACES_PUBLIC_BASE = 'https://ippon.fra1.digitaloceanspaces.com';
 
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -445,14 +446,42 @@ h1, h2, h3, h4, h5, h6,
     .replace(/\s+/g, ' ')
     .trim();
 
+  function resolveImageUrl(value, placeholder = '') {
+    const text = String(value || '').trim();
+    if (!text) return placeholder;
+    if (/^https?:\/\//i.test(text) || text.startsWith('blob:') || text.startsWith('data:')) return text;
+    if (text.startsWith('/uploads/')) return `${SPACES_PUBLIC_BASE}${text}`;
+    return text;
+  }
+
+  function imageFallbackAttrs(value) {
+    const raw = String(value || '').trim();
+    return raw.startsWith('/uploads/')
+      ? ` data-local-fallback="${esc(raw)}" onerror="window.handleResolvedImageError && window.handleResolvedImageError(this)"`
+      : '';
+  }
+
+  window.handleResolvedImageError = function handleResolvedImageError(img) {
+    if (!img) return;
+    const fallback = img.getAttribute('data-local-fallback');
+    if (fallback && img.dataset.fallbackApplied !== '1') {
+      img.dataset.fallbackApplied = '1';
+      img.src = fallback;
+      return;
+    }
+    img.removeAttribute('data-local-fallback');
+    img.removeAttribute('onerror');
+  };
+
   function buildCard(item) {
     const title = item.nosaukums || 'Raksti prese';
     const date = item.datums || '';
     const desc = norm(item.ievads || '').slice(0, 220);
     const cover = item.attels || '';
+    const coverUrl = resolveImageUrl(cover, '');
     return `
       <a class="fg-card" href="/raksti-prese/${encodeURIComponent(item.id)}">
-        ${cover ? `<img class="fg-cover" src="${esc(cover)}" alt="${esc(title)}" loading="lazy">` : `<div class="fg-cover"></div>`}
+        ${coverUrl ? `<img class="fg-cover" src="${esc(coverUrl)}" alt="${esc(title)}" loading="lazy"${imageFallbackAttrs(cover)}>` : `<div class="fg-cover"></div>`}
         <div class="fg-content">
           ${date ? `<p class="fg-date">${esc(date)}</p>` : ''}
           <h2 class="fg-name">${esc(title)}</h2>
@@ -508,11 +537,11 @@ h1, h2, h3, h4, h5, h6,
 				<div class="elementor-element elementor-element-0836316 elementor-widget elementor-widget-image" data-id="0836316" data-element_type="widget" data-e-type="widget" data-widget_type="image.default">
 															<img width="300" height="102" src="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png" class="attachment-medium size-medium wp-image-637" alt="IPPON.LV sporta klubs R?ga logo" srcset="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 300w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 768w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 1024w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 1536w" sizes="(max-width: 300px) 100vw, 300px">															</div>
 				<div class="elementor-element elementor-element-774392a elementor-widget elementor-widget-heading" data-id="774392a" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default">Liguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default">Līguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
 				</div>
 		<div class="elementor-element elementor-element-6e50c3d e-con-full e-flex e-con e-child" data-id="6e50c3d" data-element_type="container" data-e-type="container">
 				<div class="elementor-element elementor-element-d5198fa elementor-widget elementor-widget-heading" data-id="d5198fa" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default">SOCIALIE MEDIJI</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default">SOCIĀLIE MEDIJI</h2>				</div>
 				<div class="elementor-element elementor-element-e05c08e elementor-shape-square e-grid-align-right elementor-grid-0 elementor-widget elementor-widget-social-icons" data-id="e05c08e" data-element_type="widget" data-e-type="widget" data-widget_type="social-icons.default">
 							<div class="elementor-social-icons-wrapper elementor-grid" role="list">
 							<span class="elementor-grid-item" role="listitem">

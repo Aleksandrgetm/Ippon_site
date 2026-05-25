@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
-const { S3Client, ListObjectsV2Command, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
 
 const ROOT = __dirname;
@@ -1110,10 +1110,10 @@ function normalizeStoredMediaUrl(value) {
     return text;
   }
   if (text.startsWith('/uploads/')) {
-    return buildPublicUploadUrl(text.slice(1));
+    return text;
   }
   if (text.startsWith('uploads/')) {
-    return buildPublicUploadUrl(text);
+    return `/${text}`;
   }
   return text;
 }
@@ -1123,6 +1123,8 @@ function isImageFileName(name) {
 }
 
 let spacesS3Client = null;
+const spacesObjectExistsCache = new Map();
+const SPACES_EXISTS_TTL_MS = 5 * 60 * 1000;
 
 function getSpacesS3Client() {
   if (spacesS3Client) return spacesS3Client;
@@ -1142,7 +1144,77 @@ function getSpacesS3Client() {
 }
 
 function shouldUploadCategoryToSpaces(category) {
-  return String(category || '').trim().toLowerCase() === 'raksti-prese';
+  return true;
+}
+
+async function doesSpacesObjectExist(storageKey) {
+  const normalizedKey = String(storageKey || '').replace(/^\/+/, '').trim();
+  if (!normalizedKey) return false;
+
+  const cached = spacesObjectExistsCache.get(normalizedKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.exists;
+  }
+
+  let exists = false;
+  try {
+    const client = getSpacesS3Client();
+    await client.send(new HeadObjectCommand({
+      Bucket: SPACES_BUCKET,
+      Key: normalizedKey
+    }));
+    exists = true;
+  } catch (error) {
+    const status = Number(error?.$metadata?.httpStatusCode || 0);
+    const code = String(error?.name || error?.Code || '').toLowerCase();
+    if (status !== 404 && status !== 403 && code !== 'notfound' && code !== 'nosuchkey') {
+      console.error(`[spaces] failed to check object ${normalizedKey}:`, error);
+    }
+    exists = false;
+  }
+
+  spacesObjectExistsCache.set(normalizedKey, {
+    exists,
+    expiresAt: Date.now() + SPACES_EXISTS_TTL_MS
+  });
+  return exists;
+}
+
+async function resolveImageUrl(value, placeholder = '') {
+  const text = String(value || '').trim();
+  if (!text) return placeholder;
+  if (/^https?:\/\//i.test(text)) return text;
+
+  const uploadPath = text.startsWith('/uploads/')
+    ? text
+    : text.startsWith('uploads/')
+      ? `/${text}`
+      : '';
+
+  if (!uploadPath) return text;
+
+  const storageKey = uploadPath.slice(1);
+  if (await doesSpacesObjectExist(storageKey)) {
+    return buildSpacesObjectUrl(storageKey);
+  }
+  return uploadPath;
+}
+
+async function resolveImageUrlsDeep(value) {
+  if (typeof value === 'string') {
+    return resolveImageUrl(value, '');
+  }
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((item) => resolveImageUrlsDeep(item)));
+  }
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const output = {};
+    for (const [key, item] of Object.entries(value)) {
+      output[key] = await resolveImageUrlsDeep(item);
+    }
+    return output;
+  }
+  return value;
 }
 
 async function uploadBufferToSpaces(storageKey, buffer, contentType) {
@@ -2788,6 +2860,12 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(normalizedPayload));
 }
 
+async function sendResolvedJson(res, statusCode, payload) {
+  const repairedPayload = repairMojibakeDeep(payload);
+  const resolvedPayload = await resolveImageUrlsDeep(repairedPayload);
+  sendJson(res, statusCode, resolvedPayload);
+}
+
 function sendFile(res, filePath) {
   fs.stat(filePath, (err, stat) => {
     if (err || !stat.isFile()) {
@@ -3187,7 +3265,7 @@ function mapNodarbibasRow(tableName, row) {
   });
 }
 
-function handleContentApi(req, res, reqUrl) {
+async function handleContentApi(req, res, reqUrl) {
   const { pathname, searchParams } = reqUrl;
 
   if (pathname === '/api/content/sportists' && req.method === 'GET') {
@@ -3217,7 +3295,7 @@ function handleContentApi(req, res, reqUrl) {
         : null
     }));
 
-    sendJson(res, 200, { total: items.length, items });
+    await sendResolvedJson(res, 200, { total: items.length, items });
     return true;
   }
 
@@ -3324,7 +3402,7 @@ function handleContentApi(req, res, reqUrl) {
       });
     });
 
-    sendJson(res, 200, { total: items.length, items });
+    await sendResolvedJson(res, 200, { total: items.length, items });
     return true;
   }
 
@@ -3374,7 +3452,7 @@ function handleContentApi(req, res, reqUrl) {
       images: includeImages ? (imagesByAlbum.get(album.id) || []) : undefined
     }));
 
-    sendJson(res, 200, { total: items.length, items });
+    await sendResolvedJson(res, 200, { total: items.length, items });
     return true;
   }
 
@@ -3385,7 +3463,7 @@ async function handleApi(req, res, reqUrl) {
   const { pathname, searchParams } = reqUrl;
 
   if (pathname.startsWith('/api/content/')) {
-    return handleContentApi(req, res, reqUrl);
+    return await handleContentApi(req, res, reqUrl);
   }
 
   if (pathname === '/api/upload-image' && req.method === 'POST') {
@@ -3435,7 +3513,7 @@ async function handleApi(req, res, reqUrl) {
 
   if (pathname === '/api/upload-file' && req.method === 'POST') {
     parseBody(req)
-      .then((body) => {
+      .then(async (body) => {
         const parsed = parseDataUrlFile(body.dataUrl);
         if (!parsed) {
           sendJson(res, 400, { error: 'Invalid file format' });
@@ -3609,7 +3687,7 @@ async function handleApi(req, res, reqUrl) {
       sendJson(res, 404, { error: 'Raksts nav atrasts' });
       return true;
     }
-    sendJson(res, 200, {
+    await sendResolvedJson(res, 200, {
       item: {
         id: Number(row.id || 0),
         datums: String(row.datums || '').trim(),
@@ -3655,7 +3733,7 @@ async function handleApi(req, res, reqUrl) {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const safePage = Math.min(page, totalPages);
     const offset = (safePage - 1) * limit;
-    sendJson(res, 200, {
+    await sendResolvedJson(res, 200, {
       total,
       page: safePage,
       totalPages,
@@ -3705,7 +3783,7 @@ async function handleApi(req, res, reqUrl) {
       return true;
     }
     const imagesByAlbum = getGalleryImageRowsByAlbumIds([id]);
-    sendJson(res, 200, { item: mapFotoGalerijaAlbum(row, imagesByAlbum, true) });
+    await sendResolvedJson(res, 200, { item: mapFotoGalerijaAlbum(row, imagesByAlbum, true) });
     return true;
   }
 
@@ -3718,7 +3796,7 @@ async function handleApi(req, res, reqUrl) {
       return true;
     }
     parseBody(req)
-      .then((body) => {
+      .then(async (body) => {
         const files = Array.isArray(body.files) ? body.files : [];
         if (!files.length) {
           sendJson(res, 400, { error: 'Nav augšupielādējamu failu' });
@@ -3743,8 +3821,7 @@ async function handleApi(req, res, reqUrl) {
             ext: parsed.ext,
             fallbackStem: 'gallery-image'
           });
-          ensureDir(path.dirname(target.localPath));
-          fs.writeFileSync(target.localPath, Buffer.from(parsed.base64, 'base64'));
+          await uploadBufferToSpaces(target.storageKey, Buffer.from(parsed.base64, 'base64'), parsed.mime);
           currentOrder += 1;
           let createdId = 0;
           if (useManualImageId) {
@@ -3851,7 +3928,7 @@ async function handleApi(req, res, reqUrl) {
         sendJson(res, 404, { error: 'Galerija nav atrasta' });
         return true;
       }
-      sendJson(res, 200, { item });
+      await sendResolvedJson(res, 200, { item });
       return true;
     }
 
@@ -3878,7 +3955,7 @@ async function handleApi(req, res, reqUrl) {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const safePage = Math.min(page, totalPages);
     const offset = (safePage - 1) * limit;
-    sendJson(res, 200, {
+    await sendResolvedJson(res, 200, {
       total,
       page: safePage,
       totalPages,
@@ -4585,7 +4662,7 @@ async function handleApi(req, res, reqUrl) {
         sendJson(res, 404, { error: 'Treneris nav atrasts' });
         return true;
       }
-      sendJson(res, 200, { item: mapTrainerRow(row) });
+      await sendResolvedJson(res, 200, { item: mapTrainerRow(row) });
       return true;
     }
 
@@ -4603,7 +4680,7 @@ async function handleApi(req, res, reqUrl) {
         `).all();
 
     const items = rows.map(mapTrainerRow);
-    sendJson(res, 200, { total: items.length, items });
+    await sendResolvedJson(res, 200, { total: items.length, items });
     return true;
   }
 

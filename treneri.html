@@ -429,6 +429,35 @@ h1, h2, h3, h4, h5, h6,
       .replace(/'/g, '&#39;');
   }
 
+  const SPACES_PUBLIC_BASE = 'https://ippon.fra1.digitaloceanspaces.com';
+
+  function resolveImageUrl(value, placeholder = '') {
+    const text = String(value || '').trim();
+    if (!text) return placeholder;
+    if (/^https?:\/\//i.test(text) || text.startsWith('blob:') || text.startsWith('data:')) return text;
+    if (text.startsWith('/uploads/')) return `${SPACES_PUBLIC_BASE}${text}`;
+    return text;
+  }
+
+  function imageFallbackAttrs(value) {
+    const raw = String(value || '').trim();
+    return raw.startsWith('/uploads/')
+      ? ` data-local-fallback="${escapeHtml(raw)}" onerror="window.handleResolvedImageError && window.handleResolvedImageError(this)"`
+      : '';
+  }
+
+  window.handleResolvedImageError = function handleResolvedImageError(img) {
+    if (!img) return;
+    const fallback = img.getAttribute('data-local-fallback');
+    if (fallback && img.dataset.fallbackApplied !== '1') {
+      img.dataset.fallbackApplied = '1';
+      img.src = fallback;
+      return;
+    }
+    img.removeAttribute('data-local-fallback');
+    img.removeAttribute('onerror');
+  };
+
   function initialsOf(name) {
     const words = String(name || '').trim().split(/\s+/).filter(Boolean);
     if (!words.length) return 'T';
@@ -456,8 +485,9 @@ h1, h2, h3, h4, h5, h6,
         const name = escapeHtml(item.vards_uzvards || 'Treneris');
         const belt = escapeHtml(item.josta || 'Josta nav noradita');
         const href = '/treneri/' + encodeURIComponent(item.slug || '');
-        const media = item.foto_attels
-          ? `<div class="trener-media"><img src="${escapeHtml(item.foto_attels)}" alt="${name}" loading="lazy"></div>`
+        const mediaUrl = resolveImageUrl(item.foto_attels, '');
+        const media = mediaUrl
+          ? `<div class="trener-media"><img src="${escapeHtml(mediaUrl)}" alt="${name}" loading="lazy"${imageFallbackAttrs(item.foto_attels)}></div>`
           : `<div class="trener-media trener-media-fallback">${escapeHtml(initialsOf(item.vards_uzvards))}</div>`;
 
         return `
@@ -481,11 +511,11 @@ h1, h2, h3, h4, h5, h6,
 				<div class="elementor-element elementor-element-0836316 elementor-widget elementor-widget-image" data-id="0836316" data-element_type="widget" data-e-type="widget" data-widget_type="image.default">
 															<img width="300" height="102" src="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png" class="attachment-medium size-medium wp-image-637" alt="IPPON.LV sporta klubs R?ga logo" srcset="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 300w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 768w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 1024w, https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png 1536w" sizes="(max-width: 300px) 100vw, 300px">															</div>
 				<div class="elementor-element elementor-element-774392a elementor-widget elementor-widget-heading" data-id="774392a" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default">Liguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default">Līguma Nr.: 9.3-1-L-2025/129, 19.05.2025</h2>				</div>
 				</div>
 		<div class="elementor-element elementor-element-6e50c3d e-con-full e-flex e-con e-child" data-id="6e50c3d" data-element_type="container" data-e-type="container">
 				<div class="elementor-element elementor-element-d5198fa elementor-widget elementor-widget-heading" data-id="d5198fa" data-element_type="widget" data-e-type="widget" data-widget_type="heading.default">
-					<h2 class="elementor-heading-title elementor-size-default">SOCIALIE MEDIJI</h2>				</div>
+					<h2 class="elementor-heading-title elementor-size-default">SOCIĀLIE MEDIJI</h2>				</div>
 				<div class="elementor-element elementor-element-e05c08e elementor-shape-square e-grid-align-right elementor-grid-0 elementor-widget elementor-widget-social-icons" data-id="e05c08e" data-element_type="widget" data-e-type="widget" data-widget_type="social-icons.default">
 							<div class="elementor-social-icons-wrapper elementor-grid" role="list">
 							<span class="elementor-grid-item" role="listitem">

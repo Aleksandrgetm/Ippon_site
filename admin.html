@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
@@ -198,15 +198,15 @@
   <main class="app">
     <section id="loginCard" class="card">
       <h1 class="title">Admin <span>Panel</span></h1>
-      <p class="sub">Ð’Ñ…Ð¾Ð´ Ð² Ð¿Ð°Ð½ÐµÐ»ÑŒ ÑƒÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ñ Ð±Ð°Ð·Ð¾Ð¹ Ð´Ð°Ð½Ð½Ñ‹Ñ…</p>
+      <p class="sub">��&од в панел�R ђпѬавления базой данн�9�&</p>
 
-      <label for="login">Ð›Ð¾Ð³Ð¸Ð½</label>
+      <label for="login">�:огин</label>
       <input id="login" autocomplete="username" />
 
-      <label for="password">ÐŸÐ°Ñ€Ð¾Ð»ÑŒ</label>
+      <label for="password">�xаѬол�R</label>
       <input id="password" type="password" autocomplete="current-password" />
 
-      <button id="loginBtn" type="button">Ð’Ð¾Ð¹Ñ‚Ð¸?</button>
+      <button id="loginBtn" type="button">�ой�и?</button>
       <p id="loginStatus" class="status"></p>
     </section>
 
@@ -214,20 +214,20 @@
       <aside class="panel">
         <div class="toolbar">
           <h2>DB <span>Editor</span></h2>
-          <button id="logoutBtn" class="ghost" type="button">Ð’Ñ‹Ð¹Ñ‚Ð¸?</button>
+          <button id="logoutBtn" class="ghost" type="button">��9й�и?</button>
         </div>
 
-        <label for="tableSelect">Ð¢Ð°Ð±Ð»Ð¸Ñ†Ð°</label>
+        <label for="tableSelect">Табли� а</label>
         <select id="tableSelect"></select>
         <label style="display:flex;align-items:center;gap:8px;margin:8px 0 10px;">
           <input id="includeRemovedCb" type="checkbox" style="width:auto;margin:0;" />
-          ÐŸÐ¾ÐºÐ°Ð·Ñ‹Ð²Ð°Ñ‚ÑŒ ÑƒÐ´Ð°Ð»ÐµÐ½Ð½Ñ‹Ñ… ÑÐ¿Ð¾Ñ€Ñ‚ÑÐ¼ÐµÐ½Ð¾Ð²
+          �xоказ�9ва��R ђдаленн�9�& споѬ�сменов
         </label>
 
         <div class="row-actions">
-          <button id="newBtn" class="light" type="button">ÐÐ¾Ð²Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑŒ?</button>
-          <button id="saveBtn" type="button">Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ?</button>
-          <button id="deleteBtn" class="danger" type="button">Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ?</button>
+          <button id="newBtn" class="light" type="button">Новая запис�R?</button>
+          <button id="saveBtn" type="button">Со�&Ѭани��R?</button>
+          <button id="deleteBtn" class="danger" type="button">Удали��R?</button>
         </div>
         <p id="formStatus" class="status"></p>
 
@@ -239,8 +239,8 @@
         <div class="toolbar">
           <h2>Records <span>List</span></h2>
           <div class="row-actions">
-            <button id="prevBtn" class="light" type="button">ÐÐ°Ð·Ð°Ð´?</button>
-            <button id="nextBtn" class="light" type="button">Ð’Ð¿ÐµÑ€ÐµÐ´?</button>
+            <button id="prevBtn" class="light" type="button">Назад?</button>
+            <button id="nextBtn" class="light" type="button">�пеѬед?</button>
           </div>
         </div>
         <p id="listMeta" class="small"></p>
@@ -423,7 +423,7 @@
 
       const headRow = document.createElement('tr');
       const first = document.createElement('th');
-      first.textContent = 'Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ';
+      first.textContent = 'Редак�иѬова��R';
       headRow.appendChild(first);
 
       currentColumns.slice(0, 6).forEach((col) => {
@@ -443,12 +443,12 @@
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'light';
-        btn.textContent = 'ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ';
+        btn.textContent = '�~�кѬ�9��R';
         btn.addEventListener('click', () => {
           selectedRow = row;
           fillForm(row);
           renderTable();
-          setStatus(`Ð’Ñ‹Ð±Ñ€Ð°Ð½Ð° Ð·Ð°Ð¿Ð¸ÑÑŒ ID ${row[currentPk]}`, 'ok');
+          setStatus(`��9бѬана запис�R ID ${row[currentPk]}`, 'ok');
         });
         btnCell.appendChild(btn);
         tr.appendChild(btnCell);
@@ -463,7 +463,7 @@
         tableBody.appendChild(tr);
       });
 
-      listMeta.textContent = `${currentTable}: ${offset + 1}-${Math.min(offset + PAGE_SIZE, total)} Ð¸Ð· ${total}`;
+      listMeta.textContent = `${currentTable}: ${offset + 1}-${Math.min(offset + PAGE_SIZE, total)} из ${total}`;
     }
 
     async function loadTableData(resetOffset = false) {
@@ -498,14 +498,14 @@
             body: JSON.stringify(payload)
           });
           selectedRow = data.row;
-          setStatus(`Ð—Ð°Ð¿Ð¸ÑÑŒ ID ${id} Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð°`, 'ok');
+          setStatus(`�апис�R ID ${id} обновлена`, 'ok');
         } else {
           const data = await api(`/api/table/${currentTable}`, {
             method: 'POST',
             body: JSON.stringify(payload)
           });
           selectedRow = data.row;
-          setStatus(`Ð¡Ð¾Ð·Ð´Ð°Ð½Ð° Ð½Ð¾Ð²Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÑŒ ID ${data.row[currentPk]}`, 'ok');
+          setStatus(`Создана новая запис�R ID ${data.row[currentPk]}`, 'ok');
         }
         await loadTableData();
       } catch (error) {
@@ -515,17 +515,17 @@
 
     async function deleteRow() {
       if (!selectedRow || selectedRow[currentPk] == null) {
-        setStatus('Ð¡Ð½Ð°Ñ‡Ð°Ð»Ð° Ð²Ñ‹Ð±ÐµÑ€Ð¸ Ð·Ð°Ð¿Ð¸ÑÑŒ', 'error');
+        setStatus('Сна�!ала в�9беѬи запис�R', 'error');
         return;
       }
 
       const id = selectedRow[currentPk];
-      if (!confirm(`Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ Ð·Ð°Ð¿Ð¸ÑÑŒ ID ${id}?`)) return;
+      if (!confirm(`Удали��R запис�R ID ${id}?`)) return;
 
       try {
         await api(`/api/table/${currentTable}/${id}`, { method: 'DELETE' });
         selectedRow = null;
-        setStatus(`Ð—Ð°Ð¿Ð¸ÑÑŒ ID ${id} ÑƒÐ´Ð°Ð»ÐµÐ½Ð°`, 'ok');
+        setStatus(`�апис�R ID ${id} ђдалена`, 'ok');
         await loadTableData();
       } catch (error) {
         setStatus(error.message, 'error');
@@ -535,7 +535,7 @@
     loginBtn.addEventListener('click', async () => {
       const ok = loginInput.value === AUTH.login && passwordInput.value === AUTH.password;
       if (!ok) {
-        loginStatus.textContent = 'ÐÐµÐ²ÐµÑ€Ð½Ñ‹Ð¹ Ð»Ð¾Ð³Ð¸Ð½ Ð¸Ð»Ð¸ Ð¿Ð°Ñ€Ð¾Ð»ÑŒ';
+        loginStatus.textContent = 'НевеѬн�9й логин или паѬол�R';
         loginStatus.className = 'status error';
         return;
       }
@@ -573,7 +573,7 @@
       selectedRow = null;
       fillForm(null);
       renderTable();
-      setStatus('Ð ÐµÐ¶Ð¸Ð¼ ÑÐ¾Ð·Ð´Ð°Ð½Ð¸Ñ Ð½Ð¾Ð²Ð¾Ð¹ Ð·Ð°Ð¿Ð¸ÑÐ¸', 'ok');
+      setStatus('Режим создания новой записи', 'ok');
     });
 
     saveBtn.addEventListener('click', saveRow);
