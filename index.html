@@ -972,6 +972,14 @@ body > [data-elementor-type="footer"] {
 						return `https://${value}`;
 					}
 
+					function resolveImageUrl(path) {
+						const value = String(path || '').trim();
+						if (!value) return '';
+						if (value.startsWith('http://') || value.startsWith('https://')) return value;
+						if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+						return value;
+					}
+
 				function initials(text) {
 					const words = String(text || '').trim().split(/\s+/).filter(Boolean);
 					if (!words.length) return 'P';
@@ -980,7 +988,7 @@ body > [data-elementor-type="footer"] {
 
 						function cardHtml(item) {
 							const name = String(item.nosaukums || '').trim() || 'Partneris';
-							const logo = String(item.foto_attels || '').trim();
+							const logo = resolveImageUrl(item.mainImage || item.foto_attels || item.attels || item.image || '');
 							const link = normalizeExternalUrl(item.links);
 							if (!logo) return '';
 							const cardInner = `<img class="home-sponsor-logo" src="${esc(logo)}" alt="${esc(name)}" loading="lazy">`;

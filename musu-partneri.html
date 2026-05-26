@@ -457,11 +457,19 @@ h1, h2, h3, h4, h5, h6,
     return `https://${value}`;
   }
 
+  function resolveImageUrl(path) {
+    const value = String(path || '').trim();
+    if (!value) return '';
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+    return value;
+  }
+
   function renderCard(item) {
     const name = normalizeText(item.nosaukums);
     const info = htmlToPlainText(item.informacija);
     const link = normalizeExternalUrl(item.links);
-    const img = String(item.foto_attels || '').trim();
+    const img = resolveImageUrl(item.mainImage || item.foto_attels || item.attels || item.image || '');
     return `
       <article class="partner-card">
         ${img
