@@ -549,6 +549,23 @@ h1, h2, h3, h4, h5, h6,
   }
 </style>
 <script>
+  function resolveImageUrl(path) {
+    const value = String(path || '').trim();
+    if (!value) return '';
+    if (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:') ||
+      value.startsWith('blob:')
+    ) {
+      return value;
+    }
+    if (value.startsWith('/uploads/')) {
+      return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+    }
+    return value;
+  }
+
   function formatDate(dateText) {
     if (!dateText) return '';
     const m = String(dateText).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -643,7 +660,7 @@ h1, h2, h3, h4, h5, h6,
         if (item.foto) {
           const img = document.createElement('img');
           img.className = 'sportisti-photo';
-          img.src = item.foto;
+          img.src = resolveImageUrl(item.foto);
           img.alt = fullName;
           img.loading = 'lazy';
           img.addEventListener('error', () => {

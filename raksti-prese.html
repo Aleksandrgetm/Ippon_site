@@ -466,7 +466,7 @@ h1, h2, h3, h4, h5, h6,
     const fallback = img.getAttribute('data-local-fallback');
     if (fallback && img.dataset.fallbackApplied !== '1') {
       img.dataset.fallbackApplied = '1';
-      img.src = fallback;
+      img.src = resolveImageUrl(fallback);
       return;
     }
     img.removeAttribute('data-local-fallback');

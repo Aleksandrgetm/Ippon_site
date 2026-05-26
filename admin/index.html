@@ -1423,7 +1423,7 @@
         rezSacMainPreview.innerHTML = '';
         return;
       }
-      rezSacMainPreview.innerHTML = `<img src="${src}" alt="Fotogrāfija" style="max-width:180px;max-height:140px;display:block;border-radius:8px;border:1px solid var(--line);" />`;
+      rezSacMainPreview.innerHTML = buildResolvedImageHtml(src, 'Fotogrāfija', 'max-width:180px;max-height:140px;display:block;border-radius:8px;border:1px solid var(--line);');
     }
 
     function renderRezGalleryPreview() {
@@ -1434,7 +1434,7 @@
         const item = document.createElement('div');
         item.className = 'rez-gallery-item';
         const img = document.createElement('img');
-        img.src = src;
+        img.src = resolveImageUrl(src);
         img.alt = `Galerija ${index + 1}`;
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1458,7 +1458,7 @@
         const card = document.createElement('div');
         card.className = 'rez-gallery-item';
         const tag = document.createElement('img');
-        tag.src = img.url;
+        tag.src = resolveImageUrl(img.url);
         tag.alt = img.filename || 'Foto';
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -1640,6 +1640,33 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    const SPACES_PUBLIC_BASE = 'https://ippon.fra1.digitaloceanspaces.com';
+
+    function resolveImageUrl(path) {
+      const value = String(path || '').trim();
+      if (!value) return '';
+      if (
+        value.startsWith('http://') ||
+        value.startsWith('https://') ||
+        value.startsWith('data:') ||
+        value.startsWith('blob:')
+      ) {
+        return value;
+      }
+      if (value.startsWith('/uploads/')) {
+        return `${SPACES_PUBLIC_BASE}${value}`;
+      }
+      return value;
+    }
+
+    function buildResolvedImageHtml(path, alt = '', style = '') {
+      const src = resolveImageUrl(path);
+      if (!src) return '';
+      const safeAlt = escapeHtml(alt);
+      const safeStyle = String(style || '').replace(/"/g, '&quot;');
+      return `<img src="${escapeHtml(src)}" alt="${safeAlt}"${safeStyle ? ` style="${safeStyle}"` : ''}>`;
     }
 
     function rezNormalizeRows(rows) {
@@ -2054,7 +2081,7 @@
         kalImagePreview.innerHTML = '';
         return;
       }
-      kalImagePreview.innerHTML = `<img src="${src}" alt="Attēls" style="max-width:180px;max-height:140px;display:block;border-radius:8px;border:1px solid var(--line);" />`;
+      kalImagePreview.innerHTML = buildResolvedImageHtml(src, 'Attēls', 'max-width:180px;max-height:140px;display:block;border-radius:8px;border:1px solid var(--line);');
     }
 
     function resetKalForm() {
@@ -3068,7 +3095,7 @@
         preview.removeAttribute('src');
         return;
       }
-      preview.src = src;
+      preview.src = resolveImageUrl(src);
       preview.style.display = 'block';
     }
 
@@ -4221,7 +4248,7 @@
         img.style.objectFit = 'cover';
         img.style.borderRadius = '6px';
         img.style.border = '1px solid var(--line)';
-        img.src = url;
+        img.src = resolveImageUrl(url);
         preview.appendChild(img);
       });
     }
@@ -4247,7 +4274,7 @@
         preview.removeAttribute('src');
         return;
       }
-      preview.src = src;
+      preview.src = resolveImageUrl(src);
       preview.style.display = 'block';
     }
 
@@ -4282,7 +4309,7 @@
         img.style.objectFit = 'cover';
         img.style.borderRadius = '6px';
         img.style.border = '1px solid var(--line)';
-        img.src = url;
+        img.src = resolveImageUrl(url);
         preview.appendChild(img);
       });
     }
@@ -4298,7 +4325,7 @@
         preview.removeAttribute('src');
         return;
       }
-      preview.src = src;
+      preview.src = resolveImageUrl(src);
       preview.style.display = 'block';
     }
 
@@ -4333,7 +4360,7 @@
         img.style.objectFit = 'cover';
         img.style.borderRadius = '6px';
         img.style.border = '1px solid var(--line)';
-        img.src = url;
+        img.src = resolveImageUrl(url);
         preview.appendChild(img);
       });
     }
@@ -4561,7 +4588,7 @@
         preview.removeAttribute('src');
         return;
       }
-      preview.src = src;
+      preview.src = resolveImageUrl(src);
       preview.style.display = 'block';
     }
 
@@ -5049,14 +5076,14 @@
           const val = row[col.name];
           if (currentTable === NEWS_TABLE && col.name === 'foto_attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:52px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:52px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;')
               : '—';
           } else if (currentTable === NEWS_TABLE && col.name === 'galerija') {
             const count = parseNewsGalleryValue(val).length;
             td.textContent = count > 0 ? `${count} foto` : '—';
           } else if (currentTable === RAKSTI_PRESE_TABLE && col.name === 'attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:52px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:52px;height:36px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;')
               : '—';
           } else if (currentTable === RAKSTI_PRESE_TABLE && col.name === 'ievads') {
             const plain = String(val || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -5068,18 +5095,18 @@
               : '—';
           } else if (currentTable === REZULTATI_TABLE && col.name === 'foto_attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:72px;height:46px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:72px;height:46px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;')
               : '—';
           } else if (currentTable === TRAINERS_TABLE && col.name === 'foto_attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;')
               : '—';
           } else if (currentTable === TRAINERS_TABLE && col.name === 'galerija') {
             const count = parseTrainerGalleryValue(val).length;
             td.textContent = count > 0 ? `${count} foto` : '—';
           } else if (currentTable === 'ippon_sportists' && col.name === 'foto_attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;')
               : '—';
           } else if (currentTable === 'ippon_sportists' && col.name === 'galerija') {
             const count = parseTrainerGalleryValue(val).length;
@@ -5088,7 +5115,7 @@
             td.textContent = Number(val || 0) === 1 ? 'Slēpts' : 'Redzams';
           } else if (SADARBIBA_TABLES.has(currentTable) && col.name === 'foto_attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;')
               : '—';
           } else if (SADARBIBA_TABLES.has(currentTable) && col.name === 'galerija') {
             const count = parseTrainerGalleryValue(val).length;
@@ -5098,11 +5125,11 @@
             td.textContent = plain.slice(0, 120);
           } else if (NODARBIBAS_TABLES.has(currentTable) && col.name === 'attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:120px;height:70px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:120px;height:70px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;')
               : '—';
           } else if (HALL_TABLES.has(currentTable) && col.name === 'attels') {
             td.innerHTML = val
-              ? `<img src="${String(val).replace(/"/g, '&quot;')}" alt="" style="width:72px;height:46px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;">`
+              ? buildResolvedImageHtml(val, '', 'width:72px;height:46px;object-fit:cover;border-radius:4px;border:1px solid #d8dee9;')
               : '—';
           } else if (HALL_TABLES.has(currentTable) && col.name === 'galerija') {
             const count = parseHallGalleryValue(val).length;
