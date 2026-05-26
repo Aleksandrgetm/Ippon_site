@@ -562,8 +562,17 @@ h1, h2, h3, h4, h5, h6,
         .replace(/'/g, '&#39;');
     }
 
+    function resolveImageUrl(path) {
+      const value = String(path || '').trim();
+      if (!value) return '';
+      if (value.startsWith('http://') || value.startsWith('https://')) return value;
+      if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+      return value;
+    }
+
     function cardTemplate(item) {
-      const image = item.foto_attels ? `<img src="${escapeHtml(item.foto_attels)}" alt="${escapeHtml(item.nosaukums)}" loading="lazy">` : '';
+      const imageUrl = resolveImageUrl(item.foto_attels || item.mainImage || item.image || item.attels || '');
+      const image = imageUrl ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.nosaukums)}" loading="lazy">` : '';
       return `
         <a class="jaunumi-item" href="/jaunumi/${encodeURIComponent(item.slug)}">
           <div class="jaunumi-content">
