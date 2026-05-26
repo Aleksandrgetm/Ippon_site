@@ -2300,11 +2300,15 @@ function dateSortValue(dateText) {
 }
 
 function queryRezultatiSourceSacensibas(overrideMap) {
+  const hasVietuSkaitsColumn = getTableColumns('ippon_sorevnovanija').some((col) => col.name === 'vietu_skaits');
+  const vietuSkaitsSelect = hasVietuSkaitsColumn
+    ? 'COALESCE(vietu_skaits, 0) AS vietu_skaits,'
+    : '0 AS vietu_skaits,';
   const rows = db.prepare(`
     SELECT
       id, date, name_lv, name_ru, name_en,
       location_lv, location_ru, location_en,
-      status_id, image, foto_attels, vietu_skaits, galerija, layout_type, slug, structured_data, custom_html, created_at, updated_at, c_time, m_time,
+      status_id, image, foto_attels, ${vietuSkaitsSelect} galerija, layout_type, slug, structured_data, custom_html, created_at, updated_at, c_time, m_time,
       (SELECT COUNT(*) FROM ippon_results r WHERE r.event_id = ippon_sorevnovanija.id) AS rezultatu_vietu_skaits
     FROM ippon_sorevnovanija
     ORDER BY date DESC, id DESC
