@@ -769,6 +769,7 @@ function ensureRezultatiSchema() {
   ensureTableColumn('ippon_sorevnovanija', 'layout_type', "TEXT DEFAULT 'competition_default'");
   ensureTableColumn('ippon_sorevnovanija', 'slug', 'TEXT');
   ensureTableColumn('ippon_sorevnovanija', 'foto_attels', 'TEXT');
+  ensureTableColumn('ippon_sorevnovanija', 'vietu_skaits', 'INTEGER');
   ensureTableColumn('ippon_sorevnovanija', 'galerija', 'TEXT');
   ensureTableColumn('ippon_sorevnovanija', 'structured_data', 'TEXT');
   ensureTableColumn('ippon_sorevnovanija', 'custom_html', 'TEXT');
@@ -2303,14 +2304,16 @@ function queryRezultatiSourceSacensibas(overrideMap) {
     SELECT
       id, date, name_lv, name_ru, name_en,
       location_lv, location_ru, location_en,
-      status_id, image, foto_attels, galerija, layout_type, slug, structured_data, custom_html, created_at, updated_at, c_time, m_time,
-      (SELECT COUNT(*) FROM ippon_results r WHERE r.event_id = ippon_sorevnovanija.id) AS vietu_skaits
+      status_id, image, foto_attels, vietu_skaits, galerija, layout_type, slug, structured_data, custom_html, created_at, updated_at, c_time, m_time,
+      (SELECT COUNT(*) FROM ippon_results r WHERE r.event_id = ippon_sorevnovanija.id) AS rezultatu_vietu_skaits
     FROM ippon_sorevnovanija
     ORDER BY date DESC, id DESC
   `).all();
   return rows.map((row) => {
     const item = mapRezultatiSacensibasSource(row, overrideMap.get(`ippon_sorevnovanija:${row.id}`));
-    item.vietu_skaits = Number(row.vietu_skaits || 0);
+    item.vietu_skaits = row.vietu_skaits != null
+      ? (Number(row.vietu_skaits) || 0)
+      : (Number(row.rezultatu_vietu_skaits || 0) || 0);
     return item;
   });
 }
@@ -2474,6 +2477,10 @@ function buildRezultatiPayload(body, existing = null) {
   const fotoAttels = body.foto_attels != null
     ? String(body.foto_attels).trim()
     : String(current.foto_attels || '').trim();
+  const vietuSkaitsRaw = body.vietu_skaits != null ? body.vietu_skaits : current.vietu_skaits;
+  const vietuSkaits = vietuSkaitsRaw == null || String(vietuSkaitsRaw).trim() === ''
+    ? null
+    : (Number(vietuSkaitsRaw) || 0);
   const galerija = body.galerija != null ? body.galerija : current.galerija;
 
   return {
@@ -2498,6 +2505,7 @@ function buildRezultatiPayload(body, existing = null) {
       layout_type: layoutType,
       slug,
       foto_attels: fotoAttels || null,
+      vietu_skaits: vietuSkaits,
       galerija: JSON.stringify(parseGallery(galerija)),
       structured_data: stringifyStructuredData(validation.normalized),
       custom_html: customHtml || null,
@@ -5373,11 +5381,11 @@ async function handleApi(req, res, reqUrl) {
               name_lv, name_ru, name_en,
               location_lv, location_ru, location_en,
               info_lv, info_ru, info_en,
-              results_url, image, public, ordering,
+              results_url, image, public, ordering, vietu_skaits,
               c_time, m_time,
               record_type, layout_type, slug, foto_attels, galerija, structured_data, custom_html, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             v.area_id,
             v.status_id,
@@ -5396,6 +5404,7 @@ async function handleApi(req, res, reqUrl) {
             v.image,
             v.public,
             v.ordering,
+            v.vietu_skaits,
             ts,
             ts,
             v.record_type,
@@ -5988,7 +5997,7 @@ async function handleApi(req, res, reqUrl) {
               name_lv = ?, name_ru = ?, name_en = ?,
               location_lv = ?, location_ru = ?, location_en = ?,
               info_lv = ?, info_ru = ?, info_en = ?,
-              m_time = ?,
+              vietu_skaits = ?, m_time = ?,
               record_type = ?, layout_type = ?, slug = ?, foto_attels = ?, galerija = ?, structured_data = ?, custom_html = ?, updated_at = ?
             WHERE id = ?
           `).run(
@@ -6003,6 +6012,7 @@ async function handleApi(req, res, reqUrl) {
             v.info_lv,
             v.info_ru,
             v.info_en,
+            v.vietu_skaits,
             ts,
             v.record_type,
             v.layout_type,
