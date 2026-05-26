@@ -1258,6 +1258,7 @@ async function uploadBufferToSpaces(storageKey, buffer, contentType) {
       Key: normalizedKey,
       Body: buffer,
       ContentType: normalizedContentType,
+      ACL: 'public-read',
       CacheControl: 'public, max-age=31536000, immutable'
     }));
 
