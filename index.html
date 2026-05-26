@@ -1215,6 +1215,14 @@ body > [data-elementor-type="footer"] {
 						.replace(/'/g, '&#39;');
 				}
 
+				function resolveImageUrl(path) {
+					const value = String(path || '').trim();
+					if (!value) return '';
+					if (value.startsWith('http://') || value.startsWith('https://')) return value;
+					if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+					return value;
+				}
+
 				function perPage() {
 					if (window.innerWidth <= 760) return 1;
 					if (window.innerWidth <= 1100) return 2;
@@ -1223,8 +1231,10 @@ body > [data-elementor-type="footer"] {
 
 				function renderSlides() {
 					track.innerHTML = items.map((item) => {
-						const imageStyle = item.foto_attels
-							? `background-image:url('${escapeHtml(item.foto_attels)}');`
+						const image = item.mainImage || item.foto_attels || item.attels || item.image || '';
+						const imageUrl = resolveImageUrl(image);
+						const imageStyle = imageUrl
+							? `background-image:url('${escapeHtml(imageUrl)}');`
 							: '';
 						return `
 							<div class="home-news-slide">
