@@ -1626,16 +1626,21 @@ function withResolvedMedia(item, options = {}) {
     ?? item.image
     ?? ''
   ) || null;
-  const resolved = category ? resolveMedia({
-    type: category,
-    id,
-    slug: options.slug ?? item.slug,
-    name: options.name ?? item.name,
-    nosaukums: options.nosaukums ?? item.nosaukums,
-    title: options.title ?? item.title,
-    folder: options.folder
-  }) : { mainImage: null, gallery: [] };
-  const mainImage = resolved.mainImage || fallbackMain || null;
+  const useDirectFallbackMain = category === 'trainers';
+  const resolved = useDirectFallbackMain
+    ? { mainImage: null, gallery: [] }
+    : category ? resolveMedia({
+        type: category,
+        id,
+        slug: options.slug ?? item.slug,
+        name: options.name ?? item.name,
+        nosaukums: options.nosaukums ?? item.nosaukums,
+        title: options.title ?? item.title,
+        folder: options.folder
+      }) : { mainImage: null, gallery: [] };
+  const mainImage = useDirectFallbackMain
+    ? (fallbackMain || null)
+    : (resolved.mainImage || fallbackMain || null);
   const gallery = uniqueUrls([...(resolved.gallery || []), ...existingGallery]);
 
   return {
