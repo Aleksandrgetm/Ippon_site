@@ -2315,15 +2315,20 @@ function queryRezultatiSourceSacensibas(overrideMap) {
   `).all();
   return rows.map((row) => {
     const item = mapRezultatiSacensibasSource(row, overrideMap.get(`ippon_sorevnovanija:${row.id}`));
-    item.vietu_skaits = row.vietu_skaits != null
-      ? (Number(row.vietu_skaits) || 0)
-      : (Number(row.rezultatu_vietu_skaits || 0) || 0);
+    item.vietu_skaits = resolveRezultatiVietuSkaits(row, row.rezultatu_vietu_skaits);
     return item;
   });
 }
 
 function hasRezultatiVietuSkaitsColumn() {
   return getTableColumns('ippon_sorevnovanija').some((col) => col.name === 'vietu_skaits');
+}
+
+function resolveRezultatiVietuSkaits(row, fallbackCount = 0) {
+  if (hasRezultatiVietuSkaitsColumn()) {
+    return Number(row?.vietu_skaits || 0) || 0;
+  }
+  return Number(fallbackCount || 0) || 0;
 }
 
 function queryRezultatiSourceEksamens(overrideMap) {
@@ -4491,7 +4496,7 @@ async function handleApi(req, res, reqUrl) {
           informacija: pickLang(r, 'info_lv', 'info_ru', 'info_en') || ''
         }));
         mapped.results_rows = resultRows;
-        mapped.vietu_skaits = resultRows.length;
+        mapped.vietu_skaits = resolveRezultatiVietuSkaits(row, resultRows.length);
         sendJson(res, 200, { item: mapped });
         return true;
       }
@@ -4531,7 +4536,7 @@ async function handleApi(req, res, reqUrl) {
           informacija: pickLang(r, 'info_lv', 'info_ru', 'info_en') || ''
         }));
         item.results_rows = resultRows;
-        item.vietu_skaits = resultRows.length;
+        item.vietu_skaits = resolveRezultatiVietuSkaits(row, resultRows.length);
         sendJson(res, 200, { item });
         return true;
       }
