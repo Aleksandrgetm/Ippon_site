@@ -429,19 +429,20 @@ h1, h2, h3, h4, h5, h6,
       .replace(/'/g, '&#39;');
   }
 
-  const SPACES_PUBLIC_BASE = 'https://ippon.fra1.digitaloceanspaces.com';
+  function isAbsoluteImageUrl(value) {
+    return /^https?:\/\//i.test(String(value || '').trim());
+  }
 
   function resolveImageUrl(value, placeholder = '') {
     const text = String(value || '').trim();
     if (!text) return placeholder;
-    if (/^https?:\/\//i.test(text) || text.startsWith('blob:') || text.startsWith('data:')) return text;
-    if (text.startsWith('/uploads/')) return `${SPACES_PUBLIC_BASE}${text}`;
+    if (isAbsoluteImageUrl(text) || text.startsWith('blob:') || text.startsWith('data:')) return text;
     return text;
   }
 
   function imageFallbackAttrs(value) {
     const raw = String(value || '').trim();
-    return raw.startsWith('/uploads/')
+    return raw && !isAbsoluteImageUrl(raw)
       ? ` data-local-fallback="${escapeHtml(raw)}" onerror="window.handleResolvedImageError && window.handleResolvedImageError(this)"`
       : '';
   }
@@ -485,9 +486,11 @@ h1, h2, h3, h4, h5, h6,
         const name = escapeHtml(item.vards_uzvards || 'Treneris');
         const belt = escapeHtml(item.josta || 'Josta nav noradita');
         const href = '/treneri/' + encodeURIComponent(item.slug || '');
-        const mediaUrl = resolveImageUrl(item.foto_attels, '');
+        const imageUrl = item.foto_attels || item.mainImage || '';
+        console.log('TRAINER IMAGE:', imageUrl);
+        const mediaUrl = resolveImageUrl(imageUrl, '');
         const media = mediaUrl
-          ? `<div class="trener-media"><img src="${escapeHtml(mediaUrl)}" alt="${name}" loading="lazy"${imageFallbackAttrs(item.foto_attels)}></div>`
+          ? `<div class="trener-media"><img src="${escapeHtml(mediaUrl)}" alt="${name}" loading="lazy"${imageFallbackAttrs(imageUrl)}></div>`
           : `<div class="trener-media trener-media-fallback">${escapeHtml(initialsOf(item.vards_uzvards))}</div>`;
 
         return `
