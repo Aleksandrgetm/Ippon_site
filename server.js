@@ -1222,17 +1222,81 @@ async function uploadBufferToSpaces(storageKey, buffer, contentType) {
   if (!normalizedKey) {
     throw new Error('Storage key is required');
   }
+  if (normalizedKey.startsWith(`${SPACES_BUCKET}/`)) {
+    throw new Error('Storage key must not include bucket name');
+  }
+  if (normalizedKey.includes('\\')) {
+    throw new Error('Storage key must use forward slashes');
+  }
+  if (!Buffer.isBuffer(buffer)) {
+    throw new Error('Upload body must be a Buffer');
+  }
+  if (buffer.length <= 0) {
+    throw new Error('Upload body is empty');
+  }
+
+  const normalizedContentType = String(contentType || '').trim().toLowerCase() || 'application/octet-stream';
+  const allowedContentTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+  if (!allowedContentTypes.has(normalizedContentType)) {
+    throw new Error(`Unsupported image content type: ${normalizedContentType}`);
+  }
 
   const client = getSpacesS3Client();
-  await client.send(new PutObjectCommand({
-    Bucket: SPACES_BUCKET,
-    Key: normalizedKey,
-    Body: buffer,
-    ContentType: contentType || 'application/octet-stream',
-    CacheControl: 'public, max-age=31536000, immutable'
-  }));
+  const logContext = {
+    key: normalizedKey,
+    bucket: SPACES_BUCKET,
+    endpoint: SPACES_ENDPOINT,
+    contentType: normalizedContentType,
+    fileSize: buffer.length
+  };
 
-  return buildSpacesObjectUrl(normalizedKey);
+  console.log('[spaces-upload] uploading key:', logContext);
+
+  try {
+    const putResponse = await client.send(new PutObjectCommand({
+      Bucket: SPACES_BUCKET,
+      Key: normalizedKey,
+      Body: buffer,
+      ContentType: normalizedContentType,
+      CacheControl: 'public, max-age=31536000, immutable'
+    }));
+
+    console.log('[spaces-upload] upload success:', {
+      ...logContext,
+      response: putResponse
+    });
+
+    const headResponse = await client.send(new HeadObjectCommand({
+      Bucket: SPACES_BUCKET,
+      Key: normalizedKey
+    }));
+
+    console.log('[spaces-upload] headObject success:', {
+      ...logContext,
+      response: headResponse
+    });
+
+    spacesObjectExistsCache.set(normalizedKey, {
+      exists: true,
+      expiresAt: Date.now() + SPACES_EXISTS_TTL_MS
+    });
+
+    const publicUrl = buildSpacesObjectUrl(normalizedKey);
+    console.log('[spaces-upload] public url:', publicUrl);
+    return publicUrl;
+  } catch (error) {
+    spacesObjectExistsCache.delete(normalizedKey);
+    console.error('[spaces-upload] upload failed:', {
+      ...logContext,
+      error: {
+        name: error?.name || null,
+        message: error?.message || String(error),
+        code: error?.Code || error?.code || null,
+        statusCode: error?.$metadata?.httpStatusCode || null
+      }
+    });
+    throw error;
+  }
 }
 
 async function listGalleryPhotosFromSpaces(galleryId) {
