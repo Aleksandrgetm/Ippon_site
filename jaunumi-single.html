@@ -527,6 +527,14 @@ h1, h2, h3, h4, h5, h6,
         .replace(/'/g, '&#39;');
     }
 
+    function resolveImageUrl(path) {
+      const value = String(path || '').trim();
+      if (!value) return '';
+      if (value.startsWith('http://') || value.startsWith('https://')) return value;
+      if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+      return value;
+    }
+
     function getSlug() {
       const parts = location.pathname.split('/').filter(Boolean);
       const fromPath = parts.length >= 2 && parts[0] === 'jaunumi' ? parts[1] : '';
@@ -643,7 +651,8 @@ h1, h2, h3, h4, h5, h6,
     }
 
     function render(item) {
-      const gallery = parseGalleryUrls(item.galerija);
+      const gallery = parseGalleryUrls(item.galerija).map((url) => resolveImageUrl(url)).filter(Boolean);
+      const imageUrl = resolveImageUrl(item.foto_attels || item.mainImage || item.image || item.attels || '');
       root.innerHTML =
         '<div class="post-content">' +
           '<div class="post-layout">' +
@@ -658,8 +667,8 @@ h1, h2, h3, h4, h5, h6,
               '<div class="post-zina">' + (sanitizeLegacyHtml(item.zina || '') || escapeHtml(item.zina || '')) + '</div>' +
             '</div>' +
             '<aside class="post-media">' +
-              (item.foto_attels
-                ? '<div class="post-image-wrap"><img class="post-image" src="' + escapeHtml(item.foto_attels) + '" alt="' + escapeHtml(item.nosaukums || '') + '" loading="eager"></div>'
+              (imageUrl
+                ? '<div class="post-image-wrap"><img class="post-image" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(item.nosaukums || '') + '" loading="eager"></div>'
                 : '') +
             '</aside>' +
           '</div>' +
@@ -681,7 +690,7 @@ h1, h2, h3, h4, h5, h6,
       window.__ipponSeo && window.__ipponSeo.update({
         title: (item.nosaukums || 'Jaunums') + ' | IPPON.LV',
         description: item.ievads || item.zina || 'IPPON.LV jaunums par karate Riga un kluba aktualitatem.',
-        image: item.foto_attels || '',
+        image: imageUrl,
         url: window.location.href
       });
 
