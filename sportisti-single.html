@@ -502,6 +502,23 @@ h1, h2, h3, h4, h5, h6,
     return new URLSearchParams(location.search).get('slug') || '';
   }
 
+  function resolveImageUrl(path) {
+    const value = String(path || '').trim();
+    if (!value) return '';
+    if (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:') ||
+      value.startsWith('blob:')
+    ) {
+      return value;
+    }
+    if (value.startsWith('/uploads/')) {
+      return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+    }
+    return value;
+  }
+
   let sportistsLightboxEl = null;
 
   function ensureSportistsLightbox() {
@@ -643,11 +660,13 @@ h1, h2, h3, h4, h5, h6,
       if (!res.ok || !data.item) throw new Error(data.error || 'Sportists nav atrasts');
 
       const item = data.item;
+      const image = item.mainImage || item.foto_attels || item.attels || item.image || item.foto || '';
+      const resolvedImage = resolveImageUrl(image);
       // SEO: update dynamic metadata after the athlete profile is loaded.
       window.__ipponSeo && window.__ipponSeo.update({
         title: `${item.vards_uzvards} | IPPON.LV`,
         description: item.par_sevi_text || item.par_sevi_html || 'IPPON.LV sportista profils un sasniegumi karate Riga.',
-        image: item.foto || '',
+        image: resolvedImage,
         url: window.location.href
       });
       document.getElementById('sportistsName').textContent = item.vards_uzvards || 'Sportists';
@@ -658,11 +677,11 @@ h1, h2, h3, h4, h5, h6,
       bioEl.innerHTML = bioHtml || 'Informacija par sportistu vel nav pievienota.';
 
       const img = document.getElementById('sportistsPhoto');
-      if (item.foto) {
-        img.src = item.foto;
+      if (resolvedImage) {
+        img.src = resolvedImage;
         img.alt = item.vards_uzvards || 'Sportists';
         img.style.display = 'block';
-        img.onclick = () => openSportistsLightbox(item.foto);
+        img.onclick = () => openSportistsLightbox(resolvedImage);
         img.onerror = () => { img.style.display = 'none'; };
       } else {
         img.style.display = 'none';
