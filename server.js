@@ -2300,7 +2300,7 @@ function dateSortValue(dateText) {
 }
 
 function queryRezultatiSourceSacensibas(overrideMap) {
-  const hasVietuSkaitsColumn = getTableColumns('ippon_sorevnovanija').some((col) => col.name === 'vietu_skaits');
+  const hasVietuSkaitsColumn = hasRezultatiVietuSkaitsColumn();
   const vietuSkaitsSelect = hasVietuSkaitsColumn
     ? 'COALESCE(vietu_skaits, 0) AS vietu_skaits,'
     : '0 AS vietu_skaits,';
@@ -2320,6 +2320,10 @@ function queryRezultatiSourceSacensibas(overrideMap) {
       : (Number(row.rezultatu_vietu_skaits || 0) || 0);
     return item;
   });
+}
+
+function hasRezultatiVietuSkaitsColumn() {
+  return getTableColumns('ippon_sorevnovanija').some((col) => col.name === 'vietu_skaits');
 }
 
 function queryRezultatiSourceEksamens(overrideMap) {
@@ -5379,18 +5383,15 @@ async function handleApi(req, res, reqUrl) {
           }
           const ts = nowTs();
           const v = prepared.values;
-          const info = db.prepare(`
-            INSERT INTO ippon_sorevnovanija (
-              area_id, status_id, galery_id, date,
-              name_lv, name_ru, name_en,
-              location_lv, location_ru, location_en,
-              info_lv, info_ru, info_en,
-              results_url, image, public, ordering, vietu_skaits,
-              c_time, m_time,
-              record_type, layout_type, slug, foto_attels, galerija, structured_data, custom_html, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
+          const hasVietuSkaitsColumn = hasRezultatiVietuSkaitsColumn();
+          const insertColumns = [
+            'area_id', 'status_id', 'galery_id', 'date',
+            'name_lv', 'name_ru', 'name_en',
+            'location_lv', 'location_ru', 'location_en',
+            'info_lv', 'info_ru', 'info_en',
+            'results_url', 'image', 'public', 'ordering'
+          ];
+          const insertValues = [
             v.area_id,
             v.status_id,
             v.galery_id,
@@ -5407,8 +5408,17 @@ async function handleApi(req, res, reqUrl) {
             v.results_url,
             v.image,
             v.public,
-            v.ordering,
-            v.vietu_skaits,
+            v.ordering
+          ];
+          if (hasVietuSkaitsColumn) {
+            insertColumns.push('vietu_skaits');
+            insertValues.push(v.vietu_skaits);
+          }
+          insertColumns.push(
+            'c_time', 'm_time',
+            'record_type', 'layout_type', 'slug', 'foto_attels', 'galerija', 'structured_data', 'custom_html', 'created_at', 'updated_at'
+          );
+          insertValues.push(
             ts,
             ts,
             v.record_type,
@@ -5421,6 +5431,11 @@ async function handleApi(req, res, reqUrl) {
             ts,
             ts
           );
+          const placeholders = insertColumns.map(() => '?').join(', ');
+          const info = db.prepare(`
+            INSERT INTO ippon_sorevnovanija (${insertColumns.join(', ')})
+            VALUES (${placeholders})
+          `).run(...insertValues);
           const row = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ?`).get(info.lastInsertRowid);
           sendJson(res, 201, { row, warning: prepared.warning || null });
           return;
@@ -5994,17 +6009,13 @@ async function handleApi(req, res, reqUrl) {
           }
           const v = prepared.values;
           const ts = nowTs();
-          db.prepare(`
-            UPDATE ippon_sorevnovanija
-            SET
-              status_id = ?, date = ?,
-              name_lv = ?, name_ru = ?, name_en = ?,
-              location_lv = ?, location_ru = ?, location_en = ?,
-              info_lv = ?, info_ru = ?, info_en = ?,
-              vietu_skaits = ?, m_time = ?,
-              record_type = ?, layout_type = ?, slug = ?, foto_attels = ?, galerija = ?, structured_data = ?, custom_html = ?, updated_at = ?
-            WHERE id = ?
-          `).run(
+          const setParts = [
+            'status_id = ?', 'date = ?',
+            'name_lv = ?', 'name_ru = ?', 'name_en = ?',
+            'location_lv = ?', 'location_ru = ?', 'location_en = ?',
+            'info_lv = ?', 'info_ru = ?', 'info_en = ?'
+          ];
+          const updateValues = [
             v.status_id,
             v.date,
             v.name_lv,
@@ -6015,8 +6026,24 @@ async function handleApi(req, res, reqUrl) {
             v.location_en,
             v.info_lv,
             v.info_ru,
-            v.info_en,
-            v.vietu_skaits,
+            v.info_en
+          ];
+          if (hasRezultatiVietuSkaitsColumn()) {
+            setParts.push('vietu_skaits = ?');
+            updateValues.push(v.vietu_skaits);
+          }
+          setParts.push(
+            'm_time = ?',
+            'record_type = ?',
+            'layout_type = ?',
+            'slug = ?',
+            'foto_attels = ?',
+            'galerija = ?',
+            'structured_data = ?',
+            'custom_html = ?',
+            'updated_at = ?'
+          );
+          updateValues.push(
             ts,
             v.record_type,
             v.layout_type,
@@ -6025,9 +6052,14 @@ async function handleApi(req, res, reqUrl) {
             v.galerija,
             v.structured_data,
             v.custom_html,
-            ts,
-            id
+            ts
           );
+          updateValues.push(id);
+          db.prepare(`
+            UPDATE ippon_sorevnovanija
+            SET ${setParts.join(', ')}
+            WHERE id = ?
+          `).run(...updateValues);
           const row = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ?`).get(id);
           sendJson(res, 200, { row, warning: prepared.warning || null });
           return;
