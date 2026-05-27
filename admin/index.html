@@ -1231,6 +1231,7 @@
       par_mani: 'Par mani',
       sasniegumi: 'Sasniegumi',
       slug: 'Slug (URL)',
+      position: 'Pozīcija sarakstā',
       created_at: 'Izveidots',
       updated_at: 'Atjaunots'
     };
@@ -2907,7 +2908,7 @@
             || (currentTable === VIDEO_GALERIJA_TABLE && col.name === 'date')
             || (currentTable === RAKSTI_PRESE_TABLE && col.name === 'datums');
           const forceNumberInput =
-            ((currentTable === NEWS_TABLE || currentTable === 'ippon_sportists') && col.name === 'position');
+            ((currentTable === NEWS_TABLE || currentTable === 'ippon_sportists' || currentTable === TRAINERS_TABLE) && col.name === 'position');
           const useTextarea = isLongText && !forceDateInput && !forceNumberInput;
           const field = document.createElement(useTextarea ? 'textarea' : 'input');
           if (!useTextarea) {
@@ -2926,7 +2927,9 @@
           if (forceNumberInput) {
             const hint = document.createElement('small');
             hint.style.opacity = '0.8';
-            hint.textContent = 'Jo liel?ks skaitlis, jo augst?k sarakst?';
+            hint.textContent = currentTable === TRAINERS_TABLE
+              ? 'Mazāks skaitlis = augstāk sarakstā. Tukšs = saraksta beigās.'
+              : 'Jo lielāks skaitlis, jo augstāk sarakstā';
             wrap.appendChild(hint);
           }
         }

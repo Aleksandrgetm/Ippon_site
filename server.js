@@ -606,6 +606,8 @@ function ensureTreneriTable() {
       updated_at INTEGER NOT NULL
     )
   `);
+
+  ensureTableColumn('treneri', 'position', 'INTEGER');
 }
 
 function ensureKlubaNoteikumiTable() {
@@ -1837,6 +1839,7 @@ function mapTrainerRow(row) {
     koucinga_pieredze: row.koucinga_pieredze || '',
     par_mani: row.par_mani || '',
     sasniegumi: row.sasniegumi || '',
+    position: row.position == null || row.position === '' ? null : Number(row.position),
     slug: row.slug,
     created_at: row.created_at,
     updated_at: row.updated_at
@@ -3307,6 +3310,12 @@ function toIntValue(value, fallback = 0) {
   return Number.isFinite(n) ? Math.trunc(n) : (Number(fallback) || 0);
 }
 
+function toNullableInt(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
 function pickSportistRow(row) {
   return withResolvedMedia({
     id: row.id,
@@ -4762,12 +4771,18 @@ async function handleApi(req, res, reqUrl) {
     const rows = useLimit
       ? db.prepare(`
           SELECT * FROM treneri
-          ORDER BY updated_at DESC, id DESC
+          ORDER BY
+            CASE WHEN position IS NULL THEN 1 ELSE 0 END ASC,
+            position ASC,
+            id DESC
           LIMIT ?
         `).all(Math.min(Math.floor(limitRaw), 200))
       : db.prepare(`
           SELECT * FROM treneri
-          ORDER BY updated_at DESC, id DESC
+          ORDER BY
+            CASE WHEN position IS NULL THEN 1 ELSE 0 END ASC,
+            position ASC,
+            id DESC
         `).all();
 
     const items = rows.map(mapTrainerRow);
@@ -5102,6 +5117,8 @@ async function handleApi(req, res, reqUrl) {
         ? 'COALESCE(position, 0) DESC, id DESC'
       : table === 'ippon_sportists'
         ? 'COALESCE(position, 0) DESC, id DESC'
+      : table === 'treneri'
+        ? 'CASE WHEN position IS NULL THEN 1 ELSE 0 END ASC, position ASC, id DESC'
       : (table === 'treneri' || table === 'kluba_noteikumi' || table === 'ippon_sorevnovanija' || table.startsWith('zales_') || table.startsWith('nodarbibas_'))
         ? 'created_at DESC, id DESC'
         : `${pk} DESC`;
@@ -5243,9 +5260,9 @@ async function handleApi(req, res, reqUrl) {
             INSERT INTO treneri (
               vards_uzvards, dzimsanas_datums, foto_attels, galerija,
               izglitiba, josta, saka_studet, koucinga_pieredze,
-              par_mani, sasniegumi, slug, created_at, updated_at
+              par_mani, sasniegumi, slug, position, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).run(
             fullName,
             birthDate || null,
@@ -5258,6 +5275,7 @@ async function handleApi(req, res, reqUrl) {
             body.par_mani != null ? String(body.par_mani).trim() : null,
             body.sasniegumi != null ? String(body.sasniegumi).trim() : null,
             slug,
+            toNullableInt(body.position),
             ts,
             ts
           );
@@ -5711,6 +5729,7 @@ async function handleApi(req, res, reqUrl) {
               par_mani = ?,
               sasniegumi = ?,
               slug = ?,
+              position = ?,
               updated_at = ?
             WHERE id = ?
           `).run(
@@ -5725,6 +5744,7 @@ async function handleApi(req, res, reqUrl) {
             body.par_mani != null ? String(body.par_mani).trim() : existing.par_mani,
             body.sasniegumi != null ? String(body.sasniegumi).trim() : existing.sasniegumi,
             slug,
+            body.position !== undefined ? toNullableInt(body.position) : existing.position,
             nowTs(),
             id
           );
