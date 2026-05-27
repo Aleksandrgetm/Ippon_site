@@ -538,6 +538,13 @@ h1, h2, h3, h4, h5, h6,
       .replace(/\r\n/g, '\n');
   }
 
+  function resolveImageUrl(path) {
+    if (!path) return '';
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    if (path.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${path}`;
+    return path;
+  }
+
   function ensureIreLightbox() {
     if (ireLightboxEl) return ireLightboxEl;
     const lb = document.createElement('div');
@@ -596,8 +603,10 @@ h1, h2, h3, h4, h5, h6,
   function buildDetail(item) {
     const title = String(item?.nosaukums || '').trim() || 'Sporta zāles īre';
     const saturs = normalizeHtml(item?.saturs || '');
-    const foto = String(item?.foto_attels || '').trim();
-    const galerija = Array.isArray(item?.galerija) ? item.galerija.filter(Boolean) : [];
+    const foto = resolveImageUrl(String(item?.foto_attels || '').trim());
+    const galerija = Array.isArray(item?.galerija)
+      ? item.galerija.map((src) => resolveImageUrl(String(src || '').trim())).filter(Boolean)
+      : [];
 
     return `
       <header class="ire-head">
