@@ -164,6 +164,85 @@ h1, h2, h3, h4, h5, h6,
   background: rgba(220, 38, 38, 0.16) !important;
 }
 
+.home-facebook-embed {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  height: 500px;
+}
+
+.home-facebook-embed iframe {
+  border: none;
+  width: 100%;
+  max-width: 500px;
+  height: 500px;
+  display: block;
+  background: #ffffff;
+}
+
+.home-facebook-fallback {
+  display: none;
+  width: 100%;
+  max-width: 500px;
+  height: 500px;
+  padding: 32px 28px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #111827 0%, #020617 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 44px rgba(2, 6, 23, 0.32);
+  color: #f8fafc;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.home-facebook-fallback.is-visible {
+  display: flex;
+}
+
+.home-facebook-fallback-inner {
+  max-width: 320px;
+}
+
+.home-facebook-fallback-logo {
+  width: 180px;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto 28px;
+}
+
+.home-facebook-fallback-title {
+  margin: 0 0 10px;
+  font-family: "Oswald", sans-serif;
+  font-size: 30px;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.home-facebook-fallback-copy {
+  margin: 0 0 24px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(248, 250, 252, 0.84);
+}
+
+.home-facebook-fallback-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 188px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 @keyframes ipponSubmenuIn {
   from {
     opacity: 0;
@@ -1452,8 +1531,16 @@ body > [data-elementor-type="footer"] {
 					<div class="e-con-inner">
 		<div class="elementor-element elementor-element-ed448ed e-con-full e-flex e-con e-child" data-id="ed448ed" data-element_type="container" data-e-type="container">
 				<div class="elementor-element elementor-element-8e22016 elementor-widget elementor-widget-facebook-page" data-id="8e22016" data-element_type="widget" data-e-type="widget" data-widget_type="facebook-page.default">
-					<div class="elementor-facebook-widget" style="min-height: 1px; height: 500px; width: 100%; max-width: 500px;">
-						<iframe title="Facebook Page Plugin" src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fippon.lv&tabs=timeline&width=500&height=500&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true" width="500" height="500" style="border: none; width: 100%; max-width: 500px; height: 500px; display: block;" scrolling="no" frameborder="0" allowfullscreen="true" allow="encrypted-media" loading="eager" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+					<div class="elementor-facebook-widget home-facebook-embed" style="min-height: 1px; height: 500px; width: 100%; max-width: 500px;">
+						<iframe id="home-facebook-iframe" title="Facebook Page Plugin" src="https://www.facebook.com/plugins/page.php?href=https%3A%2F%2Fwww.facebook.com%2Fippon.lv&tabs=timeline&width=500&height=500&small_header=false&adapt_container_width=true&hide_cover=false&show_facepile=true" width="500" height="500" scrolling="no" frameborder="0" allowfullscreen="true" allow="encrypted-media" loading="eager" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+						<div id="home-facebook-fallback" class="home-facebook-fallback" aria-hidden="true">
+							<div class="home-facebook-fallback-inner">
+								<img class="home-facebook-fallback-logo" src="https://ippon.fra1.digitaloceanspaces.com/uploads/footer/footer.png" alt="IPPON.LV">
+								<h3 class="home-facebook-fallback-title">Ippon.lv Sports Club</h3>
+								<p class="home-facebook-fallback-copy">Sekojiet mums Facebook</p>
+								<a class="home-facebook-fallback-link" href="https://www.facebook.com/ippon.lv" target="_blank" rel="noopener noreferrer">Atvērt Facebook</a>
+							</div>
+						</div>
 					</div>
 				</div>
 				</div>
@@ -1844,6 +1931,42 @@ var starter_templates_zip_preview = {"AstColorPaletteVarPrefix":"--ast-global-",
 </script>
 <script src="./IPPON.LV – 道場_files/main.js.download" id="starter-templates-zip-preview-js"></script>
 <script src="./IPPON.LV – 道場_files/hello-frontend.js.download" id="hello-theme-frontend-js"></script>
+<script>
+  (() => {
+    const iframe = document.getElementById('home-facebook-iframe');
+    const fallback = document.getElementById('home-facebook-fallback');
+    if (!iframe || !fallback) return;
+
+    if (!window.matchMedia('(min-width: 1025px)').matches) {
+      return;
+    }
+
+    let settled = false;
+    const showFallback = () => {
+      if (settled) return;
+      settled = true;
+      iframe.style.display = 'none';
+      fallback.classList.add('is-visible');
+      fallback.setAttribute('aria-hidden', 'false');
+    };
+    const keepIframe = () => {
+      if (settled) return;
+      settled = true;
+    };
+
+    const fallbackTimer = window.setTimeout(showFallback, 4500);
+
+    iframe.addEventListener('load', () => {
+      window.clearTimeout(fallbackTimer);
+      keepIframe();
+    }, { once: true });
+
+    iframe.addEventListener('error', () => {
+      window.clearTimeout(fallbackTimer);
+      showFallback();
+    }, { once: true });
+  })();
+</script>
 <script src="./IPPON.LV – 道場_files/webpack.runtime.min.js.download" id="elementor-webpack-runtime-js"></script>
 <script src="./IPPON.LV – 道場_files/frontend-modules.min.js.download" id="elementor-frontend-modules-js"></script>
 <script src="./IPPON.LV – 道場_files/core.min.js.download" id="jquery-ui-core-js"></script>
