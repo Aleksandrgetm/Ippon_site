@@ -610,6 +610,10 @@ function ensureTreneriTable() {
   ensureTableColumn('treneri', 'position', 'INTEGER');
 }
 
+function ensureTreneriPositionColumn() {
+  ensureTableColumn('treneri', 'position', 'INTEGER');
+}
+
 function ensureKlubaNoteikumiTable() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS kluba_noteikumi (
@@ -4759,6 +4763,7 @@ async function handleApi(req, res, reqUrl) {
 
   const treneriMatch = pathname.match(/^\/api\/treneri(?:\/([a-z0-9-]+))?$/i);
   if (treneriMatch && req.method === 'GET') {
+    ensureTreneriPositionColumn();
     const slug = treneriMatch[1];
     if (slug) {
       const row = db.prepare('SELECT * FROM treneri WHERE slug = ? LIMIT 1').get(slug);
@@ -5076,6 +5081,7 @@ async function handleApi(req, res, reqUrl) {
   }
 
   if (pathname === '/api/tables' && req.method === 'GET') {
+    ensureTreneriPositionColumn();
     const tables = [...ALLOWED_TABLES]
       .filter((name) => name !== 'sportisti_sasniegumi')
       .map((name) => {
@@ -5094,6 +5100,10 @@ async function handleApi(req, res, reqUrl) {
   if (!ALLOWED_TABLES.has(table)) {
     sendJson(res, 404, { error: 'Unknown table' });
     return true;
+  }
+
+  if (table === 'treneri') {
+    ensureTreneriPositionColumn();
   }
 
   const columns = getTableColumns(table);
