@@ -331,11 +331,20 @@ h1, h2, h3, h4, h5, h6,
   (async function loadSaraksts() {
     const imageEl = document.getElementById('sarakstsImage');
     if (!imageEl) return;
+
+    function resolveImageUrl(path) {
+      const value = String(path || '').trim();
+      if (!value) return '';
+      if (value.startsWith('http://') || value.startsWith('https://')) return value;
+      if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+      return value;
+    }
+
     try {
       const res = await fetch('/api/nodarbibas/saraksts');
       const data = await res.json();
       if (!res.ok || !data.item) throw new Error(data.error || 'Neizdevas ieladet datus');
-      const src = String(data.item.attels || '').trim();
+      const src = resolveImageUrl(data.item.mainImage || data.item.attels || data.item.foto_attels || data.item.image || '');
       if (!src) throw new Error('Attels nav pievienots admin paneli');
       imageEl.src = src;
     } catch (error) {
