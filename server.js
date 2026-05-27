@@ -3258,6 +3258,10 @@ function getTableColumns(table) {
   return db.prepare(`PRAGMA table_info(${table})`).all();
 }
 
+function tableHasColumn(table, columnName) {
+  return getTableColumns(table).some((col) => col.name === columnName);
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -4768,21 +4772,25 @@ async function handleApi(req, res, reqUrl) {
 
     const limitRaw = Number(searchParams.get('limit') || 0);
     const useLimit = Number.isFinite(limitRaw) && limitRaw > 0;
-    const rows = useLimit
-      ? db.prepare(`
-          SELECT * FROM treneri
+    const treneriOrderBy = tableHasColumn('treneri', 'position')
+      ? `
           ORDER BY
             CASE WHEN position IS NULL THEN 1 ELSE 0 END ASC,
             position ASC,
             id DESC
+        `
+      : `
+          ORDER BY updated_at DESC, id DESC
+        `;
+    const rows = useLimit
+      ? db.prepare(`
+          SELECT * FROM treneri
+          ${treneriOrderBy}
           LIMIT ?
         `).all(Math.min(Math.floor(limitRaw), 200))
       : db.prepare(`
           SELECT * FROM treneri
-          ORDER BY
-            CASE WHEN position IS NULL THEN 1 ELSE 0 END ASC,
-            position ASC,
-            id DESC
+          ${treneriOrderBy}
         `).all();
 
     const items = rows.map(mapTrainerRow);
@@ -5107,6 +5115,7 @@ async function handleApi(req, res, reqUrl) {
       whereArgs.push(like, like, like, like);
     }
     const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
+    const trainerHasPosition = table === 'treneri' && columns.some((col) => col.name === 'position');
     const orderBy = table === 'ippon_galery'
       ? 'date DESC, id DESC'
       : table === 'video_galerija'
@@ -5117,7 +5126,7 @@ async function handleApi(req, res, reqUrl) {
         ? 'COALESCE(position, 0) DESC, id DESC'
       : table === 'ippon_sportists'
         ? 'COALESCE(position, 0) DESC, id DESC'
-      : table === 'treneri'
+      : trainerHasPosition
         ? 'CASE WHEN position IS NULL THEN 1 ELSE 0 END ASC, position ASC, id DESC'
       : (table === 'treneri' || table === 'kluba_noteikumi' || table === 'ippon_sorevnovanija' || table.startsWith('zales_') || table.startsWith('nodarbibas_'))
         ? 'created_at DESC, id DESC'
@@ -5256,29 +5265,53 @@ async function handleApi(req, res, reqUrl) {
 
           const ts = nowTs();
           const slug = uniqueTrainerSlug(String(body.slug || fullName).trim());
-          const info = db.prepare(`
-            INSERT INTO treneri (
-              vards_uzvards, dzimsanas_datums, foto_attels, galerija,
-              izglitiba, josta, saka_studet, koucinga_pieredze,
-              par_mani, sasniegumi, slug, position, created_at, updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            fullName,
-            birthDate || null,
-            body.foto_attels ? String(body.foto_attels).trim() : null,
-            JSON.stringify(parseGallery(body.galerija)),
-            body.izglitiba != null ? String(body.izglitiba).trim() : null,
-            body.josta != null ? String(body.josta).trim() : null,
-            body.saka_studet != null ? String(body.saka_studet).trim() : null,
-            body.koucinga_pieredze != null ? String(body.koucinga_pieredze).trim() : null,
-            body.par_mani != null ? String(body.par_mani).trim() : null,
-            body.sasniegumi != null ? String(body.sasniegumi).trim() : null,
-            slug,
-            toNullableInt(body.position),
-            ts,
-            ts
-          );
+          const trainerHasPosition = tableHasColumn('treneri', 'position');
+          const info = trainerHasPosition
+            ? db.prepare(`
+                INSERT INTO treneri (
+                  vards_uzvards, dzimsanas_datums, foto_attels, galerija,
+                  izglitiba, josta, saka_studet, koucinga_pieredze,
+                  par_mani, sasniegumi, slug, position, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `).run(
+                fullName,
+                birthDate || null,
+                body.foto_attels ? String(body.foto_attels).trim() : null,
+                JSON.stringify(parseGallery(body.galerija)),
+                body.izglitiba != null ? String(body.izglitiba).trim() : null,
+                body.josta != null ? String(body.josta).trim() : null,
+                body.saka_studet != null ? String(body.saka_studet).trim() : null,
+                body.koucinga_pieredze != null ? String(body.koucinga_pieredze).trim() : null,
+                body.par_mani != null ? String(body.par_mani).trim() : null,
+                body.sasniegumi != null ? String(body.sasniegumi).trim() : null,
+                slug,
+                toNullableInt(body.position),
+                ts,
+                ts
+              )
+            : db.prepare(`
+                INSERT INTO treneri (
+                  vards_uzvards, dzimsanas_datums, foto_attels, galerija,
+                  izglitiba, josta, saka_studet, koucinga_pieredze,
+                  par_mani, sasniegumi, slug, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              `).run(
+                fullName,
+                birthDate || null,
+                body.foto_attels ? String(body.foto_attels).trim() : null,
+                JSON.stringify(parseGallery(body.galerija)),
+                body.izglitiba != null ? String(body.izglitiba).trim() : null,
+                body.josta != null ? String(body.josta).trim() : null,
+                body.saka_studet != null ? String(body.saka_studet).trim() : null,
+                body.koucinga_pieredze != null ? String(body.koucinga_pieredze).trim() : null,
+                body.par_mani != null ? String(body.par_mani).trim() : null,
+                body.sasniegumi != null ? String(body.sasniegumi).trim() : null,
+                slug,
+                ts,
+                ts
+              );
           const row = db.prepare('SELECT * FROM treneri WHERE id = ?').get(info.lastInsertRowid);
           sendJson(res, 201, { row: mapTrainerRow(row) });
           return;
@@ -5714,40 +5747,75 @@ async function handleApi(req, res, reqUrl) {
             ? String(body.slug).trim()
             : (fullName !== existing.vards_uzvards ? fullName : existing.slug);
           const slug = uniqueTrainerSlug(slugBase, id);
+          const trainerHasPosition = tableHasColumn('treneri', 'position');
 
-          db.prepare(`
-            UPDATE treneri
-            SET
-              vards_uzvards = ?,
-              dzimsanas_datums = ?,
-              foto_attels = ?,
-              galerija = ?,
-              izglitiba = ?,
-              josta = ?,
-              saka_studet = ?,
-              koucinga_pieredze = ?,
-              par_mani = ?,
-              sasniegumi = ?,
-              slug = ?,
-              position = ?,
-              updated_at = ?
-            WHERE id = ?
-          `).run(
-            fullName,
-            birthDate || null,
-            body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
-            JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
-            body.izglitiba != null ? String(body.izglitiba).trim() : existing.izglitiba,
-            body.josta != null ? String(body.josta).trim() : existing.josta,
-            body.saka_studet != null ? String(body.saka_studet).trim() : existing.saka_studet,
-            body.koucinga_pieredze != null ? String(body.koucinga_pieredze).trim() : existing.koucinga_pieredze,
-            body.par_mani != null ? String(body.par_mani).trim() : existing.par_mani,
-            body.sasniegumi != null ? String(body.sasniegumi).trim() : existing.sasniegumi,
-            slug,
-            body.position !== undefined ? toNullableInt(body.position) : existing.position,
-            nowTs(),
-            id
-          );
+          if (trainerHasPosition) {
+            db.prepare(`
+              UPDATE treneri
+              SET
+                vards_uzvards = ?,
+                dzimsanas_datums = ?,
+                foto_attels = ?,
+                galerija = ?,
+                izglitiba = ?,
+                josta = ?,
+                saka_studet = ?,
+                koucinga_pieredze = ?,
+                par_mani = ?,
+                sasniegumi = ?,
+                slug = ?,
+                position = ?,
+                updated_at = ?
+              WHERE id = ?
+            `).run(
+              fullName,
+              birthDate || null,
+              body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
+              JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
+              body.izglitiba != null ? String(body.izglitiba).trim() : existing.izglitiba,
+              body.josta != null ? String(body.josta).trim() : existing.josta,
+              body.saka_studet != null ? String(body.saka_studet).trim() : existing.saka_studet,
+              body.koucinga_pieredze != null ? String(body.koucinga_pieredze).trim() : existing.koucinga_pieredze,
+              body.par_mani != null ? String(body.par_mani).trim() : existing.par_mani,
+              body.sasniegumi != null ? String(body.sasniegumi).trim() : existing.sasniegumi,
+              slug,
+              body.position !== undefined ? toNullableInt(body.position) : existing.position,
+              nowTs(),
+              id
+            );
+          } else {
+            db.prepare(`
+              UPDATE treneri
+              SET
+                vards_uzvards = ?,
+                dzimsanas_datums = ?,
+                foto_attels = ?,
+                galerija = ?,
+                izglitiba = ?,
+                josta = ?,
+                saka_studet = ?,
+                koucinga_pieredze = ?,
+                par_mani = ?,
+                sasniegumi = ?,
+                slug = ?,
+                updated_at = ?
+              WHERE id = ?
+            `).run(
+              fullName,
+              birthDate || null,
+              body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
+              JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
+              body.izglitiba != null ? String(body.izglitiba).trim() : existing.izglitiba,
+              body.josta != null ? String(body.josta).trim() : existing.josta,
+              body.saka_studet != null ? String(body.saka_studet).trim() : existing.saka_studet,
+              body.koucinga_pieredze != null ? String(body.koucinga_pieredze).trim() : existing.koucinga_pieredze,
+              body.par_mani != null ? String(body.par_mani).trim() : existing.par_mani,
+              body.sasniegumi != null ? String(body.sasniegumi).trim() : existing.sasniegumi,
+              slug,
+              nowTs(),
+              id
+            );
+          }
           const row = db.prepare('SELECT * FROM treneri WHERE id = ?').get(id);
           sendJson(res, 200, { row: mapTrainerRow(row) });
           return;
