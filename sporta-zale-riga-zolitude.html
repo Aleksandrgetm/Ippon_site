@@ -547,6 +547,14 @@ h1, h2, h3, h4, h5, h6,
       ensureHallLightbox().classList.add('open');
     }
 
+    function resolveImageUrl(path) {
+      const value = String(path || '').trim();
+      if (!value) return '';
+      if (value.startsWith('http://') || value.startsWith('https://')) return value;
+      if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
+      return value;
+    }
+
     function sanitizeLegacyHtml(rawHtml) {
       const source = String(rawHtml || '').trim();
       if (!source) return '';
@@ -596,14 +604,17 @@ h1, h2, h3, h4, h5, h6,
       introEl.style.display = 'none';
       textEl.innerHTML = sanitizeLegacyHtml(item.ievads || '');
 
-      if (item.attels) {
-        mainImageEl.src = item.attels;
+      const mainImage = resolveImageUrl(item.mainImage || item.attels || item.foto_attels || item.image || '');
+      if (mainImage) {
+        mainImageEl.src = mainImage;
       } else {
         mainImageEl.removeAttribute('src');
       }
 
       galleryEl.innerHTML = '';
-      hallGalleryItems = Array.isArray(item.galerija) ? item.galerija.filter(Boolean) : [];
+      hallGalleryItems = Array.isArray(item.galerija)
+        ? item.galerija.map((src) => resolveImageUrl(src)).filter(Boolean)
+        : [];
 
       if (hallGalleryItems.length === 0) {
         galleryEl.innerHTML = '<p style="grid-column:1/-1;color:#94a3b8;font-family:Roboto,sans-serif;">Galerija ir tuksa</p>';
