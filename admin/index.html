@@ -1041,7 +1041,7 @@
       'nodarbibas_izlases_grupas',
       'nodarbibas_individualas_nodarbibas'
     ]);
-    const HALL_TABLES = new Set(['zales_imanta', 'zales_zolitude', 'zales_sloka']);
+    const HALL_TABLES = new Set(['zales_imanta', 'zales_zolitude', 'zales_sloka', 'zales_pinki']);
     const GALERIJA_TABLES = new Set([FOTO_GALERIJA_TABLE, VIDEO_GALERIJA_TABLE, RAKSTI_PRESE_TABLE]);
     const SADARBIBA_TABLES = new Set([
       SADARBIBA_SPORTA_ZALES_IRE_TABLE,
@@ -2297,6 +2297,7 @@
       const baseOptions = tablesMeta.filter((t) => !HALL_TABLES.has(t.name) && !NODARBIBAS_TABLES.has(t.name) && !SADARBIBA_TABLES.has(t.name) && !GALERIJA_TABLES.has(t.name));
       const zalesLabelByName = {
         zales_imanta: 'Zales - Riga (Imanta)',
+        zales_pinki: 'Zales - Riga (Piņķi)',
         zales_zolitude: 'Zales - Riga (Zolitude)',
         zales_sloka: 'Zales - Jurmala (Sloka)'
       };
