@@ -86,7 +86,7 @@ const HALL_TABLES = {
   },
   pinki: {
     table: 'zales_pinki',
-    title: 'Sporta zāle Rīga (Piņķi)',
+    title: 'SPORTA ZĀLE PIŅĶI',
     intro: 'Jaunā iela 12, VIA JURMALA OUTLET VILLAGE teritorijā. Kontakts: +371 26800478 Eduards Sujetovs.'
   }
 };
