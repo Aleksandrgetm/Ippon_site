@@ -57,6 +57,7 @@ const ALLOWED_TABLES = new Set([
   'zales_imanta',
   'zales_zolitude',
   'zales_sloka',
+  'zales_pinki',
   'nodarbibas_saraksts',
   'nodarbibas_izlases_grupas',
   'nodarbibas_individualas_nodarbibas',
@@ -82,6 +83,11 @@ const HALL_TABLES = {
     table: 'zales_sloka',
     title: 'SPORTA ZALE JURMALA (SLOKA)',
     intro: 'Kluba IPPON.LV Jurmalas (Slokas) filiale ir aprikota karate treniniem un fiziskai sagatavosanai.'
+  },
+  pinki: {
+    table: 'zales_pinki',
+    title: 'Sporta zāle Rīga (Piņķi)',
+    intro: 'Jaunā iela 12, VIA JURMALA OUTLET VILLAGE teritorijā. Kontakts: +371 26800478 Eduards Sujetovs.'
   }
 };
 const MIME = {
@@ -687,6 +693,11 @@ function ensureHallsTables() {
     HALL_TABLES.sloka.table,
     HALL_TABLES.sloka.title,
     HALL_TABLES.sloka.intro
+  );
+  ensureSingleHallTable(
+    HALL_TABLES.pinki.table,
+    HALL_TABLES.pinki.title,
+    HALL_TABLES.pinki.intro
   );
 }
 
@@ -1782,7 +1793,7 @@ function mapHallRow(slug, row) {
 }
 
 function isHallTable(table) {
-  return table === 'zales_imanta' || table === 'zales_zolitude' || table === 'zales_sloka';
+  return Object.values(HALL_TABLES).some((cfg) => cfg.table === table);
 }
 function isNodarbibasTable(table) {
   return table === 'nodarbibas_saraksts'
@@ -4668,7 +4679,7 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
-  const hallMatch = pathname.match(/^\/api\/zales\/(imanta|zolitude|sloka)$/i);
+  const hallMatch = pathname.match(/^\/api\/zales\/(imanta|zolitude|sloka|pinki)$/i);
   if (hallMatch && req.method === 'GET') {
     const slug = hallMatch[1].toLowerCase();
     const cfg = HALL_TABLES[slug];
