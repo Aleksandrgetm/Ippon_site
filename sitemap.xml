@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SEO: static sitemap for core public pages -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://ippon.lv/</loc></url>
+  <url><loc>https://ippon.lv/jaunumi</loc></url>
+  <url><loc>https://ippon.lv/treneri</loc></url>
+  <url><loc>https://ippon.lv/sportisti</loc></url>
+  <url><loc>https://ippon.lv/rezultati</loc></url>
+  <url><loc>https://ippon.lv/kalendars</loc></url>
+  <url><loc>https://ippon.lv/foto-galerija</loc></url>
+  <url><loc>https://ippon.lv/video-galerija</loc></url>
+  <url><loc>https://ippon.lv/raksti-prese</loc></url>
+  <url><loc>https://ippon.lv/kluba-noteikumi.html</loc></url>
+  <url><loc>https://ippon.lv/sporta-zales-ire</loc></url>
+  <url><loc>https://ippon.lv/musu-partneri</loc></url>
+  <url><loc>https://ippon.lv/sponsoru-atbalsts</loc></url>
+  <url><loc>https://ippon.lv/saraksts</loc></url>
+  <url><loc>https://ippon.lv/izlases-grupas</loc></url>
+  <url><loc>https://ippon.lv/individualas-nodarbibas</loc></url>
+  <url><loc>https://ippon.lv/sporta-zale-riga-imanta.html</loc></url>
+  <url><loc>https://ippon.lv/sporta-zale-riga-zolitude.html</loc></url>
+  <url><loc>https://ippon.lv/sporta-zale-jurmala-sloka.html</loc></url>
+  <url><loc>https://ippon.lv/sporta-zale-riga-pinki.html</loc></url>
+</urlset>
