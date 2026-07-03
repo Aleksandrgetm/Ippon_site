@@ -203,7 +203,7 @@ h1, h2, h3, h4, h5, h6,
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-imanta.html" class="elementor-sub-item">Sporta zāle Rīga (Imanta)</a></li>
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-zolitude.html" class="elementor-sub-item">Sporta zāle Rīga (Zolitūde)</a></li>
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-jurmala-sloka.html" class="elementor-sub-item">Sporta zāle Jūrmala (Sloka)</a></li>
-	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-pinki.html" class="elementor-sub-item">Sporta zāle Pi�?ķi</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-pinki.html" class="elementor-sub-item">Sporta zāle Piņķi</a></li>
 </ul>
 </li>
 <li class="menu-item menu-item-type-post_type menu-item-object-kalendars menu-item-851"><a href="/kalendars.html" class="elementor-item">Kalendārs</a></li>
@@ -237,7 +237,7 @@ h1, h2, h3, h4, h5, h6,
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-imanta.html" class="elementor-sub-item" tabindex="-1">Sporta zāle Rīga (Imanta)</a></li>
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-zolitude.html" class="elementor-sub-item" tabindex="-1">Sporta zāle Rīga (Zolitūde)</a></li>
 	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-jurmala-sloka.html" class="elementor-sub-item" tabindex="-1">Sporta zāle Jūrmala (Sloka)</a></li>
-	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-pinki.html" class="elementor-sub-item" tabindex="-1">Sporta zāle Pi�?ķi</a></li>
+	<li class="menu-item menu-item-type-custom menu-item-object-custom"><a href="/sporta-zale-riga-pinki.html" class="elementor-sub-item" tabindex="-1">Sporta zāle Piņķi</a></li>
 </ul>
 </li>
 <li class="menu-item menu-item-type-post_type menu-item-object-kalendars menu-item-851"><a href="/kalendars.html" class="elementor-item" tabindex="-1">Kalendārs</a></li>
@@ -335,7 +335,7 @@ h1, h2, h3, h4, h5, h6,
   .rule-item h3 {
     margin: 0 0 10px;
     font-family: "Oswald", sans-serif;
-    font-size: clamp(28px, 2.6vw, 42px);
+    font-size: clamp(22px, 2vw, 34px);
     line-height: 1.04;
     color: #ffffff;
     text-transform: uppercase;
@@ -344,8 +344,8 @@ h1, h2, h3, h4, h5, h6,
   .rule-text {
     margin: 0;
     font-family: "Roboto", sans-serif;
-    font-size: 30px;
-    line-height: 1.35;
+    font-size: 18px;
+    line-height: 1.45;
     color: #ffffff;
   }
   .rule-text,
@@ -374,9 +374,9 @@ h1, h2, h3, h4, h5, h6,
     color: #f87171;
     text-decoration: underline;
   }
-  .rule-file {
+  .download-btn {
     display: inline-flex;
-    margin-top: 12px;
+    margin-top: 16px;
     font-family: "Oswald", sans-serif;
     font-size: 14px;
     text-transform: uppercase;
@@ -387,9 +387,100 @@ h1, h2, h3, h4, h5, h6,
     padding: 7px 12px;
     transition: all 0.2s ease;
   }
-  .rule-file:hover {
+  .download-btn:hover {
     background: #dc2626;
     color: #fff;
+  }
+  .rules-card {
+    margin-top: 14px;
+    width: 100%;
+  }
+  .rule-item--document {
+    border-color: #dc2626;
+    padding: 20px;
+  }
+  .rules-doc-header {
+    text-align: center;
+    margin-bottom: 26px;
+  }
+  .rules-doc-org {
+    margin: 0;
+    font-family: "Oswald", sans-serif;
+    font-size: clamp(20px, 2.1vw, 32px);
+    line-height: 1.1;
+    color: #ffffff;
+    font-weight: 700;
+  }
+  .rules-doc-org + .rules-doc-org {
+    margin-top: 4px;
+  }
+  .rules-doc-title {
+    margin: 18px 0 8px;
+    font-family: "Oswald", sans-serif;
+    font-size: clamp(24px, 2.5vw, 36px);
+    line-height: 1.04;
+    color: #ffffff;
+    text-transform: none;
+  }
+  .rules-doc-subtitle {
+    margin: 0 0 18px;
+    font-family: "Oswald", sans-serif;
+    font-size: 16px;
+    color: #ffffff;
+  }
+  .rules-version-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0 auto 30px;
+    color: #ffffff;
+    font-family: "Roboto", sans-serif;
+  }
+  .rules-version-table th,
+  .rules-version-table td {
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    padding: 16px 18px;
+    text-align: center;
+    font-size: 14px;
+  }
+  .rules-version-table th {
+    font-family: "Oswald", sans-serif;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .rule-item--document .rule-text {
+    font-size: 13px;
+    line-height: 1.5;
+    user-select: text;
+  }
+  .rule-item--document .rule-text p {
+    margin: 0 0 10px;
+  }
+  .rule-item--document .rule-text strong {
+    color: #ffffff;
+  }
+  .rule-item--document .rule-text > p:first-child strong,
+  .rule-item--document .rule-text > strong {
+    display: block;
+    margin: 22px 0 10px;
+    font-family: "Oswald", sans-serif;
+    font-size: 22px;
+    line-height: 1.1;
+  }
+  .rule-item--document .rule-text u {
+    text-decoration-thickness: 1px;
+  }
+  .rule-item--document .rule-text table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 24px;
+  }
+  .rule-item--document .rule-text td,
+  .rule-item--document .rule-text th {
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .rule-item--document .download-btn {
+    margin-top: 22px;
   }
   .rules-empty {
     font-family: "Oswald", sans-serif;
@@ -400,7 +491,7 @@ h1, h2, h3, h4, h5, h6,
   @media (max-width: 1100px) {
     .rules-shell { padding: 140px 0 74px; }
     .rules-container { width: min(1220px, calc(100% - 24px)); }
-    .rule-text { font-size: 20px; }
+    .rule-text { font-size: 16px; }
   }
 </style>
 <script>
@@ -408,68 +499,94 @@ h1, h2, h3, h4, h5, h6,
     const listEl = document.getElementById('rulesList');
     const emptyEl = document.getElementById('rulesEmpty');
     if (!listEl || !emptyEl) return;
+    const pdfUrl = 'assets/docs/Ippon-lv_Noteikumi_01072026.pdf';
+    const escapeHtml = (value) => String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
 
-    function escapeHtml(value) {
-      return String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    }
+    const unwrapTag = (root, selector) => {
+      root.querySelectorAll(selector).forEach((node) => {
+        node.replaceWith(...Array.from(node.childNodes));
+      });
+    };
 
-    function sanitizeRichHtml(value) {
-      let html = String(value || '');
-      html = html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
-      html = html.replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '');
-      html = html.replace(/\son\w+="[^"]*"/gi, '');
-      html = html.replace(/\son\w+='[^']*'/gi, '');
-      html = html.replace(/javascript:/gi, '');
-      return html;
-    }
+    const cleanRulesHtml = (html) => {
+      const root = document.createElement('div');
+      root.innerHTML = html || '';
+      unwrapTag(root, 'font');
+      root.querySelectorAll('*').forEach((node) => {
+        for (const attr of ['style', 'align', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'bordercolor', 'face', 'size']) {
+          node.removeAttribute(attr);
+        }
+      });
 
-    function render(items) {
-      if (!items.length) {
-        listEl.innerHTML = '';
-        emptyEl.style.display = 'block';
-        return;
+      const blocks = Array.from(root.childNodes);
+      const bodyStartIndex = blocks.findIndex((node) => {
+        const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+        return text.startsWith('1. Vispārīgie noteikumi');
+      });
+
+      if (bodyStartIndex > -1) {
+        const bodyRoot = document.createElement('div');
+        blocks.slice(bodyStartIndex).forEach((node) => bodyRoot.appendChild(node.cloneNode(true)));
+        return bodyRoot.innerHTML;
       }
-      emptyEl.style.display = 'none';
-      listEl.innerHTML = items.map((item, index) => {
-        const fileUrl = String(item.faili || '').trim();
-        const fileLink = fileUrl
-          ? `<a class="rule-file" href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">Lejupieladet failu</a>`
-          : '';
-        return `
-          <article class="rule-item">
-            <div class="rule-text">${sanitizeRichHtml(item.teksts)}</div>
-            ${fileLink}
-          </article>
-        `;
-      }).join('');
-    }
 
-    async function fetchJson(url) {
-      const response = await fetch(url);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP ${response.status}`);
-      }
-      return data;
-    }
+      return root.innerHTML;
+    };
 
     try {
-      const direct = await fetchJson('/api/kluba-noteikumi');
-      render(Array.isArray(direct.items) ? direct.items : []);
-    } catch (e) {
-      try {
-        const fallback = await fetchJson('/api/table/kluba_noteikumi?limit=500&offset=0');
-        render(Array.isArray(fallback.rows) ? fallback.rows : []);
-      } catch {
-        listEl.innerHTML = '';
-        emptyEl.textContent = 'Neizdevas ieladet noteikumus.';
-        emptyEl.style.display = 'block';
-      }
+      const response = await fetch('/api/kluba-noteikumi', { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error('Rules request failed');
+      const data = await response.json();
+      const latestItem = Array.isArray(data.items) ? data.items[0] : null;
+      if (!latestItem || !latestItem.teksts) throw new Error('Rules text missing');
+
+      const bodyHtml = cleanRulesHtml(latestItem.teksts);
+      emptyEl.style.display = 'none';
+      listEl.innerHTML = `
+        <article class="rule-item rule-item--document">
+          <div class="rules-doc-header">
+            <p class="rules-doc-org">Biedrības „IPPON.LV”</p>
+            <p class="rules-doc-org">Reģ. Nr. 40008181424</p>
+            <h3 class="rules-doc-title">Iekšējās kārtības noteikumi</h3>
+            <p class="rules-doc-subtitle">Versiju hronoloģija</p>
+          </div>
+          <table class="rules-version-table">
+            <thead>
+              <tr>
+                <th>Versija</th>
+                <th>Spēkā no</th>
+                <th>Izmaiņas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1.0</td>
+                <td>01.12.2011</td>
+                <td>sākotnējā</td>
+              </tr>
+              <tr>
+                <td>2.0</td>
+                <td>01.07.2026</td>
+                <td>pilnveidota</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="rule-text">${bodyHtml}</div>
+          <a class="download-btn" href="${escapeHtml(pdfUrl)}" download="Ippon-lv_Noteikumi_01072026.pdf">LEJUPIEL&#256;D&#274;T PDF</a>
+        </article>
+      `;
+    } catch (error) {
+      emptyEl.style.display = '';
+      listEl.innerHTML = `
+        <article class="rule-item">
+          <p class="rule-text">Noteikumu tekstu pašlaik neizdevās ielādēt, bet PDF fails ir pieejams lejupielādei.</p>
+          <a class="download-btn" href="${escapeHtml(pdfUrl)}" download="Ippon-lv_Noteikumi_01072026.pdf">LEJUPIEL&#256;D&#274;T PDF</a>
+        </article>
+      `;
     }
   })();
 </script>
@@ -559,27 +676,27 @@ h1, h2, h3, h4, h5, h6,
 					document.addEventListener( event, lazyloadRunObserver );
 				} );
 			</script>
-			<script src="./IPPON.LV �?" �"場_files/dom-ready.min.js.download" id="wp-dom-ready-js"></script>
+<script src="./IPPON.LV – 道場_files/dom-ready.min.js.download" id="wp-dom-ready-js"></script>
 <script id="starter-templates-zip-preview-js-extra">
 var starter_templates_zip_preview = {"AstColorPaletteVarPrefix":"--ast-global-","AstEleColorPaletteVarPrefix":"--ast-global-"};
 //# sourceURL=starter-templates-zip-preview-js-extra
 </script>
-<script src="./IPPON.LV �?" �"場_files/main.js.download" id="starter-templates-zip-preview-js"></script>
-<script src="./IPPON.LV �?" �"場_files/hello-frontend.js.download" id="hello-theme-frontend-js"></script>
-<script src="./IPPON.LV �?" �"場_files/webpack.runtime.min.js.download" id="elementor-webpack-runtime-js"></script>
-<script src="./IPPON.LV �?" �"場_files/frontend-modules.min.js.download" id="elementor-frontend-modules-js"></script>
-<script src="./IPPON.LV �?" �"場_files/core.min.js.download" id="jquery-ui-core-js"></script>
+<script src="./IPPON.LV – 道場_files/main.js.download" id="starter-templates-zip-preview-js"></script>
+<script src="./IPPON.LV – 道場_files/hello-frontend.js.download" id="hello-theme-frontend-js"></script>
+<script src="./IPPON.LV – 道場_files/webpack.runtime.min.js.download" id="elementor-webpack-runtime-js"></script>
+<script src="./IPPON.LV – 道場_files/frontend-modules.min.js.download" id="elementor-frontend-modules-js"></script>
+<script src="./IPPON.LV – 道場_files/core.min.js.download" id="jquery-ui-core-js"></script>
 <script id="elementor-frontend-js-before">
 var elementorFrontendConfig = {"environmentMode":{"edit":false,"wpPreview":false,"isScriptDebug":false},"i18n":{"shareOnFacebook":"Share on Facebook","shareOnTwitter":"Share on Twitter","pinIt":"Pin it","download":"Download","downloadImage":"Download image","fullscreen":"Fullscreen","zoom":"Zoom","share":"Share","playVideo":"Play Video","previous":"Previous","next":"Next","close":"Close","a11yCarouselPrevSlideMessage":"Previous slide","a11yCarouselNextSlideMessage":"Next slide","a11yCarouselFirstSlideMessage":"This is the first slide","a11yCarouselLastSlideMessage":"This is the last slide","a11yCarouselPaginationBulletMessage":"Go to slide"},"is_rtl":false,"breakpoints":{"xs":0,"sm":480,"md":768,"lg":1025,"xl":1440,"xxl":1600},"responsive":{"breakpoints":{"mobile":{"label":"Mobile Portrait","value":767,"default_value":767,"direction":"max","is_enabled":true},"mobile_extra":{"label":"Mobile Landscape","value":880,"default_value":880,"direction":"max","is_enabled":false},"tablet":{"label":"Tablet Portrait","value":1024,"default_value":1024,"direction":"max","is_enabled":true},"tablet_extra":{"label":"Tablet Landscape","value":1200,"default_value":1200,"direction":"max","is_enabled":false},"laptop":{"label":"Laptop","value":1400,"default_value":1366,"direction":"max","is_enabled":true},"widescreen":{"label":"Widescreen","value":2400,"default_value":2400,"direction":"min","is_enabled":false}},"hasCustomBreakpoints":true},"version":"3.35.0","is_static":false,"experimentalFeatures":{"e_font_icon_svg":true,"additional_custom_breakpoints":true,"container":true,"e_optimized_markup":true,"theme_builder_v2":true,"hello-theme-header-footer":true,"e_pro_free_trial_popup":true,"nested-elements":true,"home_screen":true,"global_classes_should_enforce_capabilities":true,"e_variables":true,"cloud-library":true,"e_opt_in_v4_page":true,"e_components":true,"e_interactions":true,"e_editor_one":true,"import-export-customization":true},"urls":{"assets":"https:\/\/club-wp.eu\/wp-content\/plugins\/elementor\/assets\/","ajaxurl":"https:\/\/club-wp.eu\/wp-admin\/admin-ajax.php","uploadUrl":"https:\/\/club-wp.eu\/wp-content\/uploads"},"nonces":{"floatingButtonsClickTracking":"f435834bf3"},"swiperClass":"swiper","settings":{"page":[],"editorPreferences":[]},"kit":{"active_breakpoints":["viewport_mobile","viewport_tablet","viewport_laptop"],"viewport_laptop":1400,"global_image_lightbox":"yes","lightbox_enable_counter":"yes","lightbox_enable_fullscreen":"yes","lightbox_enable_zoom":"yes","lightbox_enable_share":"yes","hello_header_logo_type":"title","hello_header_menu_layout":"horizontal","hello_footer_logo_type":"logo"},"post":{"id":10,"title":"IPPON.LV%20%E2%80%93%20%E9%81%93%E5%A0%B4","excerpt":"","featuredImage":false}};
 //# sourceURL=elementor-frontend-js-before
 </script>
-<script src="./IPPON.LV �?" �"場_files/frontend.min.js.download" id="elementor-frontend-js"></script><span id="elementor-device-mode" class="elementor-screen-only"></span>
-<script src="./IPPON.LV �?" �"場_files/jquery.smartmenus.min.js.download" id="smartmenus-js"></script>
-<script src="./IPPON.LV �?" �"場_files/imagesloaded.min.js.download" id="imagesloaded-js"></script>
-<script src="./IPPON.LV �?" �"場_files/swiper.min.js.download" id="swiper-js"></script>
-<script src="./IPPON.LV �?" �"場_files/webpack-pro.runtime.min.js.download" id="elementor-pro-webpack-runtime-js"></script>
-<script src="./IPPON.LV �?" �"場_files/hooks.min.js.download" id="wp-hooks-js"></script>
-<script src="./IPPON.LV �?" �"場_files/i18n.min.js.download" id="wp-i18n-js"></script>
+<script src="./IPPON.LV – 道場_files/frontend.min.js.download" id="elementor-frontend-js"></script><span id="elementor-device-mode" class="elementor-screen-only"></span>
+<script src="./IPPON.LV – 道場_files/jquery.smartmenus.min.js.download" id="smartmenus-js"></script>
+<script src="./IPPON.LV – 道場_files/imagesloaded.min.js.download" id="imagesloaded-js"></script>
+<script src="./IPPON.LV – 道場_files/swiper.min.js.download" id="swiper-js"></script>
+<script src="./IPPON.LV – 道場_files/webpack-pro.runtime.min.js.download" id="elementor-pro-webpack-runtime-js"></script>
+<script src="./IPPON.LV – 道場_files/hooks.min.js.download" id="wp-hooks-js"></script>
+<script src="./IPPON.LV – 道場_files/i18n.min.js.download" id="wp-i18n-js"></script>
 <script id="wp-i18n-js-after">
 wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
 //# sourceURL=wp-i18n-js-after
@@ -588,8 +705,8 @@ wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
 var ElementorProFrontendConfig = {"ajaxurl":"https:\/\/club-wp.eu\/wp-admin\/admin-ajax.php","nonce":"c1bb210344","urls":{"assets":"https:\/\/club-wp.eu\/wp-content\/plugins\/elementor-pro\/assets\/","rest":"https:\/\/club-wp.eu\/\/"},"settings":{"lazy_load_background_images":true},"popup":{"hasPopUps":false},"shareButtonsNetworks":{"facebook":{"title":"Facebook","has_counter":true},"twitter":{"title":"Twitter"},"linkedin":{"title":"LinkedIn","has_counter":true},"pinterest":{"title":"Pinterest","has_counter":true},"reddit":{"title":"Reddit","has_counter":true},"vk":{"title":"VK","has_counter":true},"odnoklassniki":{"title":"OK","has_counter":true},"tumblr":{"title":"Tumblr"},"digg":{"title":"Digg"},"skype":{"title":"Skype"},"stumbleupon":{"title":"StumbleUpon","has_counter":true},"mix":{"title":"Mix"},"telegram":{"title":"Telegram"},"pocket":{"title":"Pocket","has_counter":true},"xing":{"title":"XING","has_counter":true},"whatsapp":{"title":"WhatsApp"},"email":{"title":"Email"},"print":{"title":"Print"},"x-twitter":{"title":"X"},"threads":{"title":"Threads"}},"facebook_sdk":{"lang":"en_US","app_id":""},"lottie":{"defaultAnimationUrl":"https:\/\/club-wp.eu\/wp-content\/plugins\/elementor-pro\/modules\/lottie\/assets\/animations\/default.json"}};
 //# sourceURL=elementor-pro-frontend-js-before
 </script>
-<script src="./IPPON.LV �?" �"場_files/frontend.min(1).js.download" id="elementor-pro-frontend-js"></script>
-<script src="./IPPON.LV �?" �"場_files/elements-handlers.min.js.download" id="pro-elements-handlers-js"></script><svg style="display: none;" class="e-font-icon-svg-symbols"></svg>
+<script src="./IPPON.LV – 道場_files/frontend.min(1).js.download" id="elementor-pro-frontend-js"></script>
+<script src="./IPPON.LV – 道場_files/elements-handlers.min.js.download" id="pro-elements-handlers-js"></script><svg style="display: none;" class="e-font-icon-svg-symbols"></svg>
 <script id="wp-emoji-settings" type="application/json">
 {"baseUrl":"https://s.w.org/images/core/emoji/17.0.2/72x72/","ext":".png","svgUrl":"https://s.w.org/images/core/emoji/17.0.2/svg/","svgExt":".svg","source":{"concatemoji":"https://club-wp.eu/wp-includes/js/wp-emoji-release.min.js?ver=6.9.3"}}
 </script>
@@ -602,21 +719,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
