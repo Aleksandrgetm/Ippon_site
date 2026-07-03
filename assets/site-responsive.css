@@ -12,6 +12,12 @@
   top: 0 !important;
 }
 
+/* Header logo only: bold samurai-style font across all public pages */
+.elementor-location-header .elementor-element-a4b8bf8 .elementor-heading-title {
+  font-family: "Shojumaru", "Noto Sans JP", serif !important;
+  font-weight: 400 !important;
+}
+
 /* Global responsive layer for IPPON site */
 html, body {
   overflow-x: hidden;
