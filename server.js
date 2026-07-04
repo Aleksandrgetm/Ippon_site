@@ -634,6 +634,7 @@ function ensureKlubaNoteikumiTable() {
     CREATE TABLE IF NOT EXISTS kluba_noteikumi (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       faili TEXT,
+      pdf_file TEXT,
       teksts TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -655,12 +656,25 @@ function ensureKlubaNoteikumiTable() {
   ];
 
   const stmt = db.prepare(`
-    INSERT INTO kluba_noteikumi (faili, teksts, created_at, updated_at)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO kluba_noteikumi (faili, pdf_file, teksts, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
   `);
   const ts = nowTs();
   for (const row of seedRows) {
-    stmt.run(row.faili, row.teksts, ts, ts);
+    stmt.run(row.faili, row.faili, row.teksts, ts, ts);
+  }
+}
+
+function ensureKlubaNoteikumiPdfColumnMigration() {
+  if (!tableExists('kluba_noteikumi')) return;
+  ensureTableColumn('kluba_noteikumi', 'pdf_file', 'TEXT');
+
+  const rows = db.prepare('SELECT id, faili, pdf_file FROM kluba_noteikumi').all();
+  for (const row of rows) {
+    if (String(row?.pdf_file || '').trim()) continue;
+    const fallbackPdfUrl = normalizeStoredPdfUrl(row?.faili) || '';
+    if (!fallbackPdfUrl) continue;
+    db.prepare('UPDATE kluba_noteikumi SET pdf_file = ? WHERE id = ?').run(fallbackPdfUrl, row.id);
   }
 }
 
@@ -2034,6 +2048,19 @@ function mapSadarbibaRow(row) {
     nosaukums: row.nosaukums,
     fallbackMain: row.foto_attels
   });
+}
+
+function mapKlubaNoteikumiRow(row) {
+  if (!row) return null;
+  const pdfFile = normalizeStoredPdfUrl(row.pdf_file) || normalizeStoredPdfUrl(row.faili) || null;
+  return {
+    id: row.id,
+    faili: row.faili || null,
+    pdf_file: pdfFile,
+    teksts: row.teksts,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
 }
 
 function mapSponsoruAtbalstsPdfRow(row) {
@@ -3421,6 +3448,7 @@ function initializeDatabase() {
   ensureJaunumiMediaColumns();
   ensureTreneriTable();
   ensureKlubaNoteikumiTable();
+  ensureKlubaNoteikumiPdfColumnMigration();
   ensureHallsTables();
   ensureNodarbibasSarakstsTable();
   ensureNodarbibasIzlasesGrupasTable();
@@ -5323,15 +5351,11 @@ async function handleApi(req, res, reqUrl) {
       SELECT * FROM kluba_noteikumi
       ORDER BY created_at DESC, id DESC
     `).all();
+    const items = rows.map((row) => mapKlubaNoteikumiRow(row));
     sendJson(res, 200, {
-      total: rows.length,
-      items: rows.map((row) => ({
-        id: row.id,
-        faili: row.faili,
-        teksts: row.teksts,
-        created_at: row.created_at,
-        updated_at: row.updated_at
-      }))
+      total: items.length,
+      item: items[0] || null,
+      items
     });
     return true;
   }
@@ -5589,12 +5613,16 @@ async function handleApi(req, res, reqUrl) {
             sendJson(res, 400, { error: 'Field teksts is required' });
             return;
           }
+          const pdfFile = body.pdf_file != null
+            ? String(body.pdf_file).trim()
+            : (body.faili ? String(body.faili).trim() : null);
           const ts = nowTs();
           const info = db.prepare(`
-            INSERT INTO kluba_noteikumi (faili, teksts, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO kluba_noteikumi (faili, pdf_file, teksts, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
           `).run(
             body.faili ? String(body.faili).trim() : null,
+            pdfFile || null,
             teksts,
             ts,
             ts
@@ -6261,12 +6289,18 @@ async function handleApi(req, res, reqUrl) {
             return;
           }
           const hasFaili = Object.prototype.hasOwnProperty.call(body, 'faili');
+          const hasPdfFile = Object.prototype.hasOwnProperty.call(body, 'pdf_file');
+          const nextFaili = hasFaili ? (String(body.faili || '').trim() || null) : existing.faili;
+          const nextPdfFile = hasPdfFile
+            ? (String(body.pdf_file || '').trim() || null)
+            : (hasFaili ? (String(body.faili || '').trim() || null) : (existing.pdf_file || existing.faili || null));
           db.prepare(`
             UPDATE kluba_noteikumi
-            SET faili = ?, teksts = ?, updated_at = ?
+            SET faili = ?, pdf_file = ?, teksts = ?, updated_at = ?
             WHERE id = ?
           `).run(
-            hasFaili ? (String(body.faili || '').trim() || null) : existing.faili,
+            nextFaili,
+            nextPdfFile,
             teksts,
             nowTs(),
             id
