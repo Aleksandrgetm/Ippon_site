@@ -677,10 +677,10 @@ h1, h2, h3, h4, h5, h6,
 
       const fieldsHtml = [
         field('Dzimšanas datums', formatDate(item.dzimsanas_datums || '')),
-        field('Izglitiba', item.izglitiba || ''),
+        field('Izglītība', item.izglitiba || ''),
         field('Josta', item.josta || ''),
-        field('Saka studet', item.saka_studet || ''),
-        field('Koucinga pieredze', item.koucinga_pieredze || '')
+        field('Sāka trenēties', item.saka_studet || ''),
+        field('Trenera pieredze', item.koucinga_pieredze || '')
       ].filter(Boolean).join('');
       document.getElementById('trenerisFields').innerHTML = fieldsHtml || '<div class="treneris-empty">Papildu informacija vel nav pievienota.</div>';
 
