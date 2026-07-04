@@ -510,12 +510,15 @@ h1, h2, h3, h4, h5, h6,
         viewport
       }).promise;
 
-      const textContent = await page.getTextContent();
-      await pdfjsLib.renderTextLayer({
-        textContentSource: textContent,
+      const textLayerRenderer = new pdfjsLib.TextLayer({
+        textContentSource: page.streamTextContent({
+          includeMarkedContent: true,
+          disableNormalization: true
+        }),
         container: textLayer,
         viewport
-      }).promise;
+      });
+      await textLayerRenderer.render();
     }
   }
 
@@ -679,7 +682,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 

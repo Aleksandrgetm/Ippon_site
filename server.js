@@ -791,6 +791,16 @@ function ensureSponsoruAtbalstsPdfColumnMigration() {
     if (!hasPdfFile) {
       db.exec(`ALTER TABLE ${tableName} ADD COLUMN pdf_file TEXT`);
     }
+
+    const rows = db.prepare(`SELECT id, pdf_file FROM ${tableName}`).all();
+    for (const row of rows) {
+      if (String(row?.pdf_file || '').trim()) continue;
+      const pdfFiles = listPdfFilesInDir(path.join(RULES_UPLOADS_DIR, String(row.id)), { recursive: false });
+      const storageKey = pdfFiles.length ? localPathToUploadsStorageKey(pdfFiles[0]) : '';
+      const fallbackPdfUrl = storageKey ? buildLocalUploadUrl(storageKey) : '';
+      if (!fallbackPdfUrl) continue;
+      db.prepare(`UPDATE ${tableName} SET pdf_file = ? WHERE id = ?`).run(fallbackPdfUrl, row.id);
+    }
   }
 }
 
@@ -1459,6 +1469,31 @@ function listImageFilesInDir(dirPath, { recursive = false } = {}) {
   return out.sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
 }
 
+function listPdfFilesInDir(dirPath, { recursive = false } = {}) {
+  if (!dirPath || !fs.existsSync(dirPath)) return [];
+  const out = [];
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const abs = path.join(dirPath, entry.name);
+      if (entry.isFile() && /\.pdf$/i.test(entry.name)) {
+        out.push(abs);
+        continue;
+      }
+      if (recursive && entry.isDirectory()) {
+        out.push(...listPdfFilesInDir(abs, { recursive: true }));
+      }
+    }
+  } catch {
+    return [];
+  }
+  return out.sort((a, b) => {
+    const aTime = fs.statSync(a).mtimeMs;
+    const bTime = fs.statSync(b).mtimeMs;
+    return bTime - aTime;
+  });
+}
+
 function localPathToUploadsStorageKey(filePath) {
   const relative = path.relative(ROOT, filePath).replace(/\\/g, '/');
   if (!relative || relative.startsWith('..') || !relative.startsWith('uploads/')) return '';
@@ -1899,10 +1934,17 @@ function mapSadarbibaRow(row) {
 
 function mapSponsoruAtbalstsPdfRow(row) {
   if (!row) return null;
+  const fallbackPdfUrl = (() => {
+    const itemId = Number(row.id || 0);
+    if (!itemId) return '';
+    const pdfFiles = listPdfFilesInDir(path.join(RULES_UPLOADS_DIR, String(itemId)), { recursive: false });
+    const storageKey = pdfFiles.length ? localPathToUploadsStorageKey(pdfFiles[0]) : '';
+    return storageKey ? buildLocalUploadUrl(storageKey) : '';
+  })();
   return {
     id: row.id,
     nosaukums: String(row.nosaukums || '').trim() || 'Sponsoru atbalsts',
-    pdf_file: normalizeStoredPdfUrl(row.pdf_file) || null
+    pdf_file: normalizeStoredPdfUrl(row.pdf_file) || fallbackPdfUrl || null
   };
 }
 
@@ -3789,6 +3831,20 @@ async function handleApi(req, res, reqUrl) {
       ORDER BY id DESC
       LIMIT 1
     `).get();
+
+    if (row && !String(row.pdf_file || '').trim()) {
+      const pdfFiles = listPdfFilesInDir(path.join(RULES_UPLOADS_DIR, String(row.id)), { recursive: false });
+      const storageKey = pdfFiles.length ? localPathToUploadsStorageKey(pdfFiles[0]) : '';
+      const fallbackPdfUrl = storageKey ? buildLocalUploadUrl(storageKey) : '';
+      if (fallbackPdfUrl) {
+        db.prepare(`
+          UPDATE sadarbiba_sponsoru_atbalsts
+          SET pdf_file = ?, updated_at = ?
+          WHERE id = ?
+        `).run(fallbackPdfUrl, nowTs(), row.id);
+        row.pdf_file = fallbackPdfUrl;
+      }
+    }
 
     sendJson(res, 200, { item: mapSponsoruAtbalstsPdfRow(row) });
     return true;
@@ -6360,7 +6416,7 @@ async function handleApi(req, res, reqUrl) {
 }
 
 try {
-  //initializeDatabase();
+  initializeDatabase();
 } catch (error) {
   logSqliteError('database initialization failed', error);
   process.exit(1);
