@@ -281,13 +281,12 @@ h1, h2, h3, h4, h5, h6,
             <thead>
               <tr>
                 <th style="width:88px">#</th>
-                <th>Vards, uzvards</th>
-                <th style="width:260px">Dzimšanas datums</th>
-                <th style="width:220px">Fotografija</th>
+                <th>Vārds, uzvārds</th>
+                <th style="width:220px">Fotogrāfija</th>
               </tr>
             </thead>
             <tbody id="sportistiBody">
-              <tr><td colspan="4" class="sportisti-state">Ielade...</td></tr>
+              <tr><td colspan="3" class="sportisti-state">Ielade...</td></tr>
             </tbody>
           </table>
         </div>
@@ -471,8 +470,7 @@ h1, h2, h3, h4, h5, h6,
   }
   .sportisti-table .col-name a:hover { color:#fff; }
   .sportisti-table .col-name a:hover::after { width: 100%; }
-  .sportisti-table .col-num,
-  .sportisti-table .col-date {
+  .sportisti-table .col-num {
     font-family:"Oswald",sans-serif;
     font-size:18px;
     line-height:1;
@@ -525,7 +523,7 @@ h1, h2, h3, h4, h5, h6,
     .sportisti-table thead th { font-size:17px; padding:8px 6px; }
     .sportisti-table td { font-size:15px; padding:8px 6px; }
     .sportisti-table .col-name a { font-size:18px; }
-    .sportisti-table .col-num, .sportisti-table .col-date { font-size:15px; }
+    .sportisti-table .col-num { font-size:15px; }
     .sportisti-photo, .sportisti-fallback { width:64px; height:64px; }
     .sportisti-fallback { font-size:20px; }
     .sportisti-search-row { gap:8px; }
@@ -631,8 +629,6 @@ h1, h2, h3, h4, h5, h6,
         const fullName = item.vards_uzvards || '—';
         const slug = item.slug || '';
         const href = `/sportisti/${slug}`;
-        const birth = formatDate(item.dzimsanas_datums) || '—';
-
         const tr = document.createElement('tr');
         tr.style.animationDelay = `${Math.min(index * 35, 450)}ms`;
 
@@ -646,10 +642,6 @@ h1, h2, h3, h4, h5, h6,
         linkName.href = href;
         linkName.textContent = fullName;
         tdName.appendChild(linkName);
-
-        const tdDate = document.createElement('td');
-        tdDate.className = 'col-date';
-        tdDate.textContent = birth;
 
         const tdPhoto = document.createElement('td');
         const linkPhoto = document.createElement('a');
@@ -679,7 +671,6 @@ h1, h2, h3, h4, h5, h6,
 
         tr.appendChild(tdNum);
         tr.appendChild(tdName);
-        tr.appendChild(tdDate);
         tr.appendChild(tdPhoto);
         tbody.appendChild(tr);
       });
@@ -720,7 +711,7 @@ h1, h2, h3, h4, h5, h6,
         });
       }
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="4" class="sportisti-state" style="color:#ff5a5a">${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="3" class="sportisti-state" style="color:#ff5a5a">${err.message}</td></tr>`;
       if (searchMeta) searchMeta.textContent = '';
     }
   })();
@@ -853,7 +844,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
