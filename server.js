@@ -770,6 +770,23 @@ function ensureTableColumn(tableName, columnName, columnSql) {
   }
 }
 
+function tableExists(tableName) {
+  return Boolean(
+    db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1").get(String(tableName || '').trim())
+  );
+}
+
+function ensureSponsoruAtbalstsPdfColumnMigration() {
+  const targetTables = ['sadarbiba_sponsoru_atbalsts', 'sponsoru_atbalsts'];
+  for (const tableName of targetTables) {
+    if (!tableExists(tableName)) continue;
+    const hasPdfFile = db.prepare(`PRAGMA table_info(${tableName})`).all().some((col) => col.name === 'pdf_file');
+    if (!hasPdfFile) {
+      db.exec(`ALTER TABLE ${tableName} ADD COLUMN pdf_file TEXT`);
+    }
+  }
+}
+
 function ensureSportistiMediaColumns() {
   ensureTableColumn('ippon_sportists', 'foto_attels', 'TEXT');
   ensureTableColumn('ippon_sportists', 'galerija', 'TEXT');
@@ -1028,7 +1045,7 @@ function ensureSadarbibaSponsoruAtbalstsTable() {
     )
   `);
 
-  ensureTableColumn('sadarbiba_sponsoru_atbalsts', 'pdf_file', 'TEXT');
+  ensureSponsoruAtbalstsPdfColumnMigration();
 
   const hasAny = db.prepare('SELECT id FROM sadarbiba_sponsoru_atbalsts LIMIT 1').get();
   if (hasAny) return;
@@ -3205,6 +3222,7 @@ function initializeDatabase() {
   ensureNodarbibasIzlasesGrupasTable();
   ensureNodarbibasIndividualasNodarbibasTable();
   ensureSadarbibaSportaZalesIreTable();
+  ensureSponsoruAtbalstsPdfColumnMigration();
   ensureSadarbibaSponsoruAtbalstsTable();
   ensureSadarbibaMusuPartneriTable();
   ensureVideoGalerijaTable();
