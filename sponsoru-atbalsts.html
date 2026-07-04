@@ -350,68 +350,33 @@ h1, h2, h3, h4, h5, h6,
     border-color: #dc2626;
     padding: 20px;
   }
-  .rules-doc-header {
-    text-align: center;
-    margin-bottom: 26px;
+  .sponsor-pdf-view {
+    width: 100%;
+    min-height: 520px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    background: #060606;
+    padding: 16px;
+    overflow: auto;
   }
-  .rules-doc-org {
-    margin: 0;
-    font-family: "Oswald", sans-serif;
-    font-size: clamp(20px, 2.1vw, 32px);
-    line-height: 1.1;
-    color: #ffffff;
-    font-weight: 700;
+  .sponsor-pdf-native {
+    width: 100%;
+    min-height: 78vh;
+    border: 0;
+    border-radius: 8px;
+    background: #ffffff;
   }
-  .rules-doc-org + .rules-doc-org {
-    margin-top: 4px;
-  }
-  .rules-doc-title {
-    margin: 18px 0 8px;
-    font-family: "Oswald", sans-serif;
-    font-size: clamp(24px, 2.5vw, 36px);
-    line-height: 1.04;
-    color: #ffffff;
-    text-transform: none;
-  }
-  .rule-text {
-    margin: 0;
-    font-family: "Roboto", sans-serif;
-    font-size: 16px;
-    line-height: 1.55;
-    color: #ffffff;
-  }
-  .rule-text,
-  .rule-text * {
-    color: #ffffff !important;
-  }
-  .rule-text p {
-    margin: 0 0 12px;
-  }
-  .rule-text p:last-child {
-    margin-bottom: 0;
-  }
-  .rule-text strong {
-    font-family: "Oswald", sans-serif;
-    font-size: 20px;
-    line-height: 1.12;
-    font-weight: 600;
-    display: block;
-    margin: 20px 0 10px;
-  }
-  .sponsor-doc-body {
-    min-height: 220px;
-  }
-  .sponsor-doc-error {
+  .sponsor-pdf-error {
     margin: 16px 0 0;
     font-family: "Roboto", sans-serif;
     font-size: 14px;
     line-height: 1.45;
     color: rgba(255,255,255,0.8);
   }
-  .sponsor-doc-error[hidden] {
+  .sponsor-pdf-error[hidden] {
     display: none !important;
   }
-  .sponsor-doc-empty {
+  .sponsor-pdf-empty {
     margin: 0;
     font-family: "Roboto", sans-serif;
     font-size: 16px;
@@ -438,6 +403,7 @@ h1, h2, h3, h4, h5, h6,
   @media (max-width: 1024px) {
     .rules-shell { padding: 136px 0 74px; }
     .rules-container { width: min(1220px, calc(100% - 24px)); }
+    .sponsor-pdf-view { padding: 10px; }
   }
 </style>
 <script type="module">
@@ -456,7 +422,6 @@ h1, h2, h3, h4, h5, h6,
     const title = String(item?.nosaukums || '').trim() || 'Sponsoru atbalsts';
     const pdfUrl = String(item?.pdf_file || '').trim();
     const fileName = pdfUrl.split('/').pop() || 'sponsoru-atbalsts.pdf';
-    const pdfTextHtml = String(item?.pdf_text_html || '').trim();
     return `
       <div class="sponsor-hero">
         <p class="sponsor-kicker">Sadarb&#299;ba</p>
@@ -464,18 +429,18 @@ h1, h2, h3, h4, h5, h6,
       </div>
       <div class="rules-list">
         <article class="rule-item rule-item--document">
-          ${hasPdf ? `
-            <div class="rules-doc-header">
-              <p class="rules-doc-org">Sporta klubs "IPPON.LV"</p>
-              <h3 class="rules-doc-title">${esc(title)}</h3>
-            </div>
-            <div id="sponsorDocBody" class="rule-text sponsor-doc-body">${pdfTextHtml}</div>
-            <p id="sponsorDocError" class="sponsor-doc-error" ${pdfTextHtml ? 'hidden' : ''}>${pdfTextHtml ? '' : 'Neizdevas nolasit dokumenta tekstu, bet PDF fails ir pieejams lejupieladei.'}</p>
-          ` : '<p class="sponsor-doc-empty">PDF nav pievienots.</p>'}
+          ${hasPdf ? `<div class="sponsor-pdf-view"><iframe class="sponsor-pdf-native" src="${esc(pdfUrl)}#toolbar=1&navpanes=0&view=FitH" title="${esc(title)} PDF"></iframe></div><p id="sponsorPdfError" class="sponsor-pdf-error" hidden></p>` : '<p class="sponsor-pdf-empty">PDF nav pievienots.</p>'}
           ${hasPdf ? `<a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
         </article>
       </div>
     `;
+  }
+
+  function showRenderError(message) {
+    const errorEl = document.getElementById('sponsorPdfError');
+    if (!errorEl) return;
+    errorEl.textContent = message || 'Neizdevas ieladet dokumenta prieksskatijumu, bet PDF fails ir pieejams lejupieladei.';
+    errorEl.hidden = false;
   }
 
   async function init() {
@@ -490,6 +455,8 @@ h1, h2, h3, h4, h5, h6,
       detailEl.innerHTML = buildDetail(item, Boolean(pdfUrl));
       detailEl.hidden = false;
       stateEl.hidden = true;
+
+      if (pdfUrl) return;
     } catch (error) {
       stateEl.textContent = 'Neizdevas ieladet Sponsoru atbalsta lapu.';
       stateEl.hidden = false;
@@ -630,7 +597,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
