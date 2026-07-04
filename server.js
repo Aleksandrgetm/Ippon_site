@@ -4,6 +4,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 const Database = require('better-sqlite3');
 const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const XLSX = require('xlsx');
 
 
 const ROOT = __dirname;
@@ -729,6 +730,7 @@ function ensureNodarbibasSarakstsTable() {
     CREATE TABLE IF NOT EXISTS nodarbibas_saraksts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       attels TEXT,
+      excel_file TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
@@ -739,9 +741,9 @@ function ensureNodarbibasSarakstsTable() {
 
   const ts = nowTs();
   db.prepare(`
-    INSERT INTO nodarbibas_saraksts (attels, created_at, updated_at)
-    VALUES (?, ?, ?)
-  `).run(null, ts, ts);
+    INSERT INTO nodarbibas_saraksts (attels, excel_file, created_at, updated_at)
+    VALUES (?, ?, ?, ?)
+  `).run(null, null, ts, ts);
 }
 
 function ensureNodarbibasIzlasesGrupasTable() {
@@ -1215,6 +1217,112 @@ function normalizeStoredPdfUrl(value) {
     return buildLocalUploadUrl(storageKey);
   }
   return normalizeStoredMediaUrl(value);
+}
+
+function resolveLocalUploadPath(fileUrl) {
+  const normalizedUrl = String(fileUrl || '').trim();
+  if (!normalizedUrl) return '';
+  const storageKey = extractUploadStorageKey(normalizedUrl);
+  if (storageKey) {
+    return uploadKeyToLocalPath(storageKey);
+  }
+  if (normalizedUrl.startsWith('/')) {
+    return path.join(ROOT, normalizedUrl.replace(/^\/+/, ''));
+  }
+  return path.join(ROOT, normalizedUrl);
+}
+
+function parseCsvToMatrix(text) {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        cell += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (!inQuotes && char === ',') {
+      row.push(cell);
+      cell = '';
+      continue;
+    }
+
+    if (!inQuotes && (char === '\n' || char === '\r')) {
+      if (char === '\r' && nextChar === '\n') {
+        i += 1;
+      }
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+      continue;
+    }
+
+    cell += char;
+  }
+
+  if (cell !== '' || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function normalizeSpreadsheetTableData(matrix) {
+  const rows = Array.isArray(matrix) ? matrix : [];
+  const prepared = rows.map((row) => (
+    Array.isArray(row)
+      ? row.map((cell) => (cell == null ? '' : String(cell)))
+      : [row == null ? '' : String(row)]
+  ));
+
+  while (prepared.length) {
+    const lastRow = prepared[prepared.length - 1];
+    if (lastRow.some((cell) => String(cell || '').trim() !== '')) break;
+    prepared.pop();
+  }
+
+  const maxCols = prepared.reduce((max, row) => Math.max(max, row.length), 0);
+  return prepared.map((row) => {
+    const next = row.slice(0, maxCols);
+    while (next.length < maxCols) next.push('');
+    return next;
+  });
+}
+
+function extractSpreadsheetTableData(fileUrl) {
+  const absPath = resolveLocalUploadPath(fileUrl);
+  if (!absPath || !fs.existsSync(absPath)) return [];
+
+  const ext = String(path.extname(absPath) || '').toLowerCase();
+  let matrix = [];
+
+  if (ext === '.csv') {
+    matrix = parseCsvToMatrix(fs.readFileSync(absPath, 'utf8'));
+  } else {
+    const workbook = XLSX.read(fs.readFileSync(absPath), { type: 'buffer' });
+    const firstSheetName = workbook.SheetNames[0];
+    if (!firstSheetName) return [];
+    matrix = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], {
+      header: 1,
+      raw: false,
+      defval: ''
+    });
+  }
+
+  return normalizeSpreadsheetTableData(matrix);
 }
 
 let pdfJsModulePromise = null;
@@ -3451,6 +3559,7 @@ function initializeDatabase() {
   ensureKlubaNoteikumiPdfColumnMigration();
   ensureHallsTables();
   ensureNodarbibasSarakstsTable();
+  ensureTableColumn('nodarbibas_saraksts', 'excel_file', 'TEXT');
   ensureNodarbibasIzlasesGrupasTable();
   ensureNodarbibasIndividualasNodarbibasTable();
   ensureSadarbibaSportaZalesIreTable();
@@ -3630,6 +3739,7 @@ function mapNodarbibasRow(tableName, row) {
   return withResolvedMedia({
     ...row,
     attels: normalizeStoredMediaUrl(row.attels) || null,
+    excel_file: normalizeStoredMediaUrl(row.excel_file) || null,
     galerija: parseGallery(row.galerija)
   }, {
     category: 'nodarbibas',
@@ -4979,7 +5089,9 @@ async function handleApi(req, res, reqUrl) {
       sendJson(res, 404, { error: 'Saraksts not found' });
       return true;
     }
-    sendJson(res, 200, { item: mapNodarbibasRow('nodarbibas_saraksts', row) });
+    const item = mapNodarbibasRow('nodarbibas_saraksts', row);
+    item.table_data = item.excel_file ? extractSpreadsheetTableData(item.excel_file) : [];
+    sendJson(res, 200, { item });
     return true;
   }
 
@@ -5677,6 +5789,15 @@ async function handleApi(req, res, reqUrl) {
                 ts,
                 ts
               )
+            : table === 'nodarbibas_saraksts'
+            ? db.prepare(`
+                INSERT INTO ${table} (excel_file, created_at, updated_at)
+                VALUES (?, ?, ?)
+              `).run(
+                body.excel_file ? String(body.excel_file).trim() : null,
+                ts,
+                ts
+              )
             : db.prepare(`
                 INSERT INTO ${table} (attels, created_at, updated_at)
                 VALUES (?, ?, ?)
@@ -6368,6 +6489,16 @@ async function handleApi(req, res, reqUrl) {
               WHERE ${pk} = ?
             `).run(
               body.ievads != null ? String(body.ievads).trim() : existing.ievads,
+              nowTs(),
+              id
+            );
+          } else if (table === 'nodarbibas_saraksts') {
+            db.prepare(`
+              UPDATE ${table}
+              SET excel_file = ?, updated_at = ?
+              WHERE ${pk} = ?
+            `).run(
+              body.excel_file != null ? String(body.excel_file).trim() : existing.excel_file,
               nowTs(),
               id
             );

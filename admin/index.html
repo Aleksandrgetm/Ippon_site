@@ -1041,6 +1041,7 @@
       'nodarbibas_izlases_grupas',
       'nodarbibas_individualas_nodarbibas'
     ]);
+    const NODARBIBAS_SARAKSTS_TABLE = 'nodarbibas_saraksts';
     const HALL_TABLES = new Set(['zales_imanta', 'zales_zolitude', 'zales_sloka', 'zales_pinki']);
     const GALERIJA_TABLES = new Set([FOTO_GALERIJA_TABLE, VIDEO_GALERIJA_TABLE, RAKSTI_PRESE_TABLE]);
     const SADARBIBA_TABLES = new Set([
@@ -1217,6 +1218,7 @@
       id: 'ID',
       ievads: 'Ievads',
       attels: 'Attēls',
+      excel_file: 'Excel fails',
       created_at: 'Izveidots',
       updated_at: 'Atjaunots'
     };
@@ -1351,6 +1353,7 @@
       if (HALL_TABLES.has(tableName) && HALL_HIDDEN_FIELDS.has(colName)) return true;
       if (tableName === SADARBIBA_SPONSORU_ATBALSTS_TABLE && SPONSORU_ATBALSTS_HIDDEN_FIELDS.has(colName)) return true;
       if (SADARBIBA_TABLES.has(tableName) && SADARBIBA_HIDDEN_FIELDS.has(colName)) return true;
+      if (tableName === NODARBIBAS_SARAKSTS_TABLE && colName === 'attels') return true;
       if (NODARBIBAS_TABLES.has(tableName) && (colName === 'created_at' || colName === 'updated_at')) return true;
       if (tableName === 'ippon_sportists' && SPORTISTI_HIDDEN_FIELDS.has(colName)) return true;
       return false;
@@ -2369,6 +2372,18 @@
           pk: 0
         });
       }
+      if (
+        currentTable === NODARBIBAS_SARAKSTS_TABLE
+        && !baseColumns.some((col) => col.name === 'excel_file')
+      ) {
+        baseColumns.push({
+          name: 'excel_file',
+          type: 'TEXT',
+          notnull: 0,
+          dflt_value: null,
+          pk: 0
+        });
+      }
       return baseColumns;
     }
 
@@ -2811,6 +2826,25 @@
           preview.style.borderRadius = '8px';
           preview.style.marginBottom = '10px';
           preview.style.display = 'none';
+          wrap.appendChild(preview);
+        } else if (currentTable === NODARBIBAS_SARAKSTS_TABLE && col.name === 'excel_file') {
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.dataset.col = col.name;
+          field.id = `f_${col.name}`;
+          wrap.appendChild(field);
+
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = '.xlsx,.xls,.csv';
+          fileInput.id = 'nodarbibasExcelFile';
+          fileInput.style.marginBottom = '6px';
+          wrap.appendChild(fileInput);
+
+          const preview = document.createElement('div');
+          preview.id = 'nodarbibasExcelPreview';
+          preview.className = 'small';
+          preview.style.marginBottom = '10px';
           wrap.appendChild(preview);
         } else if (NODARBIBAS_TABLES.has(currentTable) && col.name === 'attels') {
           const field = document.createElement('input');
@@ -4639,10 +4673,25 @@
 
     function updateNodarbibasPreview() {
       if (!NODARBIBAS_TABLES.has(currentTable)) return;
-      if (!currentColumns.some((c) => c.name === 'attels')) return;
-      const valueInput = document.getElementById('f_attels');
-      const preview = document.getElementById('nodarbibasImagePreview');
+      const isSaraksts = currentTable === NODARBIBAS_SARAKSTS_TABLE;
+      const valueInput = document.getElementById(isSaraksts ? 'f_excel_file' : 'f_attels');
+      const preview = document.getElementById(isSaraksts ? 'nodarbibasExcelPreview' : 'nodarbibasImagePreview');
       if (!valueInput || !preview) return;
+
+      if (isSaraksts) {
+        const stored = String(valueInput.value || '').trim();
+        if (!stored && !selectedNodarbibasFile) {
+          preview.textContent = 'Fails nav pievienots';
+          return;
+        }
+        if (selectedNodarbibasFile) {
+          preview.textContent = `Izvēlēts fails: ${selectedNodarbibasFile.name}`;
+          return;
+        }
+        const fileName = stored.split('/').pop() || stored;
+        preview.innerHTML = `<a href="${stored}" target="_blank" rel="noopener">Pašreizējais fails: ${fileName}</a>`;
+        return;
+      }
 
       const src = selectedNodarbibasPreviewUrl || String(valueInput.value || '').trim();
       if (!src) {
@@ -4656,10 +4705,9 @@
 
     function setupNodarbibasTools() {
       if (!NODARBIBAS_TABLES.has(currentTable)) return;
-      if (!currentColumns.some((c) => c.name === 'attels')) return;
-
-      const fileInput = document.getElementById('nodarbibasImageFile');
-      const valueInput = document.getElementById('f_attels');
+      const isSaraksts = currentTable === NODARBIBAS_SARAKSTS_TABLE;
+      const fileInput = document.getElementById(isSaraksts ? 'nodarbibasExcelFile' : 'nodarbibasImageFile');
+      const valueInput = document.getElementById(isSaraksts ? 'f_excel_file' : 'f_attels');
 
       if (valueInput) {
         valueInput.addEventListener('input', updateNodarbibasPreview);
@@ -4672,9 +4720,11 @@
             URL.revokeObjectURL(selectedNodarbibasPreviewUrl);
             selectedNodarbibasPreviewUrl = '';
           }
-          if (file) {
+          if (file && !isSaraksts) {
             selectedNodarbibasPreviewUrl = URL.createObjectURL(file);
-            setStatus('Attēls izvēlēts. Nospied Saglabāt.', 'ok');
+          }
+          if (file) {
+            setStatus(isSaraksts ? 'Excel fails izvēlēts. Nospied Saglabāt.' : 'Attēls izvēlēts. Nospied Saglabāt.', 'ok');
           }
           updateNodarbibasPreview();
         });
@@ -4684,7 +4734,6 @@
 
     async function uploadSelectedNodarbibasImageIfNeeded() {
       if (!NODARBIBAS_TABLES.has(currentTable)) return;
-      if (!currentColumns.some((c) => c.name === 'attels')) return;
       if (!selectedNodarbibasFile) return;
 
       const dataUrl = await new Promise((resolve, reject) => {
@@ -4694,16 +4743,16 @@
         reader.readAsDataURL(selectedNodarbibasFile);
       });
 
-      const uploaded = await api('/api/upload-image', {
+      const uploaded = await api(currentTable === NODARBIBAS_SARAKSTS_TABLE ? '/api/upload-file' : '/api/upload-image', {
         method: 'POST',
         body: JSON.stringify(buildUploadRequestBody(selectedNodarbibasFile, dataUrl, { tableName: currentTable }))
       });
-      const valueInput = document.getElementById('f_attels');
+      const valueInput = document.getElementById(currentTable === NODARBIBAS_SARAKSTS_TABLE ? 'f_excel_file' : 'f_attels');
       if (valueInput) {
         valueInput.value = uploaded.relativeUrl || uploaded.url;
       }
       selectedNodarbibasFile = null;
-      const fileInput = document.getElementById('nodarbibasImageFile');
+      const fileInput = document.getElementById(currentTable === NODARBIBAS_SARAKSTS_TABLE ? 'nodarbibasExcelFile' : 'nodarbibasImageFile');
       if (fileInput) fileInput.value = '';
       updateNodarbibasPreview();
     }
@@ -5078,7 +5127,9 @@
         : currentTable === RULES_TABLE
           ? visibleColumns.filter((c) => ['id', 'teksts', 'faili'].includes(c.name))
           : NODARBIBAS_TABLES.has(currentTable)
-            ? visibleColumns.filter((c) => ['id', 'ievads', 'attels'].includes(c.name))
+            ? visibleColumns.filter((c) => currentTable === NODARBIBAS_SARAKSTS_TABLE
+              ? ['id', 'excel_file'].includes(c.name)
+              : ['id', 'ievads', 'attels'].includes(c.name))
           : HALL_TABLES.has(currentTable)
             ? visibleColumns.filter((c) => ['id', 'nosaukums', 'attels', 'galerija'].includes(c.name))
             : visibleColumns.slice(0, 6);
@@ -5156,6 +5207,11 @@
             const href = String(val || '').trim();
             td.innerHTML = href
               ? `<a href="${href.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">Atvērt</a>`
+              : '—';
+          } else if (currentTable === NODARBIBAS_SARAKSTS_TABLE && col.name === 'excel_file') {
+            const href = String(val || '').trim();
+            td.innerHTML = href
+              ? `<a href="${href.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${(href.split('/').pop() || href).replace(/</g, '&lt;')}</a>`
               : '—';
           } else if (currentTable === REZULTATI_TABLE && col.name === 'foto_attels') {
             td.innerHTML = val
@@ -5354,6 +5410,8 @@
       } else if (NODARBIBAS_TABLES.has(currentTable)) {
         if (currentTable === 'nodarbibas_individualas_nodarbibas') {
           setStatus('Nodarbības: aizpildi Ievads, tad spied Saglabāt.', 'ok');
+        } else if (currentTable === NODARBIBAS_SARAKSTS_TABLE) {
+          setStatus('Saraksts: pievieno Excel failu un spied Saglabāt.', 'ok');
         } else {
           setStatus('Nodarbības: aizpildi Ievads un Attēls, tad spied Saglabāt.', 'ok');
         }

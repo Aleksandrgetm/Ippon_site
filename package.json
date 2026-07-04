@@ -1,0 +1,32 @@
+{
+  "name": "ippon_site",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"No Node backend tests configured\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aleksandrgetm/Ippon_site.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Aleksandrgetm/Ippon_site/issues"
+  },
+  "homepage": "https://github.com/Aleksandrgetm/Ippon_site#readme",
+  "devDependencies": {
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1053.0",
+    "better-sqlite3": "^12.9.0",
+    "pdfjs-dist": "^6.1.200",
+    "xlsx": "^0.18.5"
+  }
+}

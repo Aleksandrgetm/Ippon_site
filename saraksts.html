@@ -270,11 +270,11 @@ h1, h2, h3, h4, h5, h6,
     <section class="saraksts-shell">
       <div class="saraksts-container">
         <div class="saraksts-hero">
-          <h1>NODARBIBU <span>SARAKSTS</span></h1>
-          <p>Aktualais treninu grafiks</p>
+          <h1>NODARBĪBU <span>SARAKSTS</span></h1>
+          <p>Aktuālais treniņu grafiks</p>
         </div>
-        <div class="saraksts-image-wrap">
-          <img id="sarakstsImage" src="" alt="Nodarbibu saraksts">
+        <div class="saraksts-table-wrap">
+          <div id="sarakstsTableHost" class="saraksts-table-host"></div>
         </div>
       </div>
     </section>
@@ -307,57 +307,118 @@ h1, h2, h3, h4, h5, h6,
     font-size: clamp(18px, 2vw, 28px);
     color: #fff;
   }
-  .saraksts-image-wrap {
+  .saraksts-table-wrap {
     margin-top: 22px;
-    border: none;
-    border-radius: 0;
-    overflow: visible;
+    border: 1px solid rgba(238, 43, 43, 0.72);
+    border-radius: 18px;
+    overflow: hidden;
     background: #000;
-    display: flex;
-    justify-content: center;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   }
-  .saraksts-image-wrap img {
-    width: min(980px, 100%);
-    display: block;
-    max-height: none;
-    height: auto;
-    object-fit: contain;
-    background: #000;
+  .saraksts-table-host {
+    overflow-x: auto;
+    padding: 18px;
+  }
+  .saraksts-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 760px;
+    background: #050505;
+    color: #fff;
+    font-family: Roboto, sans-serif;
+  }
+  .saraksts-table th,
+  .saraksts-table td {
+    border: 1px solid rgba(255,255,255,0.16);
+    padding: 14px 16px;
+    text-align: left;
+    vertical-align: top;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .saraksts-table thead th,
+  .saraksts-table tr:first-child th,
+  .saraksts-table tr:first-child td {
+    background: rgba(238, 43, 43, 0.16);
+    color: #fff;
+    font-family: "Oswald", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-size: 16px;
+  }
+  .saraksts-table tbody tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+  }
+  .saraksts-table-empty {
+    margin: 0;
+    padding: 18px 20px;
+    color: #fff;
+    font-family: Roboto, sans-serif;
   }
   @media (max-width: 980px) {
     .saraksts-shell { padding: 130px 0 70px; }
     .saraksts-container { width: min(1320px, calc(100% - 22px)); }
-    .saraksts-image-wrap img { width: min(760px, 100%); }
+    .saraksts-table-host { padding: 12px; }
   }
 </style>
 <script>
   (async function loadSaraksts() {
-    const imageEl = document.getElementById('sarakstsImage');
-    if (!imageEl) return;
+    const host = document.getElementById('sarakstsTableHost');
+    if (!host) return;
 
-    function resolveImageUrl(path) {
-      const value = String(path || '').trim();
-      if (!value) return '';
-      if (value.startsWith('http://') || value.startsWith('https://')) return value;
-      if (value.startsWith('/uploads/')) return `https://ippon.fra1.digitaloceanspaces.com${value}`;
-      return value;
-    }
+    const escapeHtml = (value) => String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+
+    const renderMessage = (text) => {
+      host.innerHTML = `<p class="saraksts-table-empty">${escapeHtml(text)}</p>`;
+    };
+
+    const renderTable = (matrix) => {
+      const rows = Array.isArray(matrix) ? matrix : [];
+      if (!rows.length) {
+        renderMessage('Grafiks nav pievienots.');
+        return;
+      }
+
+      const maxCols = rows.reduce((max, row) => Math.max(max, Array.isArray(row) ? row.length : 0), 0);
+      if (!maxCols) {
+        renderMessage('Grafiks nav pievienots.');
+        return;
+      }
+
+      const normalizedRows = rows.map((row) => {
+        const next = Array.isArray(row) ? row.slice(0, maxCols) : [];
+        while (next.length < maxCols) next.push('');
+        return next;
+      });
+
+      const [headRow, ...bodyRows] = normalizedRows;
+      host.innerHTML = `
+        <table class="saraksts-table">
+          <thead>
+            <tr>${headRow.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('')}</tr>
+          </thead>
+          <tbody>
+            ${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      `;
+    };
 
     try {
       const res = await fetch('/api/nodarbibas/saraksts');
       const data = await res.json();
       if (!res.ok || !data.item) throw new Error(data.error || 'Neizdevas ieladet datus');
-      const src = resolveImageUrl(data.item.mainImage || data.item.attels || data.item.foto_attels || data.item.image || '');
-      if (!src) throw new Error('Attels nav pievienots admin paneli');
-      imageEl.src = src;
-    } catch (error) {
-      imageEl.removeAttribute('src');
-      imageEl.alt = error.message;
-      imageEl.style.display = 'none';
-      const box = document.querySelector('.saraksts-image-wrap');
-      if (box) {
-        box.innerHTML = '<p style="margin:0;padding:18px 20px;color:#f87171;font-family:Roboto,sans-serif;">' + error.message + '</p>';
+      if (!data.item.excel_file) {
+        renderMessage('Grafiks nav pievienots.');
+        return;
       }
+      renderTable(data.item.table_data || []);
+    } catch (error) {
+      renderMessage(error.message || 'Grafiks nav pievienots.');
     }
   })();
 </script>
@@ -490,8 +551,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
 
 
 
