@@ -327,6 +327,12 @@ function buildPublicUploadUrl(storageKey) {
   return `${SPACES_PUBLIC_BASE}/${String(storageKey || '').replace(/^\/+/, '')}`;
 }
 
+function buildLocalUploadUrl(storageKey) {
+  const normalizedKey = String(storageKey || '').replace(/^\/+/, '');
+  if (!normalizedKey) return '';
+  return `/${encodeUrlPath(normalizedKey)}`;
+}
+
 function encodeUrlPath(pathname) {
   return String(pathname || '')
     .split('/')
@@ -1158,6 +1164,33 @@ function normalizeStoredMediaUrl(value) {
   return text;
 }
 
+function extractUploadStorageKey(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.startsWith('/uploads/')) return text.slice(1);
+  if (text.startsWith('uploads/')) return text;
+
+  if (/^(?:https?:)?\/\//i.test(text)) {
+    try {
+      const parsed = new URL(text.startsWith('//') ? `https:${text}` : text);
+      const normalizedPath = decodeURIComponent(parsed.pathname || '');
+      if (normalizedPath.startsWith('/uploads/')) {
+        return normalizedPath.slice(1);
+      }
+    } catch {}
+  }
+
+  return '';
+}
+
+function normalizeStoredPdfUrl(value) {
+  const storageKey = extractUploadStorageKey(value);
+  if (storageKey) {
+    return buildLocalUploadUrl(storageKey);
+  }
+  return normalizeStoredMediaUrl(value);
+}
+
 function isImageFileName(name) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
 }
@@ -1868,7 +1901,7 @@ function mapSponsoruAtbalstsPdfRow(row) {
   return {
     id: row.id,
     nosaukums: String(row.nosaukums || '').trim() || 'Sponsoru atbalsts',
-    pdf_file: normalizeStoredMediaUrl(row.pdf_file) || null
+    pdf_file: normalizeStoredPdfUrl(row.pdf_file) || null
   };
 }
 
@@ -3692,9 +3725,11 @@ async function handleApi(req, res, reqUrl) {
 
         ensureDir(path.dirname(target.localPath));
         fs.writeFileSync(target.localPath, buffer);
+        const localUrl = buildLocalUploadUrl(target.storageKey);
         sendJson(res, 201, {
-          url: target.publicUrl,
-          relativeUrl: target.publicUrl,
+          url: localUrl,
+          relativeUrl: localUrl,
+          publicUrl: target.publicUrl,
           mime: parsed.mime,
           fileName: target.fileName,
           path: target.storageKey,
