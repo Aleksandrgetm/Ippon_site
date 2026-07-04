@@ -338,51 +338,22 @@ h1, h2, h3, h4, h5, h6,
     background: rgba(10, 10, 10, 0.96);
     padding: 20px;
   }
-  .ire-pdf-pages {
-    display: grid;
-    gap: 20px;
-  }
-  .ire-pdf-page {
-    border: 1px solid rgba(255,255,255,.16);
-    border-radius: 12px;
-    background: #fff;
-    overflow: hidden;
-    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.34);
-  }
-  .ire-pdf-page-inner {
-    position: relative;
+  .ire-pdf-frame {
     width: 100%;
-    background: #fff;
+    min-height: 78vh;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: #111;
+    overflow: hidden;
   }
-  .ire-pdf-canvas {
+  .ire-pdf-frame iframe {
     display: block;
     width: 100%;
-    height: auto;
+    height: 78vh;
+    border: 0;
     background: #fff;
   }
-  .ire-pdf-textLayer {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    line-height: 1;
-    opacity: 0.22;
-  }
-  .ire-pdf-textLayer span,
-  .ire-pdf-textLayer br {
-    position: absolute;
-    white-space: pre;
-    transform-origin: 0 0;
-    color: transparent;
-    cursor: text;
-  }
-  .ire-pdf-loading {
-    padding: 28px 18px;
-    text-align: center;
-    font-family: "Oswald", sans-serif;
-    font-size: 24px;
-    color: #ffffff;
-  }
-  .ire-pdf-error {
+  .ire-pdf-empty {
     margin: 0;
     font-family: "Roboto", sans-serif;
     font-size: 16px;
@@ -409,6 +380,11 @@ h1, h2, h3, h4, h5, h6,
   @media (max-width: 1024px) {
     .ire-wrap { width: min(1100px, calc(100% - 24px)); }
     .ire-title { font-size: clamp(36px, 4.2vw, 62px); }
+    .ire-pdf-frame,
+    .ire-pdf-frame iframe {
+      min-height: 70vh;
+      height: 70vh;
+    }
   }
 </style>
 <script>
@@ -427,6 +403,7 @@ h1, h2, h3, h4, h5, h6,
     const title = String(item?.nosaukums || '').trim() || 'Sponsoru atbalsts';
     const pdfUrl = String(item?.pdf_file || '').trim();
     const fileName = pdfUrl.split('/').pop() || 'sponsoru-atbalsts.pdf';
+    const viewerUrl = `${pdfUrl}#toolbar=1&navpanes=0&view=FitH`;
 
     return `
       <header class="ire-head">
@@ -437,109 +414,41 @@ h1, h2, h3, h4, h5, h6,
       </header>
 
       <section class="ire-pdf-card">
-        <div id="irePdfPages" class="ire-pdf-pages">
-          <div class="ire-pdf-loading">PDF tiek iel&#257;d&#275;ts...</div>
+        <div class="ire-pdf-frame">
+          <iframe src="${esc(viewerUrl)}" title="${esc(title)} PDF"></iframe>
         </div>
         <a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>
       </section>
     `;
   }
 
-  let pdfJsModulePromise = null;
-
-  function loadPdfJs() {
-    if (!pdfJsModulePromise) {
-      pdfJsModulePromise = import('/assets/vendor/pdfjs/pdf.mjs');
-    }
-    return pdfJsModulePromise;
-  }
-
-  function getPageScale(page, maxWidth) {
-    const initialViewport = page.getViewport({ scale: 1 });
-    const safeWidth = Math.max(320, Math.floor(maxWidth || initialViewport.width || 320));
-    const scale = safeWidth / initialViewport.width;
-    return Math.min(Math.max(scale, 0.8), 2.2);
-  }
-
-  async function renderPdfInto(container, pdfUrl) {
-    const pdfjsLib = await loadPdfJs();
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/vendor/pdfjs/pdf.worker.mjs';
-
-    const loadingTask = pdfjsLib.getDocument(pdfUrl);
-    const pdf = await loadingTask.promise;
-    container.innerHTML = '';
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber);
-      const pageWrap = document.createElement('article');
-      pageWrap.className = 'ire-pdf-page';
-
-      const pageInner = document.createElement('div');
-      pageInner.className = 'ire-pdf-page-inner';
-
-      const canvas = document.createElement('canvas');
-      canvas.className = 'ire-pdf-canvas';
-      const context = canvas.getContext('2d', { alpha: false });
-
-      const widthForScale = Math.min(container.clientWidth || 920, 920);
-      const scale = getPageScale(page, widthForScale);
-      const viewport = page.getViewport({ scale });
-      const outputScale = window.devicePixelRatio || 1;
-
-      canvas.width = Math.floor(viewport.width * outputScale);
-      canvas.height = Math.floor(viewport.height * outputScale);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
-
-      pageInner.style.width = `${Math.floor(viewport.width)}px`;
-      pageInner.style.height = `${Math.floor(viewport.height)}px`;
-
-      const textLayer = document.createElement('div');
-      textLayer.className = 'ire-pdf-textLayer';
-      textLayer.style.width = `${Math.floor(viewport.width)}px`;
-      textLayer.style.height = `${Math.floor(viewport.height)}px`;
-
-      pageInner.appendChild(canvas);
-      pageInner.appendChild(textLayer);
-      pageWrap.appendChild(pageInner);
-      container.appendChild(pageWrap);
-
-      await page.render({
-        canvasContext: context,
-        transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null,
-        viewport
-      }).promise;
-
-      const textLayerRenderer = new pdfjsLib.TextLayer({
-        textContentSource: page.streamTextContent({
-          includeMarkedContent: true,
-          disableNormalization: true
-        }),
-        container: textLayer,
-        viewport
-      });
-      await textLayerRenderer.render();
-    }
-  }
-
   async function init() {
     try {
       const res = await fetch('/api/sadarbiba/sponsoru-atbalsts');
-      if (!res.ok) throw new Error('Neizdevas ieladet datus');
+      if (!res.ok) throw new Error('API error');
       const data = await res.json();
       const item = data && data.item ? data.item : null;
-      const pdfUrl = String(item?.pdf_file || '').trim();
-      if (!item || !pdfUrl) {
-        stateEl.textContent = 'PDF nav pievienots.';
-        stateEl.hidden = false;
-        detailEl.hidden = true;
+      if (!item) throw new Error('No item');
+
+      const pdfUrl = String(item.pdf_file || '').trim();
+      if (!pdfUrl) {
+        detailEl.innerHTML = `
+          <header class="ire-head">
+            <div class="ire-title-wrap">
+              <p class="ire-kicker">Sadarb&#299;ba</p>
+              <h1 class="ire-title">${esc(String(item.nosaukums || '').trim() || 'Sponsoru atbalsts')}</h1>
+            </div>
+          </header>
+          <section class="ire-pdf-card">
+            <p class="ire-pdf-empty">PDF nav pievienots.</p>
+          </section>
+        `;
+        detailEl.hidden = false;
+        stateEl.hidden = true;
         return;
       }
 
       detailEl.innerHTML = buildDetail(item);
-      const pdfPagesEl = document.getElementById('irePdfPages');
-      if (!pdfPagesEl) throw new Error('PDF container missing');
-      await renderPdfInto(pdfPagesEl, pdfUrl);
       detailEl.hidden = false;
       stateEl.hidden = true;
     } catch (error) {
@@ -682,8 +591,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
 
 
 
