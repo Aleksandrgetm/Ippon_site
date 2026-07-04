@@ -365,6 +365,13 @@ h1, h2, h3, h4, h5, h6,
     gap: 22px;
     align-items: center;
   }
+  .sponsor-pdf-native {
+    width: 100%;
+    min-height: 78vh;
+    border: 0;
+    border-radius: 8px;
+    background: #ffffff;
+  }
   .sponsor-pdf-page {
     position: relative;
     width: 100%;
@@ -409,6 +416,9 @@ h1, h2, h3, h4, h5, h6,
     font-size: 14px;
     line-height: 1.45;
     color: rgba(255,255,255,0.8);
+  }
+  .sponsor-pdf-fallback[hidden] {
+    display: none !important;
   }
   .sponsor-pdf-empty {
     margin: 0;
@@ -463,16 +473,25 @@ h1, h2, h3, h4, h5, h6,
       </div>
       <div class="rules-list">
         <article class="rule-item rule-item--document">
-          ${hasPdf ? '<p class="sponsor-pdf-note">Dokuments tiek att&#275;lots lapas satur&#257;, nevis p&#257;rl&#363;ka ieb&#363;v&#275;taj&#257; PDF skat&#299;t&#257;j&#257;.</p><div class="sponsor-pdf-view"><div id="sponsorPdfPages" class="sponsor-pdf-pages"></div></div><p id="sponsorPdfFallback" class="sponsor-pdf-fallback" hidden>Neizdevas pilniba ieladet interaktivo teksta slani. PDF joprojam ir pieejams apskatei un lejupieladei.</p>' : '<p class="sponsor-pdf-empty">PDF nav pievienots.</p>'}
+          ${hasPdf ? `<p id="sponsorPdfNote" class="sponsor-pdf-note">Dokuments tiek att&#275;lots lapas satur&#257;, nevis p&#257;rl&#363;ka ieb&#363;v&#275;taj&#257; PDF skat&#299;t&#257;j&#257;.</p><div class="sponsor-pdf-view"><div id="sponsorPdfPages" class="sponsor-pdf-pages"></div></div><p id="sponsorPdfFallback" class="sponsor-pdf-fallback" hidden></p>` : '<p class="sponsor-pdf-empty">PDF nav pievienots.</p>'}
           ${hasPdf ? `<a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
         </article>
       </div>
     `;
   }
 
-  function showRenderFallback() {
+  function showRenderFallback(message) {
     const fallbackEl = document.getElementById('sponsorPdfFallback');
-    if (fallbackEl) fallbackEl.hidden = false;
+    if (!fallbackEl) return;
+    fallbackEl.textContent = message || 'PDF joprojam ir pieejams apskatei un lejupieladei.';
+    fallbackEl.hidden = false;
+  }
+
+  function showNativePdfFallback(pdfUrl) {
+    const pagesEl = document.getElementById('sponsorPdfPages');
+    if (!pagesEl) return;
+    pagesEl.innerHTML = `<iframe class="sponsor-pdf-native" src="${esc(pdfUrl)}#toolbar=1&navpanes=0&view=FitH" title="Sponsoru atbalsts PDF"></iframe>`;
+    showRenderFallback('Interaktivais lapas renderis saja parlu ka nenostradaja, tapec tiek paradita stabila PDF apskate.');
   }
 
   async function renderTextLayer(pdfjsLib, page, textLayer, viewport) {
@@ -504,6 +523,8 @@ h1, h2, h3, h4, h5, h6,
     });
 
     const pdf = await loadingTask.promise;
+
+    let renderedPages = 0;
 
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
@@ -538,12 +559,17 @@ h1, h2, h3, h4, h5, h6,
         canvasContext: context,
         viewport
       }).promise;
+      renderedPages += 1;
 
       const renderedText = await renderTextLayer(pdfjsLib, page, textLayer, viewport);
       if (!renderedText) {
         textLayer.remove();
-        showRenderFallback();
+        showRenderFallback('Teksta iezimesanas slanis netika pilniba ieladets, bet pats PDF saturs ir redzams zemak.');
       }
+    }
+
+    if (!renderedPages) {
+      throw new Error('No PDF pages rendered');
     }
   }
 
@@ -566,7 +592,7 @@ h1, h2, h3, h4, h5, h6,
         await renderPdf(pdfUrl);
       } catch (renderError) {
         console.error(renderError);
-        showRenderFallback();
+        showNativePdfFallback(pdfUrl);
       }
     } catch (error) {
       stateEl.textContent = 'Neizdevas ieladet Sponsoru atbalsta lapu.';
@@ -708,7 +734,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
