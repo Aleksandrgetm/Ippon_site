@@ -313,12 +313,6 @@ h1, h2, h3, h4, h5, h6,
   .ire-title-wrap {
     max-width: 860px;
   }
-  .ire-content {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 48%);
-    gap: 24px;
-    align-items: start;
-  }
   .ire-kicker {
     margin: 0 0 8px;
     color: #ef4444;
@@ -338,196 +332,51 @@ h1, h2, h3, h4, h5, h6,
     font-size: clamp(36px, 4.2vw, 62px);
     line-height: 0.95;
   }
-  .ire-text {
-    min-width: 0;
+  .ire-pdf-card {
+    border: 1px solid rgba(220, 38, 38, 0.68);
+    border-radius: 14px;
+    background: rgba(10, 10, 10, 0.96);
+    padding: 20px;
   }
-  .ire-photo {
+  .ire-pdf-frame {
     width: 100%;
-    max-width: 100%;
-    height: auto;
-    aspect-ratio: 5 / 4;
-    justify-self: end;
-    object-fit: cover;
-    border: 1px solid rgba(255,255,255,.16);
+    min-height: 78vh;
+    border: 1px solid rgba(255,255,255,.18);
     border-radius: 12px;
-    background: rgba(255,255,255,.04);
+    background: #111;
+    overflow: hidden;
   }
-  .ire-block {
-    border: none;
-    background: transparent;
-    margin-bottom: 0;
-  }
-  .ire-block-title {
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    color: #ffffff;
-    font-family: "Oswald", sans-serif;
-    text-transform: uppercase;
-    font-size: clamp(34px, 4.2vw, 56px);
-    letter-spacing: .3px;
-    line-height: 1.05;
-  }
-  .ire-html {
-    padding: 0;
-    color: #fff;
-    font-size: 17px;
-    line-height: 1.75;
-    font-weight: 400;
-    overflow-x: auto;
-  }
-  .ire-html,
-  .ire-html * {
-    color: #fff !important;
-  }
-  .ire-html p,
-  .ire-html div,
-  .ire-html span,
-  .ire-html em,
-  .ire-html i,
-  .ire-html b,
-  .ire-html strong,
-  .ire-html li {
-    background: transparent !important;
-  }
-  .ire-text .ire-html {
-    margin-top: 8px;
-  }
-  .ire-text .ire-html p:first-child {
-    margin-top: 0;
-  }
-  .ire-html * { max-width: 100%; }
-  .ire-html table {
-    width: 100% !important;
-    max-width: 100% !important;
-    border-collapse: collapse;
-    table-layout: auto;
-  }
-  .ire-html th, .ire-html td {
-    border: 1px solid rgba(255,255,255,.2);
-    padding: 8px 10px;
-    word-break: break-word;
-    vertical-align: top;
-  }
-  .ire-html th {
-    background: rgba(255,31,41,.22);
-    font-family: "Oswald", sans-serif;
-    text-transform: uppercase;
-  }
-  .ire-gallery-wrap {
-    margin-top: 34px;
-  }
-  .ire-gallery-title {
-    margin: 0 0 12px;
-    color: #ffffff;
-    font-family: "Oswald", sans-serif;
-    text-transform: uppercase;
-    font-size: 48px;
-    letter-spacing: .3px;
-    line-height: 1;
-  }
-  .ire-gallery {
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px;
-  }
-  .ire-gallery img {
+  .ire-pdf-frame iframe {
+    display: block;
     width: 100%;
-    aspect-ratio: 16 / 10;
-    object-fit: cover;
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 10px;
-    background: rgba(255,255,255,.04);
-    cursor: pointer;
+    height: 78vh;
+    border: 0;
+    background: #fff;
   }
-  .ire-lightbox {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.9);
-    z-index: 9999;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-  .ire-lightbox.open { display: flex; }
-  .ire-lightbox img {
-    max-width: min(1200px, 92vw);
-    max-height: 88vh;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    border-radius: 10px;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
-  }
-  .ire-lightbox-close,
-  .ire-lightbox-nav {
-    position: absolute;
-    border: 0 !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    appearance: none;
-    line-height: 1;
-    margin: 0;
-    padding: 0;
-    color: #ee2b2b !important;
+  .download-btn {
+    display: inline-flex;
+    margin-top: 16px;
     font-family: "Oswald", sans-serif;
-    text-shadow: none !important;
-    cursor: pointer;
-    transition: none !important;
-    animation: none !important;
-    opacity: 1 !important;
-    transform: none !important;
+    font-size: 14px;
+    text-transform: uppercase;
+    color: #dc2626;
+    text-decoration: none;
+    border: 1px solid #dc2626;
+    border-radius: 9px;
+    padding: 7px 12px;
+    transition: all 0.2s ease;
   }
-  .ire-lightbox-close {
-    top: 18px;
-    right: 18px;
-    width: 44px;
-    height: 44px;
-    font-size: 44px;
-    display: grid;
-    place-items: center;
+  .download-btn:hover {
+    background: #dc2626;
+    color: #fff;
   }
-  .ire-lightbox-nav {
-    top: 50%;
-    transform: translateY(-50%) !important;
-    width: 64px;
-    height: 64px;
-    font-size: 92px;
-    display: grid;
-    place-items: center;
-  }
-  .ire-lightbox-prev { left: 18px; }
-  .ire-lightbox-next { right: 18px; }
-  .ire-lightbox-close:hover,
-  .ire-lightbox-close:focus,
-  .ire-lightbox-nav:hover,
-  .ire-lightbox-nav:focus {
-    background: transparent !important;
-    box-shadow: none !important;
-    color: #ee2b2b !important;
-    outline: none;
-  }
-
   @media (max-width: 1024px) {
     .ire-wrap { width: min(1100px, calc(100% - 24px)); }
     .ire-title { font-size: clamp(36px, 4.2vw, 62px); }
-    .ire-content {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-    .ire-photo {
-      justify-self: stretch;
-      max-width: 100%;
-      aspect-ratio: 16 / 10;
-    }
-    .ire-gallery-title {
-      font-size: 38px;
-    }
-    .ire-gallery {
-      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-      gap: 10px;
+    .ire-pdf-frame,
+    .ire-pdf-frame iframe {
+      min-height: 70vh;
+      height: 70vh;
     }
   }
 </style>
@@ -535,9 +384,6 @@ h1, h2, h3, h4, h5, h6,
 (() => {
   const stateEl = document.getElementById('ireState');
   const detailEl = document.getElementById('ireDetail');
-  let ireLightboxEl = null;
-  let ireLightboxItems = [];
-  let ireLightboxIndex = 0;
 
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -546,73 +392,10 @@ h1, h2, h3, h4, h5, h6,
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-  function normalizeHtml(value) {
-    return String(value || '')
-      .replace(/\\r\\n/g, '')
-      .replace(/\\n/g, '')
-      .replace(/\r\n/g, '\n');
-  }
-
-  function ensureIreLightbox() {
-    if (ireLightboxEl) return ireLightboxEl;
-    const lb = document.createElement('div');
-    lb.className = 'ire-lightbox';
-    lb.innerHTML = `
-      <button type="button" class="ire-lightbox-close" aria-label="Close">&times;</button>
-      <button type="button" class="ire-lightbox-nav ire-lightbox-prev" aria-label="Previous">&lsaquo;</button>
-      <button type="button" class="ire-lightbox-nav ire-lightbox-next" aria-label="Next">&rsaquo;</button>
-      <img alt="Foto">
-    `;
-    lb.addEventListener('click', (event) => {
-      if (event.target === lb) lb.classList.remove('open');
-    });
-    lb.querySelector('.ire-lightbox-close').addEventListener('click', () => lb.classList.remove('open'));
-    lb.querySelector('.ire-lightbox-prev').addEventListener('click', (event) => {
-      event.stopPropagation();
-      openIreLightbox(ireLightboxIndex - 1);
-    });
-    lb.querySelector('.ire-lightbox-next').addEventListener('click', (event) => {
-      event.stopPropagation();
-      openIreLightbox(ireLightboxIndex + 1);
-    });
-    document.addEventListener('keydown', (event) => {
-      if (!lb.classList.contains('open')) return;
-      if (event.key === 'Escape') lb.classList.remove('open');
-      if (event.key === 'ArrowLeft') openIreLightbox(ireLightboxIndex - 1);
-      if (event.key === 'ArrowRight') openIreLightbox(ireLightboxIndex + 1);
-    });
-    document.body.appendChild(lb);
-    ireLightboxEl = lb;
-    return lb;
-  }
-
-  function renderIreLightboxImage() {
-    if (!ireLightboxItems.length) return;
-    const lb = ensureIreLightbox();
-    const img = lb.querySelector('img');
-    const prevBtn = lb.querySelector('.ire-lightbox-prev');
-    const nextBtn = lb.querySelector('.ire-lightbox-next');
-    const total = ireLightboxItems.length;
-    ireLightboxIndex = (ireLightboxIndex + total) % total;
-    img.src = ireLightboxItems[ireLightboxIndex];
-    img.alt = `Galerijas foto ${ireLightboxIndex + 1}`;
-    const showNav = total > 1;
-    if (prevBtn) prevBtn.style.display = showNav ? 'grid' : 'none';
-    if (nextBtn) nextBtn.style.display = showNav ? 'grid' : 'none';
-  }
-
-  function openIreLightbox(index) {
-    if (!ireLightboxItems.length) return;
-    ireLightboxIndex = index;
-    renderIreLightboxImage();
-    ensureIreLightbox().classList.add('open');
-  }
-
   function buildDetail(item) {
     const title = String(item?.nosaukums || '').trim() || 'Sponsoru atbalsts';
-    const saturs = normalizeHtml(item?.saturs || '');
-    const foto = String(item?.foto_attels || '').trim();
-    const galerija = Array.isArray(item?.galerija) ? item.galerija.filter(Boolean) : [];
+    const pdfUrl = String(item?.pdf_file || '').trim();
+    const fileName = pdfUrl.split('/').pop() || 'sponsoru-atbalsts.pdf';
 
     return `
       <header class="ire-head">
@@ -622,21 +405,12 @@ h1, h2, h3, h4, h5, h6,
         </div>
       </header>
 
-      <section class="ire-content">
-        <div class="ire-block ire-text">
-          <div class="ire-html">${saturs}</div>
+      <section class="ire-pdf-card">
+        <div class="ire-pdf-frame">
+          <iframe src="${esc(pdfUrl)}#view=FitH" title="${esc(title)} PDF"></iframe>
         </div>
-        ${foto ? `<img class="ire-photo" src="${esc(foto)}" alt="${esc(title)}" loading="lazy">` : ''}
+        <a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>
       </section>
-
-      ${galerija.length ? `
-      <section class="ire-block ire-gallery-wrap">
-        <h2 class="ire-gallery-title">Galerija</h2>
-        <div class="ire-gallery">
-          ${galerija.map((src, idx) => `<img src="${esc(src)}" alt="${esc(title)}" loading="lazy" data-gallery-index="${idx}">`).join('')}
-        </div>
-      </section>
-      ` : ''}
     `;
   }
 
@@ -646,19 +420,15 @@ h1, h2, h3, h4, h5, h6,
       if (!res.ok) throw new Error('Neizdevas ieladet datus');
       const data = await res.json();
       const item = data && data.item ? data.item : null;
-      if (!item) {
-        stateEl.textContent = 'Saturs pagaidam nav pievienots.';
+      const pdfUrl = String(item?.pdf_file || '').trim();
+      if (!item || !pdfUrl) {
+        stateEl.textContent = 'PDF nav pievienots.';
         stateEl.hidden = false;
         detailEl.hidden = true;
         return;
       }
 
       detailEl.innerHTML = buildDetail(item);
-      const galleryImages = Array.from(detailEl.querySelectorAll('.ire-gallery img[data-gallery-index]'));
-      ireLightboxItems = galleryImages.map((img) => img.getAttribute('src')).filter(Boolean);
-      galleryImages.forEach((img, idx) => {
-        img.addEventListener('click', () => openIreLightbox(idx));
-      });
       detailEl.hidden = false;
       stateEl.hidden = true;
     } catch (error) {
@@ -801,13 +571,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
-
-
-
-
-
 
 
 

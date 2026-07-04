@@ -1863,6 +1863,15 @@ function mapSadarbibaRow(row) {
   });
 }
 
+function mapSponsoruAtbalstsPdfRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    nosaukums: String(row.nosaukums || '').trim() || 'Sponsoru atbalsts',
+    pdf_file: normalizeStoredMediaUrl(row.pdf_file) || null
+  };
+}
+
 function mapTrainerRow(row) {
   if (!row) return null;
   return withResolvedMedia({
@@ -3739,13 +3748,13 @@ async function handleApi(req, res, reqUrl) {
 
   if (pathname === '/api/sadarbiba/sponsoru-atbalsts' && req.method === 'GET') {
     const row = db.prepare(`
-      SELECT id, nosaukums, saturs, pdf_file, foto_attels, galerija, created_at, updated_at
+      SELECT id, nosaukums, pdf_file
       FROM sadarbiba_sponsoru_atbalsts
       ORDER BY id DESC
       LIMIT 1
     `).get();
 
-    sendJson(res, 200, { item: mapSadarbibaRow(row) });
+    sendJson(res, 200, { item: mapSponsoruAtbalstsPdfRow(row) });
     return true;
   }
 
