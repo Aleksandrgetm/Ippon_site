@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const Database = require('better-sqlite3');
 const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
@@ -1202,6 +1203,109 @@ function normalizeStoredPdfUrl(value) {
   return normalizeStoredMediaUrl(value);
 }
 
+let pdfJsModulePromise = null;
+const pdfTextCache = new Map();
+
+function getPdfJsModule() {
+  if (!pdfJsModulePromise) {
+    const moduleUrl = pathToFileURL(path.join(ROOT, 'assets', 'vendor', 'pdfjs', 'pdf.mjs')).href;
+    pdfJsModulePromise = import(moduleUrl);
+  }
+  return pdfJsModulePromise;
+}
+
+function resolveLocalPdfPath(pdfUrl) {
+  const normalizedUrl = String(pdfUrl || '').trim();
+  if (!normalizedUrl) return '';
+  const storageKey = extractUploadStorageKey(normalizedUrl);
+  if (storageKey) {
+    return uploadKeyToLocalPath(storageKey);
+  }
+  if (normalizedUrl.startsWith('/')) {
+    return path.join(ROOT, normalizedUrl.replace(/^\/+/, ''));
+  }
+  return path.join(ROOT, normalizedUrl);
+}
+
+function normalizePdfRows(items) {
+  const rows = [];
+
+  for (const item of items || []) {
+    const text = String(item?.str || '').trim();
+    if (!text) continue;
+    const y = Math.round((item.transform?.[5] || 0) * 2) / 2;
+    let row = rows.find((entry) => Math.abs(entry.y - y) < 3);
+    if (!row) {
+      row = { y, parts: [] };
+      rows.push(row);
+    }
+    row.parts.push({
+      x: item.transform?.[4] || 0,
+      text,
+      height: item.height || 0
+    });
+  }
+
+  rows.sort((a, b) => b.y - a.y);
+
+  return rows.map((row) => {
+    row.parts.sort((a, b) => a.x - b.x);
+    return {
+      text: row.parts.map((part) => part.text).join(' ').replace(/\s+/g, ' ').trim(),
+      height: Math.max(...row.parts.map((part) => part.height || 0), 0)
+    };
+  }).filter((row) => row.text);
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildPdfTextHtml(rows) {
+  return rows.map((row) => {
+    const text = escapeHtml(row.text);
+    if (!text) return '';
+    if (row.height >= 18 || /^[0-9]+\./.test(row.text) || /^[A-Z0-9" .,'()\-\/]{10,}$/.test(row.text)) {
+      return `<p><strong>${text}</strong></p>`;
+    }
+    return `<p>${text}</p>`;
+  }).join('');
+}
+
+async function extractPdfTextHtml(pdfUrl) {
+  const absPath = resolveLocalPdfPath(pdfUrl);
+  if (!absPath || !fs.existsSync(absPath)) return '';
+
+  const stat = fs.statSync(absPath);
+  const cacheKey = `${absPath}:${stat.mtimeMs}:${stat.size}`;
+  if (pdfTextCache.has(cacheKey)) {
+    return pdfTextCache.get(cacheKey);
+  }
+
+  const pdfjsLib = await getPdfJsModule();
+  const loadingTask = pdfjsLib.getDocument({
+    url: pathToFileURL(absPath).href,
+    disableWorker: true
+  });
+  const pdf = await loadingTask.promise;
+  const rows = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    rows.push(...normalizePdfRows(textContent.items || []));
+  }
+
+  const html = buildPdfTextHtml(rows);
+  pdfTextCache.set(cacheKey, html);
+  return html;
+}
+
 function isImageFileName(name) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
 }
@@ -1946,6 +2050,20 @@ function mapSponsoruAtbalstsPdfRow(row) {
     nosaukums: String(row.nosaukums || '').trim() || 'Sponsoru atbalsts',
     pdf_file: normalizeStoredPdfUrl(row.pdf_file) || fallbackPdfUrl || null
   };
+}
+
+async function mapSponsoruAtbalstsPdfRowWithText(row) {
+  const item = mapSponsoruAtbalstsPdfRow(row);
+  if (!item) return null;
+
+  try {
+    item.pdf_text_html = item.pdf_file ? await extractPdfTextHtml(item.pdf_file) : '';
+  } catch (error) {
+    console.error('Failed to extract sponsor PDF text:', error);
+    item.pdf_text_html = '';
+  }
+
+  return item;
 }
 
 function mapTrainerRow(row) {
@@ -3847,7 +3965,7 @@ async function handleApi(req, res, reqUrl) {
       }
     }
 
-    sendJson(res, 200, { item: mapSponsoruAtbalstsPdfRow(row) });
+    sendJson(res, 200, { item: await mapSponsoruAtbalstsPdfRowWithText(row) });
     return true;
   }
 
