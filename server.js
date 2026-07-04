@@ -102,6 +102,7 @@ const MIME = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
+  '.pdf': 'application/pdf',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2'
 };
@@ -126,17 +127,17 @@ function loadEnvFile(filePath) {
   }
 }
 
-const MOJIBAKE_PATTERN = /(?:Ã.|Â.|Ä.|Å.|Ð.|Ñ.|â.|�)/;
+const MOJIBAKE_PATTERN = /(?:[\u00C3\u00C2\u00C4\u00C5\u00D0\u00D1\u00E2\uFFFD].)/;
 
 function mojibakeScore(value) {
   const text = String(value || '');
-  const matches = text.match(/(?:Ã.|Â.|Ä.|Å.|Ð.|Ñ.|â.|�)/g);
+  const matches = text.match(/(?:[\u00C3\u00C2\u00C4\u00C5\u00D0\u00D1\u00E2\uFFFD].)/g);
   return matches ? matches.length : 0;
 }
 
 function latvianLetterScore(value) {
   const text = String(value || '');
-  const matches = text.match(/[ĀāČčĒēĢģĪīĶķĻļŅņŠšŪūŽž]/g);
+  const matches = text.match(/(?:[\u00C3\u00C2\u00C4\u00C5\u00D0\u00D1\u00E2\uFFFD].)/g);
   return matches ? matches.length : 0;
 }
 
@@ -553,22 +554,22 @@ function ensureJaunumiTable() {
       datums: '03.02.2026',
       nosaukums: 'Budapest Open 2024',
       foto_attels: 'https://club-wp.eu/wp-content/uploads/2024/10/IMG_3676-1024x683.jpg',
-      ievads: 'MÅ«su sportisti veiksmÄ«gi piedalÄ«jÄs vienÄ no lielÄkajiem turnÄ«riem EiropÄ.',
-      zina: 'MÅ«su sportisti veiksmÄ«gi piedalÄ«jÄs vienÄ no lielÄkajiem turnÄ«riem EiropÄ. Komanda demonstrÄ“ja stabilu tehniku, disciplÄ«nu un izcilu raksturu visÄs cÄ«Å†Äs.'
+      ievads: 'Mūsu sportisti veiksmīgi piedalījās vienā no lielākajiem turnīriem Eiropā.',
+      zina: 'Mūsu sportisti veiksmīgi piedalījās vienā no lielākajiem turnīriem Eiropā. Komanda demonstrÄ“ja stabilu tehniku, disciplīnu un izcilu raksturu visās cīÅ†ās.'
     },
     {
       datums: '03.02.2026',
-      nosaukums: 'Latvijas KaratÄ“ ÄempionÄts 2024',
+      nosaukums: 'Latvijas KaratÄ“ čempionāts 2024',
       foto_attels: 'https://club-wp.eu/wp-content/uploads/2024/10/IMG_2116-1024x683.jpg',
-      ievads: 'Komanda demonstrÄ“ja augstu disciplÄ«nu un izcilus rezultÄtus nacionÄlajÄs sacensÄ«bÄs.',
-      zina: 'Latvijas ÄempionÄtÄ mÅ«su sportisti izcÄ«nÄ«ja vairÄkas godalgas. Pateicamies treneriem un vecÄkiem par ieguldÄ«jumu sportistu attÄ«stÄ«bÄ.'
+      ievads: 'Komanda demonstrÄ“ja augstu disciplīnu un izcilus rezultātus nacionālajās sacensībās.',
+      zina: 'Latvijas čempionātā mūsu sportisti izcīnīja vairākas godalgas. Pateicamies treneriem un vecākiem par ieguldījumu sportistu attīstībā.'
     },
     {
       datums: '03.02.2026',
-      nosaukums: 'UzÅ†emÅ¡ana',
+      nosaukums: 'UzÅ†emšana',
       foto_attels: 'https://club-wp.eu/wp-content/uploads/2025/09/463784438_1064866684998728_2161927365756605866_n-1024x683.jpg',
-      ievads: 'AicinÄm zÄ“nus un meitenes no 4 gadiem uz nodarbÄ«bÄm.',
-      zina: 'AicinÄm zÄ“nus un meitenes no 4 gadu vecuma pievienoties karatÄ“ nodarbÄ«bÄm. TreniÅ†i notiek draudzÄ«gÄ un droÅ¡Ä vidÄ“ pieredzÄ“juÅ¡u treneru vadÄ«bÄ.'
+      ievads: 'Aicinām zÄ“nus un meitenes no 4 gadiem uz nodarbībām.',
+      zina: 'Aicinām zÄ“nus un meitenes no 4 gadu vecuma pievienoties karatÄ“ nodarbībām. TreniÅ†i notiek draudzīgā un drošā vidÄ“ pieredzÄ“jušu treneru vadībā.'
     }
   ];
 
@@ -636,11 +637,11 @@ function ensureKlubaNoteikumiTable() {
 
   const seedRows = [
     {
-      teksts: 'TreniÅ†os ievÄ“rojam cieÅ†pilnu attieksmi pret treneriem, sportistiem un inventÄru.',
+      teksts: 'TreniÅ†os ievÄ“rojam cieÅ†pilnu attieksmi pret treneriem, sportistiem un inventāru.',
       faili: null
     },
     {
-      teksts: 'Uz nodarbÄ«bÄm ierodamies vismaz 10 minÅ«tes pirms sÄkuma, sagatavotÄ formÄ.',
+      teksts: 'Uz nodarbībām ierodamies vismaz 10 minūtes pirms sākuma, sagatavotā formā.',
       faili: null
     }
   ];
@@ -1019,6 +1020,7 @@ function ensureSadarbibaSponsoruAtbalstsTable() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nosaukums TEXT,
       saturs TEXT,
+      pdf_file TEXT,
       foto_attels TEXT,
       galerija TEXT,
       created_at INTEGER NOT NULL,
@@ -1026,17 +1028,20 @@ function ensureSadarbibaSponsoruAtbalstsTable() {
     )
   `);
 
+  ensureTableColumn('sadarbiba_sponsoru_atbalsts', 'pdf_file', 'TEXT');
+
   const hasAny = db.prepare('SELECT id FROM sadarbiba_sponsoru_atbalsts LIMIT 1').get();
   if (hasAny) return;
 
   const now = nowTs();
   db.prepare(`
     INSERT INTO sadarbiba_sponsoru_atbalsts (
-      nosaukums, saturs, foto_attels, galerija, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      nosaukums, saturs, pdf_file, foto_attels, galerija, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
     'Sponsoru atbalsts',
     '',
+    null,
     null,
     null,
     now,
@@ -1827,6 +1832,7 @@ function mapSadarbibaRow(row) {
     id: row.id,
     nosaukums: String(row.nosaukums || '').trim(),
     saturs: String(row.saturs || ''),
+    pdf_file: normalizeStoredMediaUrl(row.pdf_file) || null,
     foto_attels: normalizeStoredMediaUrl(row.foto_attels) || null,
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
@@ -2997,6 +3003,7 @@ function serveStatic(filePath, res) {
     '.html': 'text/html; charset=utf-8',
     '.css': 'text/css; charset=utf-8',
     '.js': 'application/javascript; charset=utf-8',
+    '.pdf': 'application/pdf',
     '.png': 'image/png',
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
@@ -3714,7 +3721,7 @@ async function handleApi(req, res, reqUrl) {
 
   if (pathname === '/api/sadarbiba/sponsoru-atbalsts' && req.method === 'GET') {
     const row = db.prepare(`
-      SELECT id, nosaukums, saturs, foto_attels, galerija, created_at, updated_at
+      SELECT id, nosaukums, saturs, pdf_file, foto_attels, galerija, created_at, updated_at
       FROM sadarbiba_sponsoru_atbalsts
       ORDER BY id DESC
       LIMIT 1
@@ -5518,6 +5525,25 @@ async function handleApi(req, res, reqUrl) {
           return;
         }
 
+        if (table === 'sadarbiba_sponsoru_atbalsts') {
+          const ts = nowTs();
+          const nosaukums = String(body.nosaukums || '').trim() || 'Sponsoru atbalsts';
+          const pdfFile = body.pdf_file != null ? String(body.pdf_file).trim() : null;
+          const info = db.prepare(`
+            INSERT INTO sadarbiba_sponsoru_atbalsts
+              (nosaukums, pdf_file, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+          `).run(
+            nosaukums,
+            pdfFile || null,
+            ts,
+            ts
+          );
+          const row = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ?`).get(info.lastInsertRowid);
+          sendJson(res, 201, { row });
+          return;
+        }
+
         if (isSadarbibaCmsTable(table)) {
           const ts = nowTs();
           const defaultTitle = table === 'sadarbiba_sponsoru_atbalsts'
@@ -5842,6 +5868,37 @@ async function handleApi(req, res, reqUrl) {
           return;
         }
 
+        if (table === 'sadarbiba_sponsoru_atbalsts') {
+          const existing = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ? LIMIT 1`).get(id);
+          if (!existing) {
+            sendJson(res, 404, { error: 'Row not found' });
+            return;
+          }
+
+          const nosaukums = body.nosaukums != null
+            ? String(body.nosaukums).trim()
+            : String(existing.nosaukums || '').trim();
+          const hasPdfFile = Object.prototype.hasOwnProperty.call(body, 'pdf_file');
+          const pdfFile = hasPdfFile
+            ? String(body.pdf_file || '').trim()
+            : String(existing.pdf_file || '').trim();
+
+          db.prepare(`
+            UPDATE ${table}
+            SET nosaukums = ?, pdf_file = ?, updated_at = ?
+            WHERE ${pk} = ?
+          `).run(
+            nosaukums || 'Sponsoru atbalsts',
+            pdfFile || null,
+            nowTs(),
+            id
+          );
+
+          const row = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ?`).get(id);
+          sendJson(res, 200, { row });
+          return;
+        }
+
         if (isSadarbibaCmsTable(table)) {
           const existing = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ? LIMIT 1`).get(id);
           if (!existing) {
@@ -5965,12 +6022,13 @@ async function handleApi(req, res, reqUrl) {
             sendJson(res, 400, { error: 'Field teksts is required' });
             return;
           }
+          const hasFaili = Object.prototype.hasOwnProperty.call(body, 'faili');
           db.prepare(`
             UPDATE kluba_noteikumi
             SET faili = ?, teksts = ?, updated_at = ?
             WHERE id = ?
           `).run(
-            body.faili != null ? String(body.faili).trim() : existing.faili,
+            hasFaili ? (String(body.faili || '').trim() || null) : existing.faili,
             teksts,
             nowTs(),
             id
@@ -6266,7 +6324,8 @@ const server = http.createServer(async (req, res) => {
         '.jpeg': 'image/jpeg',
         '.webp': 'image/webp',
         '.gif': 'image/gif',
-        '.svg': 'image/svg+xml'
+        '.svg': 'image/svg+xml',
+        '.pdf': 'application/pdf'
       };
 
       const contentType = mimeTypes[ext] || 'application/octet-stream';

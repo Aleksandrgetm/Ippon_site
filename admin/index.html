@@ -1048,6 +1048,7 @@
       SADARBIBA_SPONSORU_ATBALSTS_TABLE,
       SADARBIBA_MUSU_PARTNERI_TABLE
     ]);
+    const PDF_UPLOAD_TABLES = new Set([RULES_TABLE, SADARBIBA_SPONSORU_ATBALSTS_TABLE]);
     const TABLE_LABELS = {
       ippon_sportists: 'Sportisti',
       treneri: 'Treneri',
@@ -1073,6 +1074,18 @@
       if (HALL_TABLES.has(tableName)) return 'halls';
       if (SADARBIBA_TABLES.has(tableName)) return 'sadarbiba';
       return String(tableName || 'misc');
+    }
+
+    function isPdfUploadTable(tableName = currentTable) {
+      return PDF_UPLOAD_TABLES.has(tableName);
+    }
+
+    function getPdfFieldName(tableName = currentTable) {
+      return tableName === RULES_TABLE ? 'faili' : 'pdf_file';
+    }
+
+    function getPdfUploadCategory(tableName = currentTable) {
+      return 'rules';
     }
 
     function getUploadEntityIdForTable(tableName = currentTable) {
@@ -1120,7 +1133,7 @@
       if (isTrainerMediaTable(currentTable)) {
         return Boolean(selectedTrainerMainFile || selectedTrainerGalleryFiles.length);
       }
-      if (currentTable === RULES_TABLE) {
+      if (isPdfUploadTable(currentTable)) {
         const fileInput = document.getElementById('rulesFileInput');
         return Boolean((fileInput && fileInput.files && fileInput.files[0]) || selectedRulesFile);
       }
@@ -1140,6 +1153,7 @@
     const RULES_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
     const HALL_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
     const SADARBIBA_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
+    const SPONSORU_ATBALSTS_HIDDEN_FIELDS = new Set(['saturs', 'foto_attels', 'galerija']);
     const GALERIJA_HIDDEN_FIELDS = new Set([
       'area_id',
       'name_ru',
@@ -1248,6 +1262,7 @@
       saturs: 'Saturs',
       links: 'Links',
       informacija: 'Informācija',
+      pdf_file: 'PDF fails',
       foto_attels: 'Fotoattēls',
       galerija: 'Galerija',
       created_at: 'Izveidots',
@@ -1319,7 +1334,10 @@
     }
 
     function isTrainerMediaTable(tableName) {
-      return tableName === TRAINERS_TABLE || tableName === 'ippon_sportists' || SADARBIBA_TABLES.has(tableName);
+      return tableName === TRAINERS_TABLE
+        || tableName === 'ippon_sportists'
+        || tableName === SADARBIBA_SPORTA_ZALES_IRE_TABLE
+        || tableName === SADARBIBA_MUSU_PARTNERI_TABLE;
     }
 
     function isHiddenField(tableName, colName) {
@@ -1331,6 +1349,7 @@
       if (tableName === VIDEO_GALERIJA_TABLE && VIDEO_GALERIJA_HIDDEN_FIELDS.has(colName)) return true;
       if (tableName === RAKSTI_PRESE_TABLE && RAKSTI_PRESE_HIDDEN_FIELDS.has(colName)) return true;
       if (HALL_TABLES.has(tableName) && HALL_HIDDEN_FIELDS.has(colName)) return true;
+      if (tableName === SADARBIBA_SPONSORU_ATBALSTS_TABLE && SPONSORU_ATBALSTS_HIDDEN_FIELDS.has(colName)) return true;
       if (SADARBIBA_TABLES.has(tableName) && SADARBIBA_HIDDEN_FIELDS.has(colName)) return true;
       if (NODARBIBAS_TABLES.has(tableName) && (colName === 'created_at' || colName === 'updated_at')) return true;
       if (tableName === 'ippon_sportists' && SPORTISTI_HIDDEN_FIELDS.has(colName)) return true;
@@ -2336,6 +2355,23 @@
       return tablesMeta.find((t) => t.name === name);
     }
 
+    function getEffectiveColumns(meta) {
+      const baseColumns = Array.isArray(meta?.columns) ? [...meta.columns] : [];
+      if (
+        currentTable === SADARBIBA_SPONSORU_ATBALSTS_TABLE
+        && !baseColumns.some((col) => col.name === 'pdf_file')
+      ) {
+        baseColumns.push({
+          name: 'pdf_file',
+          type: 'TEXT',
+          notnull: 0,
+          dflt_value: null,
+          pk: 0
+        });
+      }
+      return baseColumns;
+    }
+
     function renderForm() {
       formFields.innerHTML = '';
       currentColumns.forEach((col) => {
@@ -2574,7 +2610,7 @@
             <textarea id="trainerEditorCode_${editorId}" class="rich-editor-code"></textarea>
           `;
           wrap.appendChild(editor);
-        } else if (currentTable === RULES_TABLE && col.name === 'faili') {
+        } else if (isPdfUploadTable(currentTable) && col.name === getPdfFieldName(currentTable)) {
           const field = document.createElement('input');
           field.type = 'hidden';
           field.dataset.col = col.name;
@@ -2584,6 +2620,7 @@
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
           fileInput.id = 'rulesFileInput';
+          fileInput.accept = 'application/pdf,.pdf';
           fileInput.style.marginBottom = '6px';
           wrap.appendChild(fileInput);
 
@@ -3154,8 +3191,8 @@
     }
 
     function updateRulesFilePreview() {
-      if (currentTable !== RULES_TABLE) return;
-      const valueInput = document.getElementById('f_faili');
+      if (!isPdfUploadTable(currentTable)) return;
+      const valueInput = document.getElementById(`f_${getPdfFieldName(currentTable)}`);
       const preview = document.getElementById('rulesFilePreview');
       if (!valueInput || !preview) return;
 
@@ -3171,7 +3208,18 @@
       }
 
       const fileName = stored.split('/').pop() || stored;
-      preview.innerHTML = `<a href="${stored}" target="_blank" rel="noopener">Pašreizējais fails: ${fileName}</a>`;
+      preview.innerHTML = `<a href="${stored}" target="_blank" rel="noopener">Pašreizējais fails: ${fileName}</a> <button type="button" class="light" id="rulesFileRemoveBtn" style="margin-left:8px">Noņemt PDF</button>`;
+      const removeBtn = document.getElementById('rulesFileRemoveBtn');
+      if (removeBtn) {
+        removeBtn.addEventListener('click', () => {
+          valueInput.value = '';
+          selectedRulesFile = null;
+          const fileInput = document.getElementById('rulesFileInput');
+          if (fileInput) fileInput.value = '';
+          updateRulesFilePreview();
+          setStatus('PDF fails noņemts. Nospied Saglabāt.', 'ok');
+        });
+      }
     }
 
     async function uploadRulesFile(file) {
@@ -3184,15 +3232,18 @@
 
       const uploaded = await api('/api/upload-file', {
         method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: RULES_TABLE }))
+        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, {
+          tableName: currentTable,
+          category: getPdfUploadCategory(currentTable)
+        }))
       });
       return uploaded.relativeUrl || uploaded.url;
     }
 
     async function uploadSelectedRulesFileIfNeeded() {
-      if (currentTable !== RULES_TABLE) return;
+      if (!isPdfUploadTable(currentTable)) return;
       const fileInput = document.getElementById('rulesFileInput');
-      const valueInput = document.getElementById('f_faili');
+      const valueInput = document.getElementById(`f_${getPdfFieldName(currentTable)}`);
       if (!fileInput || !valueInput) return;
       const file = fileInput.files && fileInput.files[0];
       if (!file) return;
@@ -3283,11 +3334,18 @@
     }
 
     function setupRulesFileTools() {
-      if (currentTable !== RULES_TABLE) return;
+      if (!isPdfUploadTable(currentTable)) return;
       const fileInput = document.getElementById('rulesFileInput');
       if (!fileInput) return;
       fileInput.addEventListener('change', () => {
         const file = fileInput.files && fileInput.files[0];
+        if (file && !/\.pdf$/i.test(file.name)) {
+          fileInput.value = '';
+          selectedRulesFile = null;
+          updateRulesFilePreview();
+          setStatus('Atļauts augšupielādēt tikai PDF failu.', 'error');
+          return;
+        }
         selectedRulesFile = file || null;
         updateRulesFilePreview();
         if (file) {
@@ -4425,7 +4483,7 @@
       const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('NeizdevÃ¤s nolasit failu'));
+        reader.onerror = () => reject(new Error('Neizdevās nolasīt failu'));
         reader.readAsDataURL(file);
       });
 
@@ -5009,6 +5067,8 @@
           ? visibleColumns.filter((c) => ['id', 'date', 'name_lv', 'content_lv', 'image'].includes(c.name))
         : currentTable === SADARBIBA_MUSU_PARTNERI_TABLE
           ? visibleColumns.filter((c) => ['id', 'nosaukums', 'links', 'foto_attels', 'informacija'].includes(c.name))
+        : currentTable === SADARBIBA_SPONSORU_ATBALSTS_TABLE
+          ? visibleColumns.filter((c) => ['id', 'nosaukums', 'pdf_file'].includes(c.name))
         : SADARBIBA_TABLES.has(currentTable)
           ? visibleColumns.filter((c) => ['id', 'nosaukums', 'foto_attels', 'galerija'].includes(c.name))
         : currentTable === REZULTATI_TABLE
@@ -5117,6 +5177,10 @@
             td.textContent = count > 0 ? `${count} foto` : '—';
           } else if (currentTable === 'ippon_sportists' && col.name === 'is_hidden') {
             td.textContent = Number(val || 0) === 1 ? 'Slēpts' : 'Redzams';
+          } else if (currentTable === SADARBIBA_SPONSORU_ATBALSTS_TABLE && col.name === 'pdf_file') {
+            td.innerHTML = val
+              ? `<a href="${String(val).replace(/"/g, '&quot;')}" target="_blank" rel="noopener">${String(val).split('/').pop()}</a>`
+              : '—';
           } else if (SADARBIBA_TABLES.has(currentTable) && col.name === 'foto_attels') {
             td.innerHTML = val
               ? buildResolvedImageHtml(val, '', 'width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;')
@@ -5193,7 +5257,7 @@
 
       const meta = getTableMeta(currentTable);
       currentPk = meta?.pk || 'id';
-      currentColumns = meta?.columns || [];
+      currentColumns = getEffectiveColumns(meta);
 
       if (currentTable === KALENDARS_TABLE) {
         total = 0;
@@ -5281,6 +5345,8 @@
         setStatus('Sportisti: aizpildi laukus, pievieno foto/galeriju un spied Saglabat.', 'ok');
       } else if (currentTable === SADARBIBA_MUSU_PARTNERI_TABLE) {
         setStatus('Mūsu partneri: aizpildi Nosaukums, Links, Attēls un Informācija, tad spied Saglabāt.', 'ok');
+      } else if (currentTable === SADARBIBA_SPONSORU_ATBALSTS_TABLE) {
+        setStatus('Sponsoru atbalsts: pievieno PDF failu un spied Saglabāt.', 'ok');
       } else if (SADARBIBA_TABLES.has(currentTable)) {
         setStatus('Sadarbība: aizpildi Nosaukums, Saturs, Fotoattēls un Galerija, tad spied Saglabāt.', 'ok');
       } else if (currentTable === RULES_TABLE) {
@@ -5339,7 +5405,7 @@
           await uploadSelectedNewsImageIfNeeded();
         } else if (isTrainerMediaTable(currentTable)) {
           await uploadSelectedTrainerMediaIfNeeded();
-        } else if (currentTable === RULES_TABLE) {
+        } else if (isPdfUploadTable(currentTable)) {
           await uploadSelectedRulesFileIfNeeded();
         } else if (NODARBIBAS_TABLES.has(currentTable)) {
           await uploadSelectedNodarbibasImageIfNeeded();
