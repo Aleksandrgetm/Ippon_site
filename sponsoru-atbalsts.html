@@ -268,10 +268,10 @@ h1, h2, h3, h4, h5, h6,
 				</div>
 				<div data-elementor-type="wp-page" data-elementor-id="99051" class="elementor elementor-99051">
   <main id="content" class="site-main">
-    <section class="ire-shell">
-      <div class="ire-wrap">
-        <div id="ireState" class="ire-state">Ieladejam saturu...</div>
-        <article id="ireDetail" class="ire-detail" hidden></article>
+    <section class="rules-shell sponsor-shell">
+      <div class="rules-container sponsor-container">
+        <div id="sponsorState" class="rules-empty">Ieladejam saturu...</div>
+        <article id="sponsorDetail" hidden></article>
       </div>
     </section>
   </main>
@@ -288,34 +288,31 @@ h1, h2, h3, h4, h5, h6,
   body > div[data-elementor-type="wp-page"] { min-height: calc(100vh - 360px); }
   body > div[data-elementor-type="footer"] { margin-top: 0 !important; }
 
-  .ire-shell {
-    padding: 118px 0 62px;
+  .rules-shell {
     background: #000;
+    padding: 150px 0 90px;
   }
-  .ire-wrap {
-    width: min(1100px, calc(100% - 48px));
+  .rules-container {
+    width: min(1220px, calc(100% - 40px));
     margin: 0 auto;
-    border: none;
-    background: transparent;
-    padding: 0;
   }
-  .ire-state {
-    color: rgba(255,255,255,.8);
+  .rules-empty {
     font-family: "Oswald", sans-serif;
+    color: #ffffff;
     font-size: 34px;
+    margin: 0;
   }
-  .ire-head {
-    display: block;
-    border-bottom: none;
-    padding-bottom: 0;
+  .sponsor-hero {
+    background: transparent;
+    border: 0;
+    color: #fff;
+    padding: 0;
     margin-bottom: 22px;
+    box-shadow: none;
   }
-  .ire-title-wrap {
-    max-width: 860px;
-  }
-  .ire-kicker {
+  .sponsor-kicker {
     margin: 0 0 8px;
-    color: #ef4444;
+    color: #ee2b2b;
     text-transform: uppercase;
     font-family: "Oswald", sans-serif;
     letter-spacing: 0.08em;
@@ -323,37 +320,90 @@ h1, h2, h3, h4, h5, h6,
     font-weight: 400;
     line-height: normal;
   }
-  .ire-title {
+  .sponsor-hero h1 {
     margin: 0;
-    color: #fff;
     font-family: "Oswald", sans-serif;
     font-weight: 700;
-    text-transform: uppercase;
     font-size: clamp(36px, 4.2vw, 62px);
     line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    color: #ffffff;
   }
-  .ire-pdf-card {
-    border: 1px solid rgba(220, 38, 38, 0.68);
-    border-radius: 14px;
-    background: rgba(10, 10, 10, 0.96);
+  .rules-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .rule-item {
+    border-radius: 8px;
+    border: 1px solid #2b2b2b;
+    background: #000;
+    padding: 20px 22px;
+    box-shadow: none;
+    transition: border-color 0.2s ease;
+  }
+  .rule-item:hover {
+    border-color: #dc2626;
+  }
+  .rule-item--document {
+    border-color: #dc2626;
     padding: 20px;
   }
-  .ire-pdf-frame {
+  .sponsor-pdf-view {
     width: 100%;
-    min-height: 78vh;
-    border: 1px solid rgba(255,255,255,.18);
+    min-height: 520px;
+    border: 1px solid rgba(255,255,255,.14);
     border-radius: 12px;
-    background: #111;
+    background: #060606;
+    padding: 16px;
+    overflow: auto;
+  }
+  .sponsor-pdf-pages {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    align-items: center;
+  }
+  .sponsor-pdf-page {
+    position: relative;
+    width: 100%;
+    max-width: 1040px;
+    background: #fff;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
     overflow: hidden;
   }
-  .ire-pdf-frame iframe {
+  .sponsor-pdf-canvas {
     display: block;
     width: 100%;
-    height: 78vh;
-    border: 0;
-    background: #fff;
+    height: auto;
   }
-  .ire-pdf-empty {
+  .sponsor-pdf-textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+    opacity: 0.2;
+  }
+  .sponsor-pdf-textLayer span,
+  .sponsor-pdf-textLayer br {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+  .sponsor-pdf-textLayer ::selection {
+    background: rgba(238, 43, 43, 0.28);
+  }
+  .sponsor-pdf-note {
+    margin: 0 0 14px;
+    font-family: "Roboto", sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    color: rgba(255,255,255,0.72);
+  }
+  .sponsor-pdf-empty {
     margin: 0;
     font-family: "Roboto", sans-serif;
     font-size: 16px;
@@ -378,19 +428,15 @@ h1, h2, h3, h4, h5, h6,
     color: #fff;
   }
   @media (max-width: 1024px) {
-    .ire-wrap { width: min(1100px, calc(100% - 24px)); }
-    .ire-title { font-size: clamp(36px, 4.2vw, 62px); }
-    .ire-pdf-frame,
-    .ire-pdf-frame iframe {
-      min-height: 70vh;
-      height: 70vh;
-    }
+    .rules-shell { padding: 136px 0 74px; }
+    .rules-container { width: min(1220px, calc(100% - 24px)); }
+    .sponsor-pdf-view { padding: 10px; }
   }
 </style>
-<script>
+<script type="module">
 (() => {
-  const stateEl = document.getElementById('ireState');
-  const detailEl = document.getElementById('ireDetail');
+  const stateEl = document.getElementById('sponsorState');
+  const detailEl = document.getElementById('sponsorDetail');
 
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -399,27 +445,80 @@ h1, h2, h3, h4, h5, h6,
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-  function buildDetail(item) {
+  function buildDetail(item, hasPdf) {
     const title = String(item?.nosaukums || '').trim() || 'Sponsoru atbalsts';
     const pdfUrl = String(item?.pdf_file || '').trim();
     const fileName = pdfUrl.split('/').pop() || 'sponsoru-atbalsts.pdf';
-    const viewerUrl = `${pdfUrl}#toolbar=1&navpanes=0&view=FitH`;
-
     return `
-      <header class="ire-head">
-        <div class="ire-title-wrap">
-          <p class="ire-kicker">Sadarb&#299;ba</p>
-          <h1 class="ire-title">${esc(title)}</h1>
-        </div>
-      </header>
-
-      <section class="ire-pdf-card">
-        <div class="ire-pdf-frame">
-          <iframe src="${esc(viewerUrl)}" title="${esc(title)} PDF"></iframe>
-        </div>
-        <a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>
-      </section>
+      <div class="sponsor-hero">
+        <p class="sponsor-kicker">Sadarb&#299;ba</p>
+        <h1>${esc(title)}</h1>
+      </div>
+      <div class="rules-list">
+        <article class="rule-item rule-item--document">
+          ${hasPdf ? '<p class="sponsor-pdf-note">Dokuments pieejams pilna apjoma priek&#353;skat&#299; ar iez&#299;m&#275;jamu tekstu.</p><div class="sponsor-pdf-view"><div id="sponsorPdfPages" class="sponsor-pdf-pages"></div></div>' : '<p class="sponsor-pdf-empty">PDF nav pievienots.</p>'}
+          ${hasPdf ? `<a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
+        </article>
+      </div>
     `;
+  }
+
+  async function renderPdf(pdfUrl) {
+    const pagesEl = document.getElementById('sponsorPdfPages');
+    if (!pagesEl) return;
+
+    const pdfjsLib = await import('/assets/vendor/pdfjs/pdf.mjs');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/assets/vendor/pdfjs/pdf.worker.mjs';
+
+    const loadingTask = pdfjsLib.getDocument({
+      url: pdfUrl,
+      cMapPacked: true
+    });
+
+    const pdf = await loadingTask.promise;
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const availableWidth = Math.min(pagesEl.clientWidth || 1040, 1040);
+      const scale = Math.max(0.6, availableWidth / baseViewport.width);
+      const viewport = page.getViewport({ scale });
+
+      const pageEl = document.createElement('div');
+      pageEl.className = 'sponsor-pdf-page';
+      pageEl.style.width = `${viewport.width}px`;
+      pageEl.style.height = `${viewport.height}px`;
+
+      const canvas = document.createElement('canvas');
+      canvas.className = 'sponsor-pdf-canvas';
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+
+      const textLayer = document.createElement('div');
+      textLayer.className = 'sponsor-pdf-textLayer';
+      textLayer.style.width = `${viewport.width}px`;
+      textLayer.style.height = `${viewport.height}px`;
+
+      pageEl.appendChild(canvas);
+      pageEl.appendChild(textLayer);
+      pagesEl.appendChild(pageEl);
+
+      const context = canvas.getContext('2d', { alpha: false });
+      await page.render({
+        canvasContext: context,
+        viewport
+      }).promise;
+
+      const textContent = await page.getTextContent();
+      const textLayerRenderer = new pdfjsLib.TextLayer({
+        container: textLayer,
+        textContentSource: textContent,
+        viewport
+      });
+      await textLayerRenderer.render();
+    }
   }
 
   async function init() {
@@ -431,26 +530,13 @@ h1, h2, h3, h4, h5, h6,
       if (!item) throw new Error('No item');
 
       const pdfUrl = String(item.pdf_file || '').trim();
-      if (!pdfUrl) {
-        detailEl.innerHTML = `
-          <header class="ire-head">
-            <div class="ire-title-wrap">
-              <p class="ire-kicker">Sadarb&#299;ba</p>
-              <h1 class="ire-title">${esc(String(item.nosaukums || '').trim() || 'Sponsoru atbalsts')}</h1>
-            </div>
-          </header>
-          <section class="ire-pdf-card">
-            <p class="ire-pdf-empty">PDF nav pievienots.</p>
-          </section>
-        `;
-        detailEl.hidden = false;
-        stateEl.hidden = true;
-        return;
-      }
-
-      detailEl.innerHTML = buildDetail(item);
+      detailEl.innerHTML = buildDetail(item, Boolean(pdfUrl));
       detailEl.hidden = false;
       stateEl.hidden = true;
+
+      if (!pdfUrl) return;
+
+      await renderPdf(pdfUrl);
     } catch (error) {
       stateEl.textContent = 'Neizdevas ieladet Sponsoru atbalsta lapu.';
       stateEl.hidden = false;
@@ -591,8 +677,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
 
 
 
