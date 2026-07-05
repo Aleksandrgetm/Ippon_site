@@ -2377,6 +2377,10 @@ function detectKalendarsTextRecord(row) {
   return KALENDARS_KEYWORDS.some((keyword) => combined.includes(normalizeKeywordText(keyword)));
 }
 
+function isRezultatiEksamensTextRecord(row) {
+  return detectTextRecordType(row) === 'eksamens' && !detectKalendarsTextRecord(row);
+}
+
 function pickTextSourceRow(rows) {
   if (!Array.isArray(rows) || !rows.length) return null;
   const lv = rows.find((r) => normalizeKeywordText(r.lang) === 'lv');
@@ -2718,8 +2722,7 @@ function queryRezultatiSourceEksamens(overrideMap) {
   `).all();
   const grouped = new Map();
   for (const row of rows) {
-    const type = detectTextRecordType(row);
-    if (type !== 'eksamens') continue;
+    if (!isRezultatiEksamensTextRecord(row)) continue;
     const key = Number(row.area_id || 0);
     if (!key) continue;
     if (!grouped.has(key)) grouped.set(key, []);
@@ -4778,8 +4781,15 @@ async function handleApi(req, res, reqUrl) {
             sendJson(res, 404, { error: 'Source record not found' });
             return;
           }
-          const typedRows = rows.filter((row) => detectTextRecordType(row) === recordType);
-          const toDelete = typedRows.length ? typedRows : rows;
+          const typedRows = rows.filter((row) => {
+            if (recordType === 'eksamens') return isRezultatiEksamensTextRecord(row);
+            return detectTextRecordType(row) === recordType;
+          });
+          if (!typedRows.length) {
+            sendJson(res, 404, { error: 'Source record not found for requested rezultati type' });
+            return;
+          }
+          const toDelete = typedRows;
           let deleted = 0;
           for (const row of toDelete) {
             const info = db.prepare('DELETE FROM ippon_text WHERE id = ?').run(row.id);
@@ -4960,7 +4970,7 @@ async function handleApi(req, res, reqUrl) {
           ORDER BY c_time DESC, id DESC
         `).all(parsed.id);
         const row = pickTextSourceRow(rows);
-        if (!row) {
+        if (!row || !isRezultatiEksamensTextRecord(row)) {
           sendJson(res, 404, { error: 'Eksāmens source record not found' });
           return true;
         }
