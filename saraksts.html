@@ -349,6 +349,13 @@ h1, h2, h3, h4, h5, h6,
   .saraksts-table tbody tr:nth-child(even) td {
     background: rgba(255,255,255,0.02);
   }
+  .saraksts-table .saraksts-location-highlight {
+    font-family: "Oswald", sans-serif;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #fff;
+  }
   .saraksts-table-empty {
     margin: 0;
     padding: 18px 20px;
@@ -371,6 +378,31 @@ h1, h2, h3, h4, h5, h6,
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+
+    const highlightedLocations = new Map([
+      ['IMANTA, SPORTA ZALE NR.1', 'IMANTA, SPORTA ZĀLE NR.1'],
+      ['IMANTA, SPORTA ZALE NR.2', 'IMANTA, SPORTA ZĀLE NR.2'],
+      ['ZOLITUDE', 'ZOLITŪDE'],
+      ['ZOLITUDE, PAULA LEJINA IELA 8', 'ZOLITŪDE, PAULA LEJIŅA IELA 8'],
+      ['JURMALA', 'JŪRMALA'],
+      ['JURMALA, VENTSPILS SOSEJA 32, "IPPON.LV JURMALA"', 'JŪRMALA, VENTSPILS ŠOSEJA 32, "IPPON.LV JŪRMALA"']
+    ]);
+
+    const normalizeLocationKey = (value) => String(value == null ? '' : value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[“”]/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+
+    const renderCell = (cell, tagName) => {
+      const raw = String(cell == null ? '' : cell);
+      const highlighted = highlightedLocations.get(normalizeLocationKey(raw));
+      const className = highlighted ? ' class="saraksts-location-highlight"' : '';
+      const display = highlighted || raw;
+      return `<${tagName}${className}>${escapeHtml(display)}</${tagName}>`;
+    };
 
     const renderMessage = (text) => {
       host.innerHTML = `<p class="saraksts-table-empty">${escapeHtml(text)}</p>`;
@@ -399,10 +431,10 @@ h1, h2, h3, h4, h5, h6,
       host.innerHTML = `
         <table class="saraksts-table">
           <thead>
-            <tr>${headRow.map((cell) => `<th>${escapeHtml(cell)}</th>`).join('')}</tr>
+            <tr>${headRow.map((cell) => renderCell(cell, 'th')).join('')}</tr>
           </thead>
           <tbody>
-            ${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
+            ${bodyRows.map((row) => `<tr>${row.map((cell) => renderCell(cell, 'td')).join('')}</tr>`).join('')}
           </tbody>
         </table>
       `;
@@ -551,7 +583,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
