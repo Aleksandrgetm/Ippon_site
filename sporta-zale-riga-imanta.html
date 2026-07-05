@@ -274,7 +274,7 @@ h1, h2, h3, h4, h5, h6,
           <p id="hallIntro">Ievadi informaciju par zāli admin paneli.</p>
         </div>
         <div class="hall-main">
-          <div class="hall-text" id="hallText"></div>
+          <div class="hall-text hall-intro" id="hallText"></div>
           <div class="hall-image-wrap">
             <img id="hallMainImage" src="" alt="Sporta zāle" />
           </div>
@@ -320,21 +320,47 @@ h1, h2, h3, h4, h5, h6,
     gap: 28px;
     align-items: start;
   }
-  .hall-text {
+  .hall-text,
+  .hall-intro {
     font-family: "Roboto", sans-serif;
     font-size: 22px;
     line-height: 1.55;
     color: #fff;
-    white-space: pre-line;
+    white-space: normal;
   }
   .hall-text,
-  .hall-text * {
+  .hall-intro,
+  .hall-text *,
+  .hall-intro * {
     color: #fff !important;
     font-family: "Roboto", sans-serif !important;
     font-size: inherit !important;
     line-height: inherit !important;
     font-weight: 400 !important;
     letter-spacing: 0 !important;
+  }
+  .hall-intro p,
+  .hall-intro ul,
+  .hall-intro ol {
+    margin: 0 0 1em;
+  }
+  .hall-intro ul,
+  .hall-intro ol {
+    padding-left: 1.3em;
+  }
+  .hall-intro li + li {
+    margin-top: 0.3em;
+  }
+  .hall-intro strong,
+  .hall-intro b {
+    font-weight: 700 !important;
+  }
+  .hall-intro em,
+  .hall-intro i {
+    font-style: italic !important;
+  }
+  .hall-intro u {
+    text-decoration: underline !important;
   }
   .hall-image-wrap {
     border: 1px solid rgba(255,255,255,0.16);
@@ -568,7 +594,7 @@ h1, h2, h3, h4, h5, h6,
         .replace(/<font[^>]*>/gi, '')
         .replace(/<\/font>/gi, '');
 
-      const allowed = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'UL', 'OL', 'LI', 'A']);
+      const allowed = new Set(['P', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'UL', 'OL', 'LI']);
       const nodes = Array.from(root.querySelectorAll('*'));
       nodes.forEach((node) => {
         const tag = String(node.tagName || '').toUpperCase();
@@ -580,8 +606,6 @@ h1, h2, h3, h4, h5, h6,
           return;
         }
         Array.from(node.attributes || []).forEach((attr) => {
-          const name = String(attr.name || '').toLowerCase();
-          if (tag === 'A' && (name === 'href' || name === 'target' || name === 'rel')) return;
           node.removeAttribute(attr.name);
         });
       });
@@ -768,7 +792,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
