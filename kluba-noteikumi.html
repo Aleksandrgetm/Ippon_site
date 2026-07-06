@@ -784,6 +784,11 @@ h1, h2, h3, h4, h5, h6,
 
       const mountEl = renderDocumentShell(pdfUrl);
       try {
+        const test = await fetch(pdfUrl);
+        if (!test.ok) {
+          throw new Error(`PDF not found: ${test.status} ${pdfUrl}`);
+        }
+
         const pdfjsLib = await loadPdfJs();
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
@@ -794,8 +799,8 @@ h1, h2, h3, h4, h5, h6,
           await renderPdfPage(pdfjsLib, page, mountEl);
         }
       } catch (error) {
-        console.error('Kluba noteikumi PDF render error:', error);
-        renderDocumentError(pdfUrl);
+        console.error('PDF render failed', error);
+        renderDocumentError(pdfUrl, `Neizdevas ieladet dokumentu: ${error?.message || 'Nezinama kluda.'}`);
       }
     };
 
@@ -819,7 +824,7 @@ h1, h2, h3, h4, h5, h6,
         const pdfPath = String(item?.pdf_file || '').trim();
         const pdfUrl = pdfPath ? new URL(pdfPath, window.location.origin).href : '';
         if (pdfUrl) {
-          renderDocumentError(pdfUrl);
+          renderDocumentError(pdfUrl, `Neizdevas ieladet dokumentu: ${error?.message || 'Nezinama kluda.'}`);
           return;
         }
         renderEmpty('PDF nav pievienots.');
@@ -963,7 +968,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
