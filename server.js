@@ -637,10 +637,13 @@ function ensureKlubaNoteikumiTable() {
       faili TEXT,
       pdf_file TEXT,
       teksts TEXT NOT NULL,
+      html_content TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
   `);
+
+  ensureTableColumn('kluba_noteikumi', 'html_content', 'TEXT');
 
   const count = db.prepare('SELECT COUNT(*) AS c FROM kluba_noteikumi').get().c;
   if (count > 0) return;
@@ -1428,6 +1431,17 @@ async function extractPdfTextHtml(pdfUrl) {
   return html;
 }
 
+async function buildKlubaNoteikumiHtmlContent(pdfUrl) {
+  const normalizedPdfUrl = String(pdfUrl || '').trim();
+  if (!normalizedPdfUrl) return '';
+  try {
+    return await extractPdfTextHtml(normalizedPdfUrl);
+  } catch (error) {
+    console.error('Failed to extract Kluba noteikumi PDF text:', error);
+    return '';
+  }
+}
+
 function isImageFileName(name) {
   return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
 }
@@ -2161,18 +2175,48 @@ function mapSadarbibaRow(row) {
 function mapKlubaNoteikumiRow(row) {
   if (!row) return null;
   const pdfFile = normalizeStoredPdfUrl(row.pdf_file) || normalizeStoredPdfUrl(row.faili) || null;
-  const htmlContent = String(row.teksts || '');
+  const htmlContent = String(row.html_content || '').trim();
   return {
     id: row.id,
     faili: row.faili || null,
     pdf_file: pdfFile,
-    teksts: htmlContent,
+    teksts: String(row.teksts || ''),
     html_content: htmlContent,
     content: htmlContent,
     saturs: htmlContent,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
+}
+
+async function mapKlubaNoteikumiRowWithHtml(row, { persist = false } = {}) {
+  if (!row) return null;
+  const item = mapKlubaNoteikumiRow(row);
+  if (!item) return null;
+
+  if (!item.pdf_file) {
+    if (persist && String(row?.html_content || '').trim()) {
+      db.prepare('UPDATE kluba_noteikumi SET html_content = ?, updated_at = ? WHERE id = ?')
+        .run('', nowTs(), row.id);
+    }
+    item.html_content = '';
+    item.content = '';
+    item.saturs = '';
+    return item;
+  }
+
+  if (!item.html_content) {
+    const extractedHtml = await buildKlubaNoteikumiHtmlContent(item.pdf_file);
+    item.html_content = extractedHtml;
+    item.content = extractedHtml;
+    item.saturs = extractedHtml;
+    if (persist && extractedHtml !== String(row?.html_content || '')) {
+      db.prepare('UPDATE kluba_noteikumi SET html_content = ?, updated_at = ? WHERE id = ?')
+        .run(extractedHtml, nowTs(), row.id);
+    }
+  }
+
+  return item;
 }
 
 function mapSponsoruAtbalstsPdfRow(row) {
@@ -5477,7 +5521,10 @@ async function handleApi(req, res, reqUrl) {
       SELECT * FROM kluba_noteikumi
       ORDER BY created_at DESC, id DESC
     `).all();
-    const items = rows.map((row) => mapKlubaNoteikumiRow(row));
+    const items = [];
+    for (const row of rows) {
+      items.push(await mapKlubaNoteikumiRowWithHtml(row, { persist: true }));
+    }
     sendJson(res, 200, {
       total: items.length,
       item: items[0] || null,
@@ -5555,7 +5602,7 @@ async function handleApi(req, res, reqUrl) {
 
   if (req.method === 'POST' && id === null) {
     parseBody(req)
-      .then((body) => {
+      .then(async (body) => {
         if (table === 'ippon_sportists') {
           const ts = nowTs();
           const nameLv = String(body.name_lv || '').trim();
@@ -5742,19 +5789,21 @@ async function handleApi(req, res, reqUrl) {
           const pdfFile = body.pdf_file != null
             ? String(body.pdf_file).trim()
             : (body.faili ? String(body.faili).trim() : null);
+          const htmlContent = pdfFile ? await buildKlubaNoteikumiHtmlContent(pdfFile) : '';
           const ts = nowTs();
           const info = db.prepare(`
-            INSERT INTO kluba_noteikumi (faili, pdf_file, teksts, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO kluba_noteikumi (faili, pdf_file, teksts, html_content, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
           `).run(
             body.faili ? String(body.faili).trim() : null,
             pdfFile || null,
             teksts,
+            htmlContent,
             ts,
             ts
           );
           const row = db.prepare('SELECT * FROM kluba_noteikumi WHERE id = ?').get(info.lastInsertRowid);
-          sendJson(res, 201, { row });
+          sendJson(res, 201, { row: await mapKlubaNoteikumiRowWithHtml(row) });
           return;
         }
 
@@ -6048,7 +6097,7 @@ async function handleApi(req, res, reqUrl) {
 
   if (req.method === 'PUT' && id !== null) {
     parseBody(req)
-      .then((body) => {
+      .then(async (body) => {
         if (table === 'ippon_sportists') {
           const existing = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ? LIMIT 1`).get(id);
           if (!existing) {
@@ -6429,19 +6478,21 @@ async function handleApi(req, res, reqUrl) {
           const nextPdfFile = hasPdfFile
             ? (String(body.pdf_file || '').trim() || null)
             : (hasFaili ? (String(body.faili || '').trim() || null) : (existing.pdf_file || existing.faili || null));
+          const nextHtmlContent = nextPdfFile ? await buildKlubaNoteikumiHtmlContent(nextPdfFile) : '';
           db.prepare(`
             UPDATE kluba_noteikumi
-            SET faili = ?, pdf_file = ?, teksts = ?, updated_at = ?
+            SET faili = ?, pdf_file = ?, teksts = ?, html_content = ?, updated_at = ?
             WHERE id = ?
           `).run(
             nextFaili,
             nextPdfFile,
             teksts,
+            nextHtmlContent,
             nowTs(),
             id
           );
           const row = db.prepare('SELECT * FROM kluba_noteikumi WHERE id = ?').get(id);
-          sendJson(res, 200, { row });
+          sendJson(res, 200, { row: await mapKlubaNoteikumiRowWithHtml(row) });
           return;
         }
 
