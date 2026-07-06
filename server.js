@@ -131,6 +131,8 @@ function loadEnvFile(filePath) {
 }
 
 const MOJIBAKE_PATTERN = /(?:[\u00C3\u00C2\u00C4\u00C5\u00D0\u00D1\u00E2\uFFFD].)/;
+let pdfParseFn = null;
+let pdfParseLoadFailed = false;
 
 function mojibakeScore(value) {
   const text = String(value || '');
@@ -1402,6 +1404,52 @@ function buildPdfTextHtml(rows) {
   }).join('');
 }
 
+function getPdfParse() {
+  if (pdfParseFn) return pdfParseFn;
+  if (pdfParseLoadFailed) return null;
+
+  try {
+    const mod = require('pdf-parse');
+    pdfParseFn = typeof mod === 'function'
+      ? mod
+      : (mod && typeof mod.default === 'function' ? mod.default : null);
+    if (!pdfParseFn) {
+      throw new Error('pdf-parse export not found');
+    }
+    return pdfParseFn;
+  } catch (error) {
+    pdfParseLoadFailed = true;
+    console.error('Failed to load pdf-parse:', error);
+    return null;
+  }
+}
+
+async function extractKlubaNoteikumiHtmlFromPdf(pdfUrl) {
+  const absPath = resolveLocalPdfPath(pdfUrl);
+  if (!absPath || !fs.existsSync(absPath)) return '';
+
+  const stat = fs.statSync(absPath);
+  const cacheKey = `kluba:${absPath}:${stat.mtimeMs}:${stat.size}`;
+  if (pdfTextCache.has(cacheKey)) {
+    return pdfTextCache.get(cacheKey);
+  }
+
+  const pdfParse = getPdfParse();
+  if (!pdfParse) return '';
+
+  const buffer = fs.readFileSync(absPath);
+  const parsed = await pdfParse(buffer);
+  const html = String(parsed?.text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join('');
+
+  pdfTextCache.set(cacheKey, html);
+  return html;
+}
+
 async function extractPdfTextHtml(pdfUrl) {
   const absPath = resolveLocalPdfPath(pdfUrl);
   if (!absPath || !fs.existsSync(absPath)) return '';
@@ -1435,6 +1483,8 @@ async function buildKlubaNoteikumiHtmlContent(pdfUrl) {
   const normalizedPdfUrl = String(pdfUrl || '').trim();
   if (!normalizedPdfUrl) return '';
   try {
+    const html = await extractKlubaNoteikumiHtmlFromPdf(normalizedPdfUrl);
+    if (html) return html;
     return await extractPdfTextHtml(normalizedPdfUrl);
   } catch (error) {
     console.error('Failed to extract Kluba noteikumi PDF text:', error);
