@@ -350,31 +350,95 @@ h1, h2, h3, h4, h5, h6,
     border-color: #dc2626;
     padding: 20px;
   }
-  .sponsor-pdf-view {
+  .rules-doc-frame {
+    box-sizing: border-box;
     width: 100%;
-    min-height: 520px;
-    border: 1px solid rgba(255,255,255,.14);
+    border: 1px solid rgba(220, 38, 38, 0.95);
     border-radius: 12px;
-    background: #060606;
-    padding: 16px;
-    overflow: auto;
+    background: #050505;
+    padding: 18px;
   }
-  .sponsor-pdf-native {
+  .rules-doc-head {
     width: 100%;
-    min-height: 78vh;
-    border: 0;
-    border-radius: 8px;
-    background: #ffffff;
+    text-align: center;
+    margin: 0 0 24px;
   }
-  .sponsor-pdf-error {
-    margin: 16px 0 0;
+  .rules-doc-head h3 {
+    margin: 0 0 8px;
+    font-family: "Oswald", sans-serif;
+    font-size: clamp(24px, 2.8vw, 38px);
+    line-height: 1;
+    color: #ffffff;
+    text-transform: uppercase;
+  }
+  .rules-doc-head p {
+    margin: 0;
     font-family: "Roboto", sans-serif;
     font-size: 14px;
-    line-height: 1.45;
-    color: rgba(255,255,255,0.8);
+    line-height: 1.5;
+    color: rgba(255,255,255,0.82);
   }
-  .sponsor-pdf-error[hidden] {
-    display: none !important;
+  .rules-pdf-document {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+    overflow-x: hidden;
+  }
+  .rules-pdf-loading {
+    margin: 0;
+    font-family: "Roboto", sans-serif;
+    font-size: 16px;
+    color: rgba(255,255,255,0.78);
+  }
+  .rules-pdf-page {
+    position: relative;
+    width: 100%;
+    margin: 0 auto;
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.35);
+  }
+  .rules-pdf-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .rules-pdf-textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+    opacity: 1;
+    forced-color-adjust: none;
+  }
+  .rules-pdf-textLayer span,
+  .rules-pdf-textLayer br {
+    position: absolute;
+    white-space: pre;
+    color: transparent;
+    transform-origin: 0% 0%;
+    cursor: text;
+  }
+  .rules-pdf-textLayer::selection,
+  .rules-pdf-textLayer span::selection {
+    background: rgba(59, 130, 246, 0.35);
+    color: transparent;
+  }
+  .rules-pdf-textLayer::-moz-selection,
+  .rules-pdf-textLayer span::-moz-selection {
+    background: rgba(59, 130, 246, 0.35);
+    color: transparent;
+  }
+  .rules-pdf-textLayer .endOfContent {
+    display: block;
+    position: absolute;
+    inset: 100% 0 0;
+    z-index: -1;
+    cursor: default;
+    user-select: none;
   }
   .sponsor-pdf-empty {
     margin: 0;
@@ -403,13 +467,40 @@ h1, h2, h3, h4, h5, h6,
   @media (max-width: 1024px) {
     .rules-shell { padding: 136px 0 74px; }
     .rules-container { width: min(1220px, calc(100% - 24px)); }
-    .sponsor-pdf-view { padding: 10px; }
+    .rules-doc-frame { padding: 12px; }
+  }
+  @media (max-width: 768px) {
+    .rules-card {
+      padding: 10px;
+      overflow: hidden;
+    }
+    .rule-item--document {
+      padding: 12px;
+    }
+    .rules-doc-frame {
+      padding: 10px;
+    }
+    .rules-pdf-document {
+      gap: 12px;
+      overflow-x: hidden;
+    }
+    .rules-pdf-page,
+    .rules-pdf-canvas {
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+    }
+    .rules-pdf-textLayer {
+      max-width: 100%;
+    }
   }
 </style>
-<script type="module">
+<script>
 (() => {
   const stateEl = document.getElementById('sponsorState');
   const detailEl = document.getElementById('sponsorDetail');
+  const PDF_SCRIPT_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+  const PDF_WORKER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   const esc = (v) => String(v == null ? '' : v)
     .replace(/&/g, '&amp;')
@@ -418,9 +509,8 @@ h1, h2, h3, h4, h5, h6,
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-  function buildDetail(item, hasPdf) {
+  function buildDetail(item, pdfUrl) {
     const title = String(item?.nosaukums || '').trim() || 'Sponsoru atbalsts';
-    const pdfUrl = String(item?.pdf_file || '').trim();
     const fileName = pdfUrl.split('/').pop() || 'sponsoru-atbalsts.pdf';
     return `
       <div class="sponsor-hero">
@@ -429,18 +519,125 @@ h1, h2, h3, h4, h5, h6,
       </div>
       <div class="rules-list">
         <article class="rule-item rule-item--document">
-          ${hasPdf ? `<div class="sponsor-pdf-view"><iframe class="sponsor-pdf-native" src="${esc(pdfUrl)}#toolbar=1&navpanes=0&view=FitH" title="${esc(title)} PDF"></iframe></div><p id="sponsorPdfError" class="sponsor-pdf-error" hidden></p>` : '<p class="sponsor-pdf-empty">PDF nav pievienots.</p>'}
-          ${hasPdf ? `<a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
+          ${pdfUrl ? `
+            <div class="rules-doc-frame">
+              <div class="rules-doc-head">
+                <h3>${esc(title)}</h3>
+                <p>Sponsoru atbalsta aktualais dokuments.</p>
+              </div>
+              <div id="sponsorPdfDocument" class="rules-pdf-document">
+                <p class="rules-pdf-loading">Notiek dokumenta ielade...</p>
+              </div>
+            </div>
+            <a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>
+          ` : '<p class="sponsor-pdf-empty">PDF nav pievienots.</p>'}
         </article>
       </div>
     `;
   }
 
-  function showRenderError(message) {
-    const errorEl = document.getElementById('sponsorPdfError');
-    if (!errorEl) return;
-    errorEl.textContent = message || 'Neizdevas ieladet dokumenta prieksskatijumu, bet PDF fails ir pieejams lejupieladei.';
-    errorEl.hidden = false;
+  function renderDocumentError(pdfUrl, message = 'Neizdevas ieladet dokumentu.') {
+    const fileName = pdfUrl.split('/').pop() || 'sponsoru-atbalsts.pdf';
+    detailEl.innerHTML = `
+      <div class="sponsor-hero">
+        <p class="sponsor-kicker">Sadarb&#299;ba</p>
+        <h1>Sponsoru atbalsts</h1>
+      </div>
+      <div class="rules-list">
+        <article class="rule-item rule-item--document">
+          <div class="rules-doc-frame">
+            <div class="rules-doc-head">
+              <h3>Sponsoru atbalsts</h3>
+              <p>Sponsoru atbalsta aktualais dokuments.</p>
+            </div>
+            <div class="rules-pdf-document">
+              <p class="sponsor-pdf-empty">${esc(message)}</p>
+            </div>
+          </div>
+          ${pdfUrl ? `<a class="download-btn" href="${esc(pdfUrl)}" download="${esc(fileName)}">LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
+        </article>
+      </div>
+    `;
+  }
+
+  async function loadPdfJs() {
+    if (window.pdfjsLib && typeof window.pdfjsLib.getDocument === 'function') {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
+      return window.pdfjsLib;
+    }
+
+    await new Promise((resolve, reject) => {
+      const existing = document.querySelector('script[data-pdfjs-lib="1"]');
+      if (existing) {
+        existing.addEventListener('load', resolve, { once: true });
+        existing.addEventListener('error', () => reject(new Error(`Failed to load PDF.js script: ${PDF_SCRIPT_SRC}`)), { once: true });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = PDF_SCRIPT_SRC;
+      script.async = true;
+      script.dataset.pdfjsLib = '1';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Failed to load PDF.js script: ${PDF_SCRIPT_SRC}`));
+      document.head.appendChild(script);
+    });
+
+    const pdfjsLib = window.pdfjsLib;
+    if (!pdfjsLib || typeof pdfjsLib.getDocument !== 'function') {
+      throw new Error('PDF.js module did not expose getDocument');
+    }
+    if (!pdfjsLib.GlobalWorkerOptions) {
+      throw new Error('PDF.js worker options are unavailable');
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = PDF_WORKER_SRC;
+    return pdfjsLib;
+  }
+
+  async function renderPdfPage(pdfjsLib, page, mountEl) {
+    const containerWidth = Math.max(1, Math.floor(mountEl.getBoundingClientRect().width || mountEl.clientWidth || mountEl.parentElement?.clientWidth || 960));
+    const baseViewport = page.getViewport({ scale: 1 });
+    const fitScale = containerWidth / baseViewport.width;
+    const viewport = page.getViewport({ scale: fitScale });
+    const pixelRatio = Math.max(window.devicePixelRatio || 1, 1);
+
+    const pageEl = document.createElement('div');
+    pageEl.className = 'rules-pdf-page';
+    pageEl.style.width = '100%';
+    pageEl.style.maxWidth = '100%';
+
+    const canvas = document.createElement('canvas');
+    canvas.className = 'rules-pdf-canvas';
+    canvas.width = Math.ceil(viewport.width * pixelRatio);
+    canvas.height = Math.ceil(viewport.height * pixelRatio);
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+
+    const textLayerEl = document.createElement('div');
+    textLayerEl.className = 'textLayer rules-pdf-textLayer';
+    textLayerEl.style.width = `${viewport.width}px`;
+    textLayerEl.style.height = `${viewport.height}px`;
+
+    pageEl.appendChild(canvas);
+    pageEl.appendChild(textLayerEl);
+    mountEl.appendChild(pageEl);
+
+    const context = canvas.getContext('2d', { alpha: false });
+    await page.render({
+      canvasContext: context,
+      viewport,
+      transform: pixelRatio === 1 ? null : [pixelRatio, 0, 0, pixelRatio, 0, 0]
+    }).promise;
+
+    if (typeof pdfjsLib.TextLayer === 'function') {
+      const textContent = await page.getTextContent();
+      const textLayer = new pdfjsLib.TextLayer({
+        container: textLayerEl,
+        textContentSource: textContent,
+        viewport
+      });
+      await textLayer.render();
+    }
   }
 
   async function init() {
@@ -451,17 +648,49 @@ h1, h2, h3, h4, h5, h6,
       const item = data && data.item ? data.item : null;
       if (!item) throw new Error('No item');
 
-      const pdfUrl = String(item.pdf_file || '').trim();
-      detailEl.innerHTML = buildDetail(item, Boolean(pdfUrl));
+      const pdfPath = String(item.pdf_file || '').trim();
+      const pdfUrl = pdfPath ? new URL(pdfPath, window.location.origin).href : '';
+      detailEl.innerHTML = buildDetail(item, pdfUrl);
       detailEl.hidden = false;
       stateEl.hidden = true;
 
-      if (pdfUrl) return;
+      if (!pdfUrl) return;
+
+      const mountEl = document.getElementById('sponsorPdfDocument');
+      if (!mountEl) return;
+
+      const test = await fetch(pdfUrl);
+      if (!test.ok) {
+        throw new Error(`PDF not found: ${test.status} ${pdfUrl}`);
+      }
+
+      const pdfjsLib = await loadPdfJs();
+      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      const pdf = await loadingTask.promise;
+      mountEl.innerHTML = '';
+
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        await renderPdfPage(pdfjsLib, page, mountEl);
+      }
     } catch (error) {
-      stateEl.textContent = 'Neizdevas ieladet Sponsoru atbalsta lapu.';
+      console.error('Sponsoru atbalsts PDF render error:', error);
+      try {
+        const res = await fetch('/api/sadarbiba/sponsoru-atbalsts');
+        const data = await res.json();
+        const item = data && data.item ? data.item : null;
+        const pdfPath = String(item?.pdf_file || '').trim();
+        const pdfUrl = pdfPath ? new URL(pdfPath, window.location.origin).href : '';
+        if (pdfUrl) {
+          detailEl.hidden = false;
+          stateEl.hidden = true;
+          renderDocumentError(pdfUrl, `Neizdevas ieladet dokumentu: ${error?.message || 'Nezinama kluda.'}`);
+          return;
+        }
+      } catch {}
+      stateEl.textContent = 'PDF nav pievienots.';
       stateEl.hidden = false;
       detailEl.hidden = true;
-      console.error(error);
     }
   }
 
@@ -597,7 +826,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
 
 
 
