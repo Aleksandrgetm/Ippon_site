@@ -2161,11 +2161,15 @@ function mapSadarbibaRow(row) {
 function mapKlubaNoteikumiRow(row) {
   if (!row) return null;
   const pdfFile = normalizeStoredPdfUrl(row.pdf_file) || normalizeStoredPdfUrl(row.faili) || null;
+  const htmlContent = String(row.teksts || '');
   return {
     id: row.id,
     faili: row.faili || null,
     pdf_file: pdfFile,
-    teksts: row.teksts,
+    teksts: htmlContent,
+    html_content: htmlContent,
+    content: htmlContent,
+    saturs: htmlContent,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
