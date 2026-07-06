@@ -399,73 +399,19 @@ h1, h2, h3, h4, h5, h6,
     border-color: #dc2626;
     padding: 20px;
   }
-  .rules-doc-frame {
+  .rules-pdf-view {
     width: 100%;
     border: 1px solid rgba(255,255,255,.14);
     border-radius: 12px;
     background: #060606;
     padding: 14px;
   }
-  .rules-doc-paper {
+  .rules-pdf-native {
     width: 100%;
-    background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%);
+    min-height: 78vh;
+    border: 0;
     border-radius: 8px;
-    padding: clamp(20px, 4vw, 42px);
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
-  }
-  .rules-doc-header {
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.12);
-    margin-bottom: 22px;
-    text-align: center;
-  }
-  .rules-doc-org,
-  .rules-doc-subtitle {
-    margin: 0;
-    font-family: "Roboto", sans-serif;
-    font-size: 14px;
-    line-height: 1.5;
-    color: #475569;
-  }
-  .rules-doc-title {
-    margin: 10px 0 8px;
-    font-family: "Oswald", sans-serif;
-    font-size: clamp(28px, 3vw, 42px);
-    line-height: 1;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: #111827;
-  }
-  .rule-text.rule-text--paper {
-    color: #111827;
-    font-size: 17px;
-    line-height: 1.7;
-  }
-  .rule-text.rule-text--paper,
-  .rule-text.rule-text--paper * {
-    color: #111827 !important;
-  }
-  .rule-text.rule-text--paper h1,
-  .rule-text.rule-text--paper h2,
-  .rule-text.rule-text--paper h3,
-  .rule-text.rule-text--paper h4 {
-    color: #0f172a !important;
-    margin-top: 18px;
-  }
-  .rule-text.rule-text--paper table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 0 0 18px;
-    background: rgba(255,255,255,0.82);
-  }
-  .rule-text.rule-text--paper th,
-  .rule-text.rule-text--paper td {
-    padding: 10px 12px;
-    border: 1px solid rgba(15, 23, 42, 0.16) !important;
-    vertical-align: top;
-  }
-  .rule-text.rule-text--paper a {
-    color: #b91c1c !important;
+    background: #ffffff;
   }
   .rules-empty {
     font-family: "Oswald", sans-serif;
@@ -476,7 +422,7 @@ h1, h2, h3, h4, h5, h6,
   @media (max-width: 1100px) {
     .rules-shell { padding: 140px 0 74px; }
     .rules-container { width: min(1220px, calc(100% - 24px)); }
-    .rules-doc-frame { padding: 10px; }
+    .rules-pdf-view { padding: 10px; }
   }
 </style>
 <script>
@@ -597,92 +543,29 @@ h1, h2, h3, h4, h5, h6,
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
 
-    const unwrapTag = (root, selector) => {
-      root.querySelectorAll(selector).forEach((node) => {
-        node.replaceWith(...Array.from(node.childNodes));
-      });
-    };
-
-    const normalizeRuleText = (value) => String(value || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-
-    const cleanRulesHtml = (html) => {
-      const root = document.createElement('div');
-      root.innerHTML = String(html || '');
-      unwrapTag(root, 'font');
-      unwrapTag(root, 'span');
-      root.querySelectorAll('script, style, iframe, object, embed').forEach((node) => node.remove());
-      root.querySelectorAll('*').forEach((node) => {
-        for (const attr of ['style', 'align', 'width', 'height', 'cellpadding', 'cellspacing', 'border', 'bordercolor', 'face', 'size', 'class', 'id']) {
-          node.removeAttribute(attr);
-        }
-      });
-
-      const blocks = Array.from(root.childNodes);
-      const bodyStartIndex = blocks.findIndex((node) => {
-        const text = normalizeRuleText(node.textContent || '');
-        return text.startsWith('1. visparigie noteikumi');
-      });
-
-      if (bodyStartIndex > -1) {
-        const bodyRoot = document.createElement('div');
-        blocks.slice(bodyStartIndex).forEach((node) => bodyRoot.appendChild(node.cloneNode(true)));
-        return bodyRoot.innerHTML.trim();
-      }
-
-      return root.innerHTML.trim();
-    };
-
-    const textToHtml = (text) => String(text || '')
-      .split(/\n{2,}/)
-      .map((block) => block.trim())
-      .filter(Boolean)
-      .map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
-      .join('');
-
-    const buildBodyHtml = (rawValue) => {
-      const source = String(rawValue || '').trim();
-      if (!source) return '';
-      return /<\/?[a-z][\s\S]*>/i.test(source) ? cleanRulesHtml(source) : textToHtml(source);
-    };
-
     const renderDocument = (item) => {
       const pdfUrl = String(item?.pdf_file || '').trim();
-      const bodyHtml = buildBodyHtml(item?.teksts);
-      if (!bodyHtml) {
-        renderEmpty('Noteikumu saturs paslaik nav pievienots.', pdfUrl);
+      if (!pdfUrl) {
+        renderEmpty();
         return;
       }
 
       emptyEl.style.display = 'none';
       listEl.innerHTML = `
         <article class="rule-item rule-item--document">
-          <div class="rules-doc-frame">
-            <div class="rules-doc-paper">
-              <div class="rules-doc-header">
-                <p class="rules-doc-org">Biedr&#299;bas &quot;IPPON.LV&quot;</p>
-                <p class="rules-doc-org">Re&#291;. Nr. 40008181424</p>
-                <h3 class="rules-doc-title">Kluba noteikumi</h3>
-                <p class="rules-doc-subtitle">Dokuments att&#275;lots k&#257; lapas saturs bez PDF skat&#299;t&#257;ja.</p>
-              </div>
-              <div class="rule-text rule-text--paper">${bodyHtml}</div>
-            </div>
+          <div class="rules-pdf-view">
+            <iframe class="rules-pdf-native" src="${escapeHtml(pdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&view=FitH" title="Kluba noteikumi PDF"></iframe>
           </div>
-          ${pdfUrl ? `<a class="download-btn" href="${escapeHtml(pdfUrl)}" download>LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
+          <a class="download-btn" href="${escapeHtml(pdfUrl)}" download>LEJUPIEL&#256;D&#274;T PDF</a>
         </article>
       `;
     };
 
-    const renderEmpty = (message = 'Noteikumi nav pievienoti.', pdfUrl = '') => {
+    const renderEmpty = (message = 'PDF nav pievienots.') => {
       emptyEl.style.display = 'none';
       listEl.innerHTML = `
         <article class="rule-item">
           <p class="rule-text">${escapeHtml(message)}</p>
-          ${pdfUrl ? `<a class="download-btn" href="${escapeHtml(pdfUrl)}" download>LEJUPIEL&#256;D&#274;T PDF</a>` : ''}
         </article>
       `;
     };
@@ -692,14 +575,14 @@ h1, h2, h3, h4, h5, h6,
         const res = await fetch('/api/kluba-noteikumi', { headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error('API error');
         const data = await res.json();
-        const item = data.item || data;
+        const item = data?.item || null;
         if (!item) {
           throw new Error('No item');
         }
         renderDocument(item);
       } catch (error) {
         console.error('Kluba noteikumi load failed:', error);
-        renderEmpty('Kluba noteikumus paslaik neizdevas ieladet.');
+        renderEmpty('PDF nav pievienots.');
       }
     };
 
@@ -840,8 +723,6 @@ const a=JSON.parse(document.getElementById("wp-emoji-settings").textContent),o=(
 
 
 <div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; width: 0px; height: 0px;"><div></div></div></div><script src="/assets/lang-switcher.js" defer></script></body></html>
-
-
 
 
 
