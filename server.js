@@ -3302,13 +3302,6 @@ function resolveGalleryImagePath(imgRow) {
   if (rawPath.startsWith('uploads/')) {
     return buildPublicUploadUrl(rawPath);
   }
-  if (rawPath) {
-    const legacyAbs = path.join(ROOT, 'legacy_import', 'images', rawPath);
-    if (fs.existsSync(legacyAbs)) {
-      return `/legacy_import/images/${rawPath.replace(/\\/g, '/')}`;
-    }
-  }
-
   const itemId = Number(imgRow?.item_id || 0);
   const fileName = String(imgRow?.filename || '').trim();
   if (itemId && fileName) {
