@@ -53,12 +53,13 @@ html, body {
 }
 
 :root {
-  --site-header-height: 90px;
+  --site-header-height: 88px;
   --site-header-height-mobile: 80px;
 }
 
 body {
   padding-top: var(--site-header-height, 90px);
+  background: #000 !important;
 }
 
 @media (max-width: 768px) {
@@ -502,27 +503,48 @@ body {
 }
 
 /* Keep desktop navigation on a single line on narrower laptop screens */
-@media (min-width: 1025px) and (max-width: 1440px) {
+@media (min-width: 1025px) and (max-width: 1600px) {
+  .elementor-location-header,
   .elementor-location-header .elementor-element-4534216 {
+    margin-bottom: 0 !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .elementor-location-header + [data-elementor-type="wp-page"],
+  main,
+  .site-main,
+  .page-content {
+    margin-top: 0 !important;
+    border-top: 0 !important;
+  }
+
+  .elementor-location-header .elementor-element-4534216 {
+    width: min(calc(100% - 8px), 1560px) !important;
+    max-width: 1560px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
     justify-content: flex-start !important;
     flex-wrap: nowrap !important;
-    gap: clamp(6px, 0.8vw, 18px) !important;
-    padding-left: clamp(0px, 0.3vw, 6px) !important;
-    padding-right: clamp(8px, 0.9vw, 18px) !important;
+    gap: clamp(10px, 0.95vw, 24px) !important;
+    padding-left: clamp(4px, 0.45vw, 10px) !important;
+    padding-right: clamp(4px, 0.45vw, 10px) !important;
     overflow: visible !important;
   }
 
   .elementor-location-header .elementor-element-e48e2a2 {
     flex: 0 1 auto !important;
     min-width: 0 !important;
-    margin-right: clamp(6px, 0.7vw, 18px) !important;
+    max-width: clamp(190px, 15vw, 260px) !important;
+    margin-right: clamp(14px, 1vw, 28px) !important;
     justify-content: flex-start !important;
+    transform: translateX(clamp(-52px, -2.7vw, -24px));
   }
 
   .elementor-location-header .elementor-element-f058eba {
     margin-left: 0 !important;
     flex: 1 1 auto !important;
-    justify-content: flex-start !important;
+    justify-content: center !important;
     width: auto !important;
     min-width: 0 !important;
   }
@@ -540,9 +562,9 @@ body {
   .elementor-location-header .elementor-nav-menu {
     display: flex !important;
     align-items: center !important;
-    justify-content: flex-start !important;
+    justify-content: center !important;
     flex-wrap: nowrap !important;
-    gap: clamp(4px, 0.5vw, 12px) !important;
+    gap: clamp(8px, 0.9vw, 20px) !important;
     min-width: 0 !important;
     white-space: nowrap !important;
   }
@@ -550,6 +572,7 @@ body {
   .elementor-location-header .elementor-element-ad27a2f .elementor-nav-menu--main > .elementor-nav-menu {
     flex: 1 1 auto !important;
     min-width: 0 !important;
+    justify-content: center !important;
   }
 
   .elementor-location-header .elementor-nav-menu > li {
@@ -559,27 +582,36 @@ body {
   }
 
   .elementor-location-header .elementor-nav-menu > li > .elementor-item {
-    font-size: clamp(12px, 0.74vw, 15px) !important;
-    padding-left: clamp(1px, 0.2vw, 5px) !important;
-    padding-right: clamp(1px, 0.2vw, 5px) !important;
+    font-size: clamp(13px, 0.92vw, 16px) !important;
+    line-height: 1 !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    padding-left: clamp(1px, 0.2vw, 3px) !important;
+    padding-right: clamp(1px, 0.2vw, 3px) !important;
+    white-space: nowrap !important;
+  }
+
+  .elementor-location-header .elementor-element-a4b8bf8 .elementor-heading-title {
+    font-size: clamp(26px, 1.6vw, 34px) !important;
+    line-height: 1 !important;
     white-space: nowrap !important;
   }
 
   .ippon-lang-host {
     flex: 0 0 auto !important;
-    margin-left: clamp(6px, 0.7vw, 14px) !important;
+    margin-left: auto !important;
   }
 
   .ippon-lang-switcher {
     display: inline-flex !important;
-    gap: clamp(3px, 0.35vw, 6px) !important;
-    padding-left: clamp(6px, 0.55vw, 10px) !important;
+    gap: clamp(4px, 0.35vw, 8px) !important;
+    padding-left: clamp(6px, 0.45vw, 10px) !important;
   }
 
   .ippon-lang-btn {
-    min-width: clamp(34px, 2.2vw, 40px) !important;
-    padding: 0 clamp(8px, 0.7vw, 10px) !important;
-    font-size: clamp(11px, 0.7vw, 12px) !important;
+    min-width: clamp(32px, 1.95vw, 40px) !important;
+    padding: 0 clamp(6px, 0.55vw, 10px) !important;
+    font-size: clamp(10px, 0.62vw, 12px) !important;
   }
 
   .ippon-lang-note {
@@ -598,35 +630,44 @@ body {
   }
 }
 
-@media (min-width: 1025px) and (max-width: 1280px) {
+@media (min-width: 1025px) and (max-width: 1440px) {
   .elementor-location-header .elementor-element-4534216 {
-    gap: clamp(4px, 0.55vw, 10px) !important;
-    padding-right: 8px !important;
+    width: calc(100% - 16px) !important;
+    gap: clamp(8px, 0.75vw, 16px) !important;
+    padding-left: 0 !important;
+    padding-right: 2px !important;
   }
 
   .elementor-location-header .elementor-element-e48e2a2 {
-    margin-right: clamp(4px, 0.45vw, 10px) !important;
-    transform: translateX(-8px);
+    max-width: clamp(176px, 14vw, 220px) !important;
+    margin-right: clamp(2px, 0.25vw, 8px) !important;
+    transform: translateX(clamp(-36px, -1.8vw, -18px));
   }
 
   .elementor-location-header .elementor-nav-menu--main,
   .elementor-location-header .elementor-nav-menu {
-    gap: clamp(3px, 0.35vw, 8px) !important;
+    gap: clamp(6px, 0.65vw, 12px) !important;
   }
 
   .elementor-location-header .elementor-nav-menu > li > .elementor-item {
-    font-size: clamp(11px, 0.68vw, 13px) !important;
-    padding-left: 2px !important;
-    padding-right: 2px !important;
+    font-size: clamp(13px, 0.82vw, 14px) !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
   }
 
-  .ippon-lang-host {
-    margin-left: clamp(4px, 0.35vw, 8px) !important;
+  .elementor-location-header .elementor-element-a4b8bf8 .elementor-heading-title {
+    font-size: clamp(24px, 1.45vw, 30px) !important;
   }
 
   .ippon-lang-switcher {
-    gap: 3px !important;
+    gap: 4px !important;
     padding-left: 6px !important;
+  }
+
+  .ippon-lang-btn {
+    min-width: 30px !important;
+    padding: 0 5px !important;
+    font-size: 10px !important;
   }
 
   .ippon-lang-note {
@@ -636,18 +677,28 @@ body {
 
 @media (min-width: 1025px) and (max-width: 1366px) {
   .elementor-location-header .elementor-element-4534216 {
-    gap: clamp(4px, 0.45vw, 9px) !important;
+    width: calc(100% - 20px) !important;
+    gap: clamp(6px, 0.55vw, 10px) !important;
   }
 
   .elementor-location-header .elementor-nav-menu--main,
   .elementor-location-header .elementor-nav-menu {
-    gap: clamp(3px, 0.32vw, 7px) !important;
+    gap: clamp(5px, 0.45vw, 8px) !important;
   }
 
   .elementor-location-header .elementor-nav-menu > li > .elementor-item {
-    font-size: clamp(11px, 0.66vw, 13px) !important;
-    padding-left: 2px !important;
-    padding-right: 2px !important;
+    font-size: 13px !important;
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+  }
+
+  .elementor-location-header .elementor-element-e48e2a2 {
+    max-width: clamp(170px, 13vw, 200px) !important;
+    margin-right: 4px !important;
+  }
+
+  .elementor-location-header .elementor-element-a4b8bf8 .elementor-heading-title {
+    font-size: clamp(22px, 1.3vw, 26px) !important;
   }
 
   .ippon-lang-note {
