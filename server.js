@@ -2573,6 +2573,18 @@ function buildKalendarsManualSlug(id, baseTitle) {
   return `kalendars-manual-${id}-${base}`;
 }
 
+function extractKalendarsYear(...values) {
+  for (const value of values) {
+    const text = safeText(value);
+    if (!text) continue;
+    const match = text.match(/\b(19|20)\d{2}\b/);
+    if (!match) continue;
+    const year = Number(match[0]);
+    if (Number.isFinite(year)) return year;
+  }
+  return null;
+}
+
 function parseSourceSlug(slug) {
   const m = String(slug || '').match(/^(sacensibas|eksamens|reitings)-(\d+)-/i);
   if (!m) return null;
@@ -2694,6 +2706,8 @@ function mapKalendarsTextSource(row, overrideRow = null) {
   const contentHtml = safeText(overrideRow?.content_override || baseHtml);
   const defaultImage = row.image ? (mapLegacyImageById(row.image)?.url || '') : '';
   const image = safeText(overrideRow?.image_override) || defaultImage || null;
+  const slugBase = overrideRow?.slug_override || title || `kalendars-${row.area_id}`;
+  const calendarYear = extractKalendarsYear(title, row.name, slugBase, date, baseDate, contentHtml);
   return withResolvedMedia({
     id: row.area_id,
     source_table: 'ippon_text',
@@ -2703,10 +2717,12 @@ function mapKalendarsTextSource(row, overrideRow = null) {
     nosaukums: title,
     date,
     datums: date,
+    year: calendarYear,
+    calendar_year: calendarYear,
     image,
     foto_attels: image,
     custom_html: contentHtml,
-    slug: buildKalendarsSourceSlug(row.area_id, overrideRow?.slug_override || title || `kalendars-${row.area_id}`),
+    slug: buildKalendarsSourceSlug(row.area_id, slugBase),
     created_at: row.c_time ?? null,
     updated_at: overrideRow?.updated_at ?? row.m_time ?? null
   }, { category: 'events', id: row.area_id, fallbackMain: image });
@@ -2716,6 +2732,7 @@ function mapKalendarsManualRow(row) {
   const title = safeText(row.title);
   const date = safeText(row.date);
   const image = safeText(row.image) || null;
+  const calendarYear = extractKalendarsYear(title, row.slug, date, row.content_html);
   return withResolvedMedia({
     id: row.id,
     source_table: 'ippon_kalendars_records',
@@ -2725,6 +2742,8 @@ function mapKalendarsManualRow(row) {
     nosaukums: title,
     date,
     datums: date,
+    year: calendarYear,
+    calendar_year: calendarYear,
     image,
     foto_attels: image,
     custom_html: safeText(row.content_html),
@@ -2770,9 +2789,15 @@ function queryAllKalendarsItems() {
   const manual = queryKalendarsManualItems();
   const items = [...source, ...manual];
   items.sort((a, b) => {
+    const ya = Number(a.calendar_year || a.year || 0);
+    const yb = Number(b.calendar_year || b.year || 0);
+    if (ya !== yb) return yb - ya;
     const da = dateSortValue(a.date || a.datums);
     const dbv = dateSortValue(b.date || b.datums);
     if (da !== dbv) return dbv - da;
+    const ua = Number(a.updated_at || 0);
+    const ub = Number(b.updated_at || 0);
+    if (ua !== ub) return ub - ua;
     return Number(b.source_id || 0) - Number(a.source_id || 0);
   });
   return { source, manual, items };

@@ -600,6 +600,53 @@ h1, h2, h3, h4, h5, h6,
     return m[3] + '.' + m[2] + '.' + m[1];
   }
 
+  function extractKalendarsYear(item) {
+    const values = Array.isArray(item) ? item : [item];
+    for (const value of values) {
+      const text = String(value || '');
+      const match = text.match(/\b(19|20)\d{2}\b/);
+      if (!match) continue;
+      const year = Number(match[0]);
+      if (Number.isFinite(year)) return year;
+    }
+    return null;
+  }
+
+  function parseKalendarsDate(value) {
+    const text = String(value || '').trim();
+    if (!text) return 0;
+    const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (iso) return Date.parse(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00Z`) || 0;
+    const dot = text.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})$/);
+    if (dot) {
+      const dd = dot[1].padStart(2, '0');
+      const mm = dot[2].padStart(2, '0');
+      return Date.parse(`${dot[3]}-${mm}-${dd}T00:00:00Z`) || 0;
+    }
+    return 0;
+  }
+
+  function compareKalendarsItems(a, b) {
+    const yearA = Number(a?.calendar_year || a?.year || extractKalendarsYear([
+      a?.title, a?.nosaukums, a?.slug, a?.date, a?.datums, a?.custom_html
+    ]) || 0);
+    const yearB = Number(b?.calendar_year || b?.year || extractKalendarsYear([
+      b?.title, b?.nosaukums, b?.slug, b?.date, b?.datums, b?.custom_html
+    ]) || 0);
+    if (yearA !== yearB) return yearB - yearA;
+    const dateA = parseKalendarsDate(a?.date || a?.datums || '');
+    const dateB = parseKalendarsDate(b?.date || b?.datums || '');
+    if (dateA !== dateB) return dateB - dateA;
+    const updatedA = Number(a?.updated_at || 0);
+    const updatedB = Number(b?.updated_at || 0);
+    if (updatedA !== updatedB) return updatedB - updatedA;
+    return Number(b?.source_id || 0) - Number(a?.source_id || 0);
+  }
+
+  function pickLatestKalendarsItem(list) {
+    return [...(Array.isArray(list) ? list : [])].sort(compareKalendarsItems)[0] || null;
+  }
+
   function buildSearchable(item) {
     return normalizeSearch([
       item.title || item.nosaukums || '',
@@ -669,6 +716,22 @@ h1, h2, h3, h4, h5, h6,
       stateEl.hidden = true;
       detailEl.hidden = false;
       detailEl.innerHTML = buildDetail(item);
+      console.log({
+        selectedCalendarId: item.source_id ?? item.id ?? null,
+        title: item.title || item.nosaukums || '',
+        year: item.calendar_year || item.year || extractKalendarsYear([
+          item.title, item.nosaukums, item.slug, item.date, item.datums, item.custom_html
+        ]) || null,
+        savedRecordId: null,
+        loadedPublicRecord: {
+          sourceId: item.source_id ?? item.id ?? null,
+          slug: item.slug || '',
+          title: item.title || item.nosaukums || '',
+          year: item.calendar_year || item.year || extractKalendarsYear([
+            item.title, item.nosaukums, item.slug, item.date, item.datums, item.custom_html
+          ]) || null
+        }
+      });
       if (pushState) {
         const url = new URL(window.location.href);
         url.searchParams.set('slug', item.slug);
@@ -690,13 +753,30 @@ h1, h2, h3, h4, h5, h6,
           item.image = sanitizeText(item.image || item.foto_attels || '');
           item.foto_attels = item.image;
           item.custom_html = sanitizeHtml(item.custom_html || '');
+          item.calendar_year = Number(item.calendar_year || item.year || extractKalendarsYear([
+            item.title, item.nosaukums, item.slug, item.date, item.datums, item.custom_html
+          ]) || 0);
           item.searchableText = buildSearchable(item);
           return item;
         })
         : [];
+      items.sort(compareKalendarsItems);
 
       const fromUrl = new URL(window.location.href).searchParams.get('slug') || '';
-      activeSlug = fromUrl || (items[0] ? items[0].slug : '');
+      const latestItem = pickLatestKalendarsItem(items);
+      activeSlug = fromUrl || (latestItem ? latestItem.slug : '');
+      console.log({
+        selectedCalendarId: latestItem?.source_id ?? latestItem?.id ?? null,
+        title: latestItem?.title || latestItem?.nosaukums || '',
+        year: latestItem?.calendar_year || latestItem?.year || null,
+        savedRecordId: null,
+        loadedPublicRecord: latestItem ? {
+          sourceId: latestItem.source_id ?? latestItem.id ?? null,
+          slug: latestItem.slug || '',
+          title: latestItem.title || latestItem.nosaukums || '',
+          year: latestItem.calendar_year || latestItem.year || null
+        } : null
+      });
 
       drawList();
       if (!items.length) {
