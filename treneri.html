@@ -350,7 +350,7 @@ h1, h2, h3, h4, h5, h6,
   }
   .trener-card {
     display: grid;
-    grid-template-rows: 290px auto;
+    grid-template-rows: clamp(390px, 28vw, 420px) auto;
     border: 1px solid rgba(255, 255, 255, 0.14);
     background: #080808;
     color: #fff;
@@ -372,7 +372,7 @@ h1, h2, h3, h4, h5, h6,
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center 16%;
+    object-position: center center;
     background: #111;
   }
   .trener-media-fallback {
@@ -411,7 +411,7 @@ h1, h2, h3, h4, h5, h6,
   }
   @media (max-width: 1080px) {
     .treneri-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .trener-card { grid-template-rows: 260px auto; }
+    .trener-card { grid-template-rows: 330px auto; }
   }
   @media (max-width: 768px) {
     .treneri-shell { padding: 112px 0 56px; }
@@ -419,7 +419,6 @@ h1, h2, h3, h4, h5, h6,
     .treneri-grid { grid-template-columns: 1fr; }
     .treneri-intro { font-size: 16px; }
     .trener-card { grid-template-rows: 340px auto; }
-    .trener-media img { object-position: center center; }
     .trener-name { font-size: 26px; }
   }
 </style>
