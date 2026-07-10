@@ -1025,6 +1025,11 @@
     let kalSelectedManual = null;
     let kalSearchDebounce = null;
     let selectedKalImagePreviewUrl = '';
+    let kalImportedWorkbook = null;
+    let kalImportedMatrix = [];
+    let kalCachedImportedHtml = '';
+    let kalImportInProgress = false;
+    let kalPreventAutoHydration = false;
     const NEWS_TABLE = 'jaunumi';
     const TRAINERS_TABLE = 'treneri';
     const SADARBIBA_SPORTA_ZALES_IRE_TABLE = 'sadarbiba_sporta_zales_ire';
@@ -2158,14 +2163,36 @@
       kalImagePreview.innerHTML = buildResolvedImageHtml(src, 'Attēls', 'max-width:180px;max-height:140px;display:block;border-radius:8px;border:1px solid var(--line);');
     }
 
+    function setKalContentValue(nextValue, reason = 'unknown') {
+      if (!kalContent) return;
+      console.trace('HTML saturs overwritten here');
+      console.log('[Kalendars] set kalContent', { reason });
+      kalContent.value = String(nextValue || '');
+    }
+
+    function setKalPreviewValue(nextHtml, reason = 'unknown') {
+      if (!kalPreview) return;
+      console.trace('HTML saturs overwritten here');
+      console.log('[Kalendars] set kalPreview', { reason });
+      kalPreview.innerHTML = nextHtml || '<em>Priekšskatījums parādīsies šeit.</em>';
+    }
+
+    function clearKalImportState() {
+      kalImportedWorkbook = null;
+      kalImportedMatrix = [];
+      kalCachedImportedHtml = '';
+    }
+
     function resetKalForm() {
       kalSelectedSource = null;
       kalSelectedManual = null;
       if (kalTitle) kalTitle.value = '';
       if (kalDate) kalDate.value = '';
       if (kalImage) kalImage.value = '';
-      if (kalContent) kalContent.value = '';
-      if (kalPreview) kalPreview.innerHTML = 'Priekšskatījums parādīsies šeit.';
+      clearKalImportState();
+      kalPreventAutoHydration = false;
+      setKalContentValue('', 'resetKalForm');
+      setKalPreviewValue('Priekšskatījums parādīsies šeit.', 'resetKalForm');
       if (kalTableStatus) kalTableStatus.textContent = '';
       if (selectedKalImagePreviewUrl) {
         URL.revokeObjectURL(selectedKalImagePreviewUrl);
@@ -2175,18 +2202,27 @@
       if (kalDeleteBtn) kalDeleteBtn.style.display = 'none';
     }
 
-    function openKalItem(item) {
+    function openKalItem(item, options = {}) {
       if (!item) return;
+      if (kalImportInProgress || (kalPreventAutoHydration && options.source === 'refresh')) {
+        console.trace('HTML saturs overwritten here');
+        console.log('[Kalendars] auto hydration skipped', {
+          source: options.source || 'unknown',
+          sourceId: item.source_id ?? null,
+          title: item.title || item.nosaukums || ''
+        });
+        return;
+      }
       kalSelectedSource = item.source_table === 'ippon_text' ? item : null;
       kalSelectedManual = item.source_table === 'ippon_kalendars_records' ? item : null;
+      kalPreventAutoHydration = false;
+      clearKalImportState();
       if (kalTitle) kalTitle.value = item.title || item.nosaukums || '';
       if (kalDate) kalDate.value = toDateInputValue(item.date || item.datums || '');
       if (kalImage) kalImage.value = item.image || item.foto_attels || '';
-      if (kalContent) kalContent.value = normalizeHtmlText(item.custom_html || '');
-      if (kalPreview) {
-        const html = normalizeHtmlText(kalContent?.value || '').trim();
-        kalPreview.innerHTML = html || '<em>Priekšskatījums parādīsies šeit.</em>';
-      }
+      const hydratedHtml = normalizeHtmlText(item.custom_html || '');
+      setKalContentValue(hydratedHtml, 'openKalItem');
+      setKalPreviewValue(normalizeHtmlText(kalContent?.value || '').trim(), 'openKalItem');
       renderKalImagePreview();
       if (kalDeleteBtn) kalDeleteBtn.style.display = kalSelectedManual ? '' : 'none';
       console.log({
@@ -2217,7 +2253,7 @@
         });
       renderRezMiniList(kalList, all, (kalSelectedManual || kalSelectedSource)
         ? `${(kalSelectedManual || kalSelectedSource).source_table}:${(kalSelectedManual || kalSelectedSource).source_id}`
-        : '', openKalItem);
+        : '', (item) => openKalItem(item, { source: 'user' }));
     }
 
     async function loadKalendarsData() {
@@ -2236,7 +2272,7 @@
         const all = [...kalData.source, ...kalData.manual];
         const selectedItem = all.find((item) => `${item.source_table}:${item.source_id}` === selectedKey);
         if (selectedItem) {
-          openKalItem(selectedItem);
+          openKalItem(selectedItem, { source: 'refresh' });
           return;
         }
       }
@@ -5880,6 +5916,7 @@
           savedRecordId,
           loadedPublicRecord: null
         });
+        kalPreventAutoHydration = false;
         await loadKalendarsData();
       } catch (error) {
         setStatus(error.message, 'error');
@@ -6100,29 +6137,51 @@
         const file = event.target.files && event.target.files[0];
         if (!file) return;
         try {
+          kalImportInProgress = true;
+          kalPreventAutoHydration = true;
+          clearKalImportState();
+          setKalContentValue('', 'kalTableFile:before-import-clear');
+          setKalPreviewValue('', 'kalTableFile:before-import-clear');
+          if (kalTableStatus) kalTableStatus.textContent = '';
+          console.log('IMPORT FILE', file.name, file.size);
           const name = String(file.name || '').toLowerCase();
           let matrix = [];
           if (name.endsWith('.csv')) {
             matrix = parseCsvToMatrix(await file.text());
+            kalImportedWorkbook = { SheetNames: ['csv'] };
           } else {
             if (!window.XLSX) throw new Error('Excel parseris nav pieejams.');
             const arr = await file.arrayBuffer();
-            const wb = window.XLSX.read(arr, { type: 'array' });
-            const firstSheet = wb.SheetNames[0];
-            matrix = window.XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, raw: false });
+            const workbook = window.XLSX.read(arr, { type: 'array' });
+            kalImportedWorkbook = workbook;
+            console.log('WORKBOOK SHEETS', workbook.SheetNames);
+            const firstNonEmptySheet = workbook.SheetNames.find((sheetName) => {
+              const sheet = workbook.Sheets[sheetName];
+              if (!sheet) return false;
+              const sheetMatrix = window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+              return Array.isArray(sheetMatrix) && sheetMatrix.some((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
+            });
+            if (!firstNonEmptySheet) {
+              throw new Error('Excel failā nav nevienas nepustas lapas importam.');
+            }
+            matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[firstNonEmptySheet], { header: 1, raw: false });
           }
+          kalImportedMatrix = Array.isArray(matrix) ? matrix : [];
+          console.log('FIRST ROWS', kalImportedMatrix.slice(0, 10));
           const tableHtml = matrixToHtmlTable(matrix);
           if (!tableHtml) throw new Error('Failā nav tabulas datu importam.');
-          const previous = normalizeHtmlText(kalContent.value || '').trim();
-          kalContent.value = previous ? `${previous}\n\n${tableHtml}` : tableHtml;
-          const html = normalizeHtmlText(kalContent.value || '').trim();
-          if (kalPreview) kalPreview.innerHTML = html || '<em>Priekšskatījums parādīsies šeit.</em>';
+          const html = normalizeHtmlText(tableHtml).trim();
+          kalCachedImportedHtml = html;
+          console.log('HTML BEFORE ASSIGN', html.slice(0, 500));
+          setKalContentValue(html, 'kalTableFile:import');
+          setKalPreviewValue(html, 'kalTableFile:import');
           if (kalTableStatus) kalTableStatus.textContent = 'Tabula importēta laukā “HTML saturs”.';
           setStatus('Kalendāra tabula importēta.', 'ok');
         } catch (error) {
           if (kalTableStatus) kalTableStatus.textContent = '';
           setStatus(error.message, 'error');
         } finally {
+          kalImportInProgress = false;
           kalTableFile.value = '';
         }
       });
@@ -6130,7 +6189,8 @@
     if (kalContent && kalPreview) {
       kalContent.addEventListener('input', () => {
         const html = normalizeHtmlText(kalContent.value || '').trim();
-        kalPreview.innerHTML = html || '<em>Priekšskatījums parādīsies šeit.</em>';
+        kalCachedImportedHtml = html;
+        setKalPreviewValue(html, 'kalContent:input');
       });
     }
     if (kalSaveBtn) kalSaveBtn.addEventListener('click', saveKalendarsEntry);
