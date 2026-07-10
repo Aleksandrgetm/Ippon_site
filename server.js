@@ -1,7 +1,10 @@
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { pathToFileURL } = require('url');
+const { pipeline } = require('stream/promises');
 const Database = require('better-sqlite3');
 const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const XLSX = require('xlsx');
@@ -27,6 +30,7 @@ const SPACES_REGION = String(process.env.SPACES_REGION || 'fra1').trim();
 const SPACES_ENDPOINT = String(process.env.SPACES_ENDPOINT || `https://${SPACES_REGION}.digitaloceanspaces.com`).replace(/\/+$/, '');
 const SPACES_ACCESS_KEY_ID = String(process.env.SPACES_KEY || process.env.AWS_ACCESS_KEY_ID || '').trim();
 const SPACES_SECRET_ACCESS_KEY = String(process.env.SPACES_SECRET || process.env.AWS_SECRET_ACCESS_KEY || '').trim();
+const BYTES_IN_MB = 1024 * 1024;
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const NEWS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'news');
 const RULES_UPLOADS_DIR = path.join(UPLOADS_DIR, 'rules');
@@ -104,11 +108,66 @@ const MIME = {
   '.jpeg': 'image/jpeg',
   '.gif': 'image/gif',
   '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.heic': 'image/heic',
+  '.heif': 'image/heif',
   '.ico': 'image/x-icon',
   '.pdf': 'application/pdf',
+  '.csv': 'text/csv; charset=utf-8',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2'
 };
+
+const IMAGE_TYPE_DEFS = [
+  { ext: 'jpg', mime: 'image/jpeg', aliases: ['jpg', 'jpeg'] },
+  { ext: 'png', mime: 'image/png', aliases: ['png'] },
+  { ext: 'webp', mime: 'image/webp', aliases: ['webp'] },
+  { ext: 'gif', mime: 'image/gif', aliases: ['gif'] },
+  { ext: 'avif', mime: 'image/avif', aliases: ['avif'] },
+  { ext: 'heic', mime: 'image/heic', aliases: ['heic'] },
+  { ext: 'heif', mime: 'image/heif', aliases: ['heif'] }
+];
+
+const IMAGE_ALLOWED_MIME_TYPES = new Set(IMAGE_TYPE_DEFS.map((item) => item.mime));
+const IMAGE_ALLOWED_EXTENSIONS = new Set(IMAGE_TYPE_DEFS.flatMap((item) => item.aliases));
+const FILE_ALLOWED_EXTENSIONS = new Set(['pdf', 'csv', 'xls', 'xlsx']);
+const FILE_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'text/csv',
+  'application/csv',
+  'text/plain',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+  'application/octet-stream'
+]);
+
+function parsePositiveIntEnv(name, fallback) {
+  const raw = String(process.env[name] || '').trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.trunc(parsed);
+}
+
+function parseMegabytesEnv(name, fallbackMb) {
+  return parsePositiveIntEnv(name, fallbackMb) * BYTES_IN_MB;
+}
+
+const UPLOAD_MAX_FILE_SIZE_BYTES = parseMegabytesEnv('UPLOAD_MAX_FILE_SIZE_MB', 100);
+const UPLOAD_MAX_REQUEST_SIZE_BYTES = Math.max(
+  parseMegabytesEnv('UPLOAD_MAX_REQUEST_SIZE_MB', 500),
+  UPLOAD_MAX_FILE_SIZE_BYTES
+);
+const UPLOAD_MAX_FILES = parsePositiveIntEnv('UPLOAD_MAX_FILES', 100);
+const UPLOAD_TIMEOUT_MS = parsePositiveIntEnv('UPLOAD_TIMEOUT_MS', 600000);
+const DEFAULT_JSON_BODY_LIMIT_BYTES = 10 * BYTES_IN_MB;
+const LEGACY_JSON_UPLOAD_MAX_BYTES = Math.max(
+  Math.ceil(UPLOAD_MAX_FILE_SIZE_BYTES * 1.4),
+  20 * BYTES_IN_MB
+);
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -299,6 +358,128 @@ function normalizeFileExtension(rawExt) {
   if (!ext) return '';
   if (ext === 'jpeg') return 'jpg';
   return ext.replace(/[^a-z0-9]+/g, '').slice(0, 10);
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value >= BYTES_IN_MB) {
+    const mb = value / BYTES_IN_MB;
+    return `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB`;
+  }
+  if (value >= 1024) {
+    const kb = value / 1024;
+    return `${Number.isInteger(kb) ? kb : kb.toFixed(1)} KB`;
+  }
+  return `${value} B`;
+}
+
+function createHttpError(statusCode, message, details = null) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  if (details && typeof details === 'object') {
+    error.details = details;
+  }
+  return error;
+}
+
+function normalizeHeaderValue(value) {
+  const text = Array.isArray(value) ? value[0] : value;
+  return String(text || '').trim();
+}
+
+function decodeUploadHeaderValue(value) {
+  const text = normalizeHeaderValue(value);
+  if (!text) return '';
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+function detectIsoBmffImageType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 16) return null;
+  if (buffer.toString('ascii', 4, 8) !== 'ftyp') return null;
+  const majorBrand = buffer.toString('ascii', 8, 12).toLowerCase();
+  const compatible = [];
+  for (let index = 8; index + 4 <= Math.min(buffer.length, 48); index += 4) {
+    compatible.push(buffer.toString('ascii', index, index + 4).toLowerCase());
+  }
+  const brands = new Set([majorBrand, ...compatible]);
+  if (brands.has('avif') || brands.has('avis')) {
+    return { mime: 'image/avif', ext: 'avif' };
+  }
+  if (brands.has('heic') || brands.has('heix') || brands.has('hevc') || brands.has('hevx')) {
+    return { mime: 'image/heic', ext: 'heic' };
+  }
+  if (brands.has('heif') || brands.has('mif1') || brands.has('msf1')) {
+    return { mime: 'image/heif', ext: 'heif' };
+  }
+  return null;
+}
+
+function detectImageTypeFromBuffer(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mime: 'image/jpeg', ext: 'jpg' };
+  }
+  if (
+    buffer[0] === 0x89
+    && buffer[1] === 0x50
+    && buffer[2] === 0x4e
+    && buffer[3] === 0x47
+    && buffer[4] === 0x0d
+    && buffer[5] === 0x0a
+    && buffer[6] === 0x1a
+    && buffer[7] === 0x0a
+  ) {
+    return { mime: 'image/png', ext: 'png' };
+  }
+  const asciiHeader = buffer.toString('ascii', 0, 12);
+  if (asciiHeader.startsWith('GIF87a') || asciiHeader.startsWith('GIF89a')) {
+    return { mime: 'image/gif', ext: 'gif' };
+  }
+  if (asciiHeader.startsWith('RIFF') && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return { mime: 'image/webp', ext: 'webp' };
+  }
+  return detectIsoBmffImageType(buffer);
+}
+
+function isProbablyTextBuffer(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) return true;
+  let printable = 0;
+  for (const byte of buffer) {
+    if (byte === 9 || byte === 10 || byte === 13 || (byte >= 32 && byte <= 126)) {
+      printable += 1;
+    }
+  }
+  return printable / buffer.length > 0.85;
+}
+
+function detectGenericFileTypeFromBuffer(buffer, normalizedExt) {
+  if (!Buffer.isBuffer(buffer) || !normalizedExt) return null;
+  if (normalizedExt === 'pdf') {
+    return buffer.slice(0, 5).toString('ascii') === '%PDF-'
+      ? { mime: 'application/pdf', ext: 'pdf' }
+      : null;
+  }
+  if (normalizedExt === 'xls') {
+    const oleHeader = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    return buffer.slice(0, 8).equals(oleHeader)
+      ? { mime: 'application/vnd.ms-excel', ext: 'xls' }
+      : null;
+  }
+  if (normalizedExt === 'xlsx') {
+    return buffer.slice(0, 2).toString('ascii') === 'PK'
+      ? { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext: 'xlsx' }
+      : null;
+  }
+  if (normalizedExt === 'csv') {
+    return isProbablyTextBuffer(buffer)
+      ? { mime: 'text/csv', ext: 'csv' }
+      : null;
+  }
+  return null;
 }
 
 function stripExtensionArtifacts(baseName, normalizedExt) {
@@ -1493,16 +1674,26 @@ async function buildKlubaNoteikumiHtmlContent(pdfUrl) {
 }
 
 function isImageFileName(name) {
-  return /\.(jpg|jpeg|png|webp|gif)$/i.test(String(name || ''));
+  return /\.(jpg|jpeg|png|webp|gif|avif|heic|heif)$/i.test(String(name || ''));
 }
 
 let spacesS3Client = null;
 const spacesObjectExistsCache = new Map();
 const SPACES_EXISTS_TTL_MS = 5 * 60 * 1000;
 
+function isSpacesConfigured() {
+  return Boolean(
+    SPACES_BUCKET
+    && SPACES_REGION
+    && SPACES_ENDPOINT
+    && SPACES_ACCESS_KEY_ID
+    && SPACES_SECRET_ACCESS_KEY
+  );
+}
+
 function getSpacesS3Client() {
   if (spacesS3Client) return spacesS3Client;
-  if (!SPACES_BUCKET || !SPACES_REGION || !SPACES_ENDPOINT || !SPACES_ACCESS_KEY_ID || !SPACES_SECRET_ACCESS_KEY) {
+  if (!isSpacesConfigured()) {
     throw new Error('Spaces is not configured');
   }
 
@@ -1518,7 +1709,7 @@ function getSpacesS3Client() {
 }
 
 function shouldUploadCategoryToSpaces(category) {
-  return true;
+  return isSpacesConfigured();
 }
 
 async function doesSpacesObjectExist(storageKey) {
@@ -1610,8 +1801,7 @@ async function uploadBufferToSpaces(storageKey, buffer, contentType) {
   }
 
   const normalizedContentType = String(contentType || '').trim().toLowerCase() || 'application/octet-stream';
-  const allowedContentTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-  if (!allowedContentTypes.has(normalizedContentType)) {
+  if (!IMAGE_ALLOWED_MIME_TYPES.has(normalizedContentType)) {
     throw new Error(`Unsupported image content type: ${normalizedContentType}`);
   }
 
@@ -3419,9 +3609,19 @@ function sendJson(res, statusCode, payload) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type, X-Upload-Filename, X-Upload-Category, X-Upload-Entity-Id, X-Upload-Sub-Path'
   });
   res.end(JSON.stringify(normalizedPayload));
+}
+
+function sendErrorJson(res, error, fallbackStatusCode = 500) {
+  const statusCode = Number(error?.statusCode || error?.status || fallbackStatusCode) || fallbackStatusCode;
+  const message = String(error?.message || 'Upload failed');
+  const payload = { error: message };
+  if (error?.details && typeof error.details === 'object') {
+    payload.details = error.details;
+  }
+  sendJson(res, statusCode, payload);
 }
 
 async function sendResolvedJson(res, statusCode, payload) {
@@ -3473,14 +3673,7 @@ function parseDataUrlImage(dataUrl) {
   if (!match) return null;
   const mime = match[1].toLowerCase();
   const base64 = match[2];
-  const extByMime = {
-    'image/jpeg': 'jpg',
-    'image/jpg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-    'image/gif': 'gif'
-  };
-  const ext = extByMime[mime];
+  const ext = IMAGE_TYPE_DEFS.find((item) => item.mime === mime || (mime === 'image/jpg' && item.mime === 'image/jpeg'))?.ext || '';
   if (!ext) return null;
   return { mime, base64, ext };
 }
@@ -3492,6 +3685,110 @@ function parseDataUrlFile(dataUrl) {
     mime: match[1].toLowerCase(),
     base64: match[2]
   };
+}
+
+function detectUploadedFileKindFromPath(filePath, expectedType, originalName) {
+  const header = readFileSignature(filePath, 64);
+  if (expectedType === 'image') {
+    return validateImageUpload({
+      fileName: originalName,
+      detected: detectImageTypeFromBuffer(header),
+      declaredMime: MIME[path.extname(originalName).toLowerCase()] || ''
+    });
+  }
+  return validateGenericFileUpload({
+    fileName: originalName,
+    detected: detectGenericFileTypeFromBuffer(header, normalizeFileExtension(path.extname(originalName))),
+    declaredMime: MIME[path.extname(originalName).toLowerCase()] || ''
+  });
+}
+
+function detectUploadedFileKindFromBuffer(buffer, expectedType, originalName, declaredMime) {
+  if (expectedType === 'image') {
+    return validateImageUpload({
+      fileName: originalName,
+      declaredMime,
+      detected: detectImageTypeFromBuffer(buffer)
+    });
+  }
+  return validateGenericFileUpload({
+    fileName: originalName,
+    declaredMime,
+    detected: detectGenericFileTypeFromBuffer(buffer, normalizeFileExtension(path.extname(originalName)))
+  });
+}
+
+async function handleBinaryManagedUpload(req, res, options = {}) {
+  const meta = options.meta || getUploadMetaFromHeaders(req.headers);
+  const originalName = meta.filename || options.defaultFileName || 'file.bin';
+  const requestContentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+
+  if (!meta.category || !meta.entityId) {
+    throw createHttpError(400, 'Upload category and entityId are required.');
+  }
+
+  const streamed = await streamRequestToTempFile(req, originalName, Math.min(UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES));
+  if (streamed.size <= 0) {
+    await removeTempFile(streamed.filePath);
+    throw createHttpError(400, 'Uploaded file is empty.');
+  }
+  if (streamed.size > UPLOAD_MAX_FILE_SIZE_BYTES) {
+    await removeTempFile(streamed.filePath);
+    throw createHttpError(
+      413,
+      `File is too large. Max ${formatBytes(UPLOAD_MAX_FILE_SIZE_BYTES)} per file.`,
+      { maxFileSizeBytes: UPLOAD_MAX_FILE_SIZE_BYTES }
+    );
+  }
+
+  try {
+    const detected = options.kind === 'image'
+      ? validateImageUpload({
+          fileName: originalName,
+          declaredMime: requestContentType,
+          detected: detectImageTypeFromBuffer(readFileSignature(streamed.filePath, 64))
+        })
+      : validateGenericFileUpload({
+          fileName: originalName,
+          declaredMime: requestContentType,
+          detected: detectGenericFileTypeFromBuffer(
+            readFileSignature(streamed.filePath, 64),
+            normalizeFileExtension(path.extname(originalName))
+          )
+        });
+
+    const target = resolveUploadTarget({
+      category: meta.category,
+      entityId: meta.entityId,
+      subPath: meta.subPath,
+      fileName: originalName,
+      ext: detected.ext,
+      fallbackStem: options.kind === 'image' ? 'image' : 'file'
+    });
+
+    const publicUrl = await persistUploadedTempFile({
+      tempPath: streamed.filePath,
+      target,
+      contentType: detected.mime,
+      uploadToSpaces: options.uploadToSpaces == null
+        ? shouldUploadCategoryToSpaces(target.category)
+        : options.uploadToSpaces
+    });
+
+    return {
+      url: publicUrl,
+      relativeUrl: publicUrl,
+      publicUrl: target.publicUrl,
+      mime: detected.mime,
+      fileName: target.fileName,
+      path: target.storageKey,
+      category: target.category,
+      entityId: target.entityId,
+      size: streamed.size
+    };
+  } finally {
+    await removeTempFile(streamed.filePath);
+  }
 }
 
 function splitSqlStatements(sql) {
@@ -3737,13 +4034,16 @@ function tableHasColumn(table, columnName) {
   return getTableColumns(table).some((col) => col.name === columnName);
 }
 
-function parseBody(req) {
+function parseBody(req, options = {}) {
+  const limitBytes = Number(options.limitBytes) > 0 ? Number(options.limitBytes) : DEFAULT_JSON_BODY_LIMIT_BYTES;
+  const tooLargeMessage = String(options.tooLargeMessage || `Payload is too large. Max ${formatBytes(limitBytes)}.`);
+  const tooLargeStatusCode = Number(options.tooLargeStatusCode) || 413;
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', (chunk) => {
       data += chunk;
-      if (data.length > 10 * 1024 * 1024) {
-        reject(new Error('Payload too large'));
+      if (data.length > limitBytes) {
+        reject(createHttpError(tooLargeStatusCode, tooLargeMessage));
       }
     });
     req.on('end', () => {
@@ -3759,6 +4059,190 @@ function parseBody(req) {
     });
     req.on('error', reject);
   });
+}
+
+function createTempUploadPath(fileName = 'upload.bin') {
+  const ext = normalizeFileExtension(path.extname(String(fileName || '').trim()));
+  const suffix = ext ? `.${ext}` : '.bin';
+  return path.join(os.tmpdir(), `ippon-upload-${Date.now()}-${crypto.randomBytes(8).toString('hex')}${suffix}`);
+}
+
+async function removeTempFile(filePath) {
+  if (!filePath) return;
+  try {
+    await fs.promises.unlink(filePath);
+  } catch {}
+}
+
+function readFileSignature(filePath, length = 64) {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(length);
+    const bytesRead = fs.readSync(fd, buffer, 0, length, 0);
+    return buffer.slice(0, bytesRead);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+async function streamRequestToTempFile(req, originalFileName, maxBytes) {
+  const filePath = createTempUploadPath(originalFileName);
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+
+  return new Promise((resolve, reject) => {
+    const output = fs.createWriteStream(filePath);
+    let bytesRead = 0;
+    let settled = false;
+
+    const fail = async (error) => {
+      if (settled) return;
+      settled = true;
+      output.destroy();
+      await removeTempFile(filePath);
+      reject(error);
+    };
+
+    output.on('error', fail);
+    req.on('error', fail);
+
+    req.on('data', (chunk) => {
+      if (settled) return;
+      bytesRead += chunk.length;
+      if (bytesRead > maxBytes) {
+        req.pause();
+        fail(createHttpError(
+          413,
+          `Request is too large. Max ${formatBytes(maxBytes)} per upload request.`,
+          { maxRequestSizeBytes: maxBytes }
+        ));
+        return;
+      }
+      if (!output.write(chunk)) {
+        req.pause();
+      }
+    });
+
+    output.on('drain', () => {
+      if (!settled) req.resume();
+    });
+
+    req.on('end', () => {
+      if (settled) return;
+      output.end();
+    });
+
+    output.on('finish', () => {
+      if (settled) return;
+      settled = true;
+      resolve({ filePath, size: bytesRead });
+    });
+  });
+}
+
+function getUploadMetaFromHeaders(headers) {
+  return {
+    filename: decodeUploadHeaderValue(headers['x-upload-filename']),
+    category: decodeUploadHeaderValue(headers['x-upload-category']),
+    entityId: decodeUploadHeaderValue(headers['x-upload-entity-id']),
+    subPath: decodeUploadHeaderValue(headers['x-upload-sub-path'])
+  };
+}
+
+function validateImageUpload({ fileName, declaredMime, detected }) {
+  const normalizedExt = normalizeFileExtension(path.extname(fileName));
+  if (!detected || !IMAGE_ALLOWED_MIME_TYPES.has(detected.mime) || !IMAGE_ALLOWED_EXTENSIONS.has(detected.ext)) {
+    throw createHttpError(400, 'Only JPG, PNG, WEBP, GIF, AVIF, HEIC and HEIF images are allowed.');
+  }
+  if (normalizedExt && normalizedExt !== detected.ext && !(normalizedExt === 'jpeg' && detected.ext === 'jpg')) {
+    throw createHttpError(400, `File extension does not match the actual image type (${detected.ext.toUpperCase()}).`);
+  }
+  const normalizedDeclaredMime = String(declaredMime || '').trim().toLowerCase();
+  if (
+    normalizedDeclaredMime
+    && normalizedDeclaredMime !== 'application/octet-stream'
+    && normalizedDeclaredMime !== detected.mime
+    && !(normalizedDeclaredMime === 'image/jpg' && detected.mime === 'image/jpeg')
+  ) {
+    throw createHttpError(400, `Image MIME type mismatch. Expected ${detected.mime}.`);
+  }
+  return {
+    mime: detected.mime,
+    ext: detected.ext
+  };
+}
+
+function validateGenericFileUpload({ fileName, declaredMime, detected }) {
+  const normalizedExt = normalizeFileExtension(path.extname(fileName));
+  if (!FILE_ALLOWED_EXTENSIONS.has(normalizedExt)) {
+    throw createHttpError(400, 'Allowed file types: PDF, XLS, XLSX, CSV.');
+  }
+  if (!detected || !FILE_ALLOWED_EXTENSIONS.has(detected.ext) || detected.ext !== normalizedExt) {
+    throw createHttpError(400, 'The uploaded file does not match the allowed PDF/XLS/XLSX/CSV formats.');
+  }
+  const normalizedDeclaredMime = String(declaredMime || '').trim().toLowerCase();
+  if (normalizedDeclaredMime && !FILE_ALLOWED_MIME_TYPES.has(normalizedDeclaredMime)) {
+    throw createHttpError(400, `Unsupported file MIME type: ${normalizedDeclaredMime}`);
+  }
+  return {
+    mime: detected.mime,
+    ext: detected.ext
+  };
+}
+
+async function uploadLocalFileToSpaces(storageKey, filePath, contentType) {
+  const normalizedKey = String(storageKey || '').replace(/^\/+/, '').trim();
+  if (!normalizedKey) {
+    throw createHttpError(400, 'Storage key is required');
+  }
+  const normalizedContentType = String(contentType || '').trim().toLowerCase() || 'application/octet-stream';
+  const client = getSpacesS3Client();
+  const stats = await fs.promises.stat(filePath);
+  const logContext = {
+    key: normalizedKey,
+    bucket: SPACES_BUCKET,
+    endpoint: SPACES_ENDPOINT,
+    contentType: normalizedContentType,
+    fileSize: stats.size
+  };
+
+  try {
+    await client.send(new PutObjectCommand({
+      Bucket: SPACES_BUCKET,
+      Key: normalizedKey,
+      Body: fs.createReadStream(filePath),
+      ContentType: normalizedContentType,
+      ACL: 'public-read',
+      CacheControl: 'public, max-age=31536000, immutable'
+    }));
+
+    spacesObjectExistsCache.set(normalizedKey, {
+      exists: true,
+      expiresAt: Date.now() + SPACES_EXISTS_TTL_MS
+    });
+
+    return buildSpacesObjectUrl(normalizedKey);
+  } catch (error) {
+    spacesObjectExistsCache.delete(normalizedKey);
+    console.error('[spaces-upload] upload failed:', {
+      ...logContext,
+      error: {
+        name: error?.name || null,
+        message: error?.message || String(error),
+        code: error?.Code || error?.code || null,
+        statusCode: error?.$metadata?.httpStatusCode || null
+      }
+    });
+    throw error;
+  }
+}
+
+async function persistUploadedTempFile({ tempPath, target, contentType, uploadToSpaces = true }) {
+  if (uploadToSpaces) {
+    return uploadLocalFileToSpaces(target.storageKey, tempPath, contentType);
+  }
+  ensureDir(path.dirname(target.localPath));
+  await pipeline(fs.createReadStream(tempPath), fs.createWriteStream(target.localPath));
+  return buildLocalUploadUrl(target.storageKey);
 }
 
 function extractTableFromPath(pathname) {
@@ -4047,91 +4531,132 @@ async function handleApi(req, res, reqUrl) {
   }
 
   if (pathname === '/api/upload-image' && req.method === 'POST') {
-    parseBody(req)
-      .then(async (body) => {
-        const parsed = parseDataUrlImage(body.dataUrl);
-        if (!parsed) {
-          sendJson(res, 400, { error: 'Invalid image format. Use png/jpg/webp/gif.' });
-          return;
-        }
-
-        const target = resolveUploadTarget({
-          category: body.category,
-          entityId: body.entityId,
-          subPath: body.subPath,
-          fileName: body.filename || 'image',
-          ext: parsed.ext,
-          fallbackStem: 'image'
-        });
-
-        const buffer = Buffer.from(parsed.base64, 'base64');
-        if (buffer.length > 8 * 1024 * 1024) {
-          sendJson(res, 400, { error: 'Image is too large. Max 8MB.' });
-          return;
-        }
-
-        let publicUrl = target.publicUrl;
-        if (shouldUploadCategoryToSpaces(target.category)) {
-          publicUrl = await uploadBufferToSpaces(target.storageKey, buffer, parsed.mime);
-        } else {
-          ensureDir(path.dirname(target.localPath));
-          fs.writeFileSync(target.localPath, buffer);
-        }
-
-        sendJson(res, 201, {
-          url: publicUrl,
-          relativeUrl: publicUrl,
-          fileName: target.fileName,
-          path: target.storageKey,
-          category: target.category,
-          entityId: target.entityId
-        });
+    const contentType = String(req.headers['content-type'] || '').toLowerCase();
+    if (contentType.startsWith('application/json')) {
+      parseBody(req, {
+        limitBytes: LEGACY_JSON_UPLOAD_MAX_BYTES,
+        tooLargeMessage: `Legacy JSON upload is too large. Max ${formatBytes(LEGACY_JSON_UPLOAD_MAX_BYTES)} in base64 mode.`
       })
-      .catch((error) => sendJson(res, 400, { error: error.message }));
+        .then(async (body) => {
+          const parsed = parseDataUrlImage(body.dataUrl);
+          if (!parsed) {
+            throw createHttpError(400, 'Invalid image format. Use JPG, PNG, WEBP, GIF, AVIF, HEIC or HEIF.');
+          }
+
+          const buffer = Buffer.from(parsed.base64, 'base64');
+          if (buffer.length > UPLOAD_MAX_FILE_SIZE_BYTES) {
+            throw createHttpError(
+              413,
+              `Image is too large. Max ${formatBytes(UPLOAD_MAX_FILE_SIZE_BYTES)} per file.`,
+              { maxFileSizeBytes: UPLOAD_MAX_FILE_SIZE_BYTES }
+            );
+          }
+
+          const detected = detectUploadedFileKindFromBuffer(buffer, 'image', body.filename || 'image', parsed.mime);
+          const target = resolveUploadTarget({
+            category: body.category,
+            entityId: body.entityId,
+            subPath: body.subPath,
+            fileName: body.filename || 'image',
+            ext: detected.ext,
+            fallbackStem: 'image'
+          });
+
+          let publicUrl = target.publicUrl;
+          if (shouldUploadCategoryToSpaces(target.category)) {
+            publicUrl = await uploadBufferToSpaces(target.storageKey, buffer, detected.mime);
+          } else {
+            ensureDir(path.dirname(target.localPath));
+            fs.writeFileSync(target.localPath, buffer);
+            publicUrl = buildLocalUploadUrl(target.storageKey);
+          }
+
+          sendJson(res, 201, {
+            url: publicUrl,
+            relativeUrl: publicUrl,
+            fileName: target.fileName,
+            path: target.storageKey,
+            category: target.category,
+            entityId: target.entityId,
+            size: buffer.length
+          });
+        })
+        .catch((error) => sendErrorJson(res, error, 400));
+      return true;
+    }
+
+    try {
+      const uploaded = await handleBinaryManagedUpload(req, res, {
+        kind: 'image'
+      });
+      sendJson(res, 201, uploaded);
+    } catch (error) {
+      sendErrorJson(res, error, 400);
+    }
     return true;
   }
 
   if (pathname === '/api/upload-file' && req.method === 'POST') {
-    parseBody(req)
-      .then(async (body) => {
-        const parsed = parseDataUrlFile(body.dataUrl);
-        if (!parsed) {
-          sendJson(res, 400, { error: 'Invalid file format' });
-          return;
-        }
-
-        const originalName = String(body.filename || 'file').trim();
-        const extFromName = normalizeFileExtension(path.extname(originalName)) || 'bin';
-        const target = resolveUploadTarget({
-          category: body.category,
-          entityId: body.entityId,
-          subPath: body.subPath,
-          fileName: originalName || 'file',
-          ext: extFromName,
-          fallbackStem: 'file'
-        });
-
-        const buffer = Buffer.from(parsed.base64, 'base64');
-        if (buffer.length > 25 * 1024 * 1024) {
-          sendJson(res, 400, { error: 'File is too large. Max 25MB.' });
-          return;
-        }
-
-        ensureDir(path.dirname(target.localPath));
-        fs.writeFileSync(target.localPath, buffer);
-        const localUrl = buildLocalUploadUrl(target.storageKey);
-        sendJson(res, 201, {
-          url: localUrl,
-          relativeUrl: localUrl,
-          publicUrl: target.publicUrl,
-          mime: parsed.mime,
-          fileName: target.fileName,
-          path: target.storageKey,
-          category: target.category,
-          entityId: target.entityId
-        });
+    const contentType = String(req.headers['content-type'] || '').toLowerCase();
+    if (contentType.startsWith('application/json')) {
+      parseBody(req, {
+        limitBytes: LEGACY_JSON_UPLOAD_MAX_BYTES,
+        tooLargeMessage: `Legacy JSON upload is too large. Max ${formatBytes(LEGACY_JSON_UPLOAD_MAX_BYTES)} in base64 mode.`
       })
-      .catch((error) => sendJson(res, 400, { error: error.message }));
+        .then(async (body) => {
+          const parsed = parseDataUrlFile(body.dataUrl);
+          if (!parsed) {
+            throw createHttpError(400, 'Invalid file format.');
+          }
+
+          const originalName = String(body.filename || 'file').trim() || 'file';
+          const buffer = Buffer.from(parsed.base64, 'base64');
+          if (buffer.length > UPLOAD_MAX_FILE_SIZE_BYTES) {
+            throw createHttpError(
+              413,
+              `File is too large. Max ${formatBytes(UPLOAD_MAX_FILE_SIZE_BYTES)} per file.`,
+              { maxFileSizeBytes: UPLOAD_MAX_FILE_SIZE_BYTES }
+            );
+          }
+
+          const detected = detectUploadedFileKindFromBuffer(buffer, 'file', originalName, parsed.mime);
+          const target = resolveUploadTarget({
+            category: body.category,
+            entityId: body.entityId,
+            subPath: body.subPath,
+            fileName: originalName,
+            ext: detected.ext,
+            fallbackStem: 'file'
+          });
+
+          ensureDir(path.dirname(target.localPath));
+          fs.writeFileSync(target.localPath, buffer);
+          const localUrl = buildLocalUploadUrl(target.storageKey);
+          sendJson(res, 201, {
+            url: localUrl,
+            relativeUrl: localUrl,
+            publicUrl: target.publicUrl,
+            mime: detected.mime,
+            fileName: target.fileName,
+            path: target.storageKey,
+            category: target.category,
+            entityId: target.entityId,
+            size: buffer.length
+          });
+        })
+        .catch((error) => sendErrorJson(res, error, 400));
+      return true;
+    }
+
+    try {
+      const uploaded = await handleBinaryManagedUpload(req, res, {
+        kind: 'file',
+        uploadToSpaces: false
+      });
+      sendJson(res, 201, uploaded);
+    } catch (error) {
+      sendErrorJson(res, error, 400);
+    }
     return true;
   }
 
@@ -4391,74 +4916,138 @@ async function handleApi(req, res, reqUrl) {
       sendJson(res, 404, { error: 'Galerija nav atrasta' });
       return true;
     }
-    parseBody(req)
+    const saveGalleryImageRecord = async ({ originalName, uploadAction, ext }) => {
+      const target = resolveUploadTarget({
+        category: 'gallery',
+        entityId: albumId,
+        fileName: originalName || 'gallery-image',
+        ext,
+        fallbackStem: 'gallery-image'
+      });
+
+      await uploadAction(target);
+
+      const ts = nowTs();
+      const currentOrder = Number(
+        db.prepare('SELECT COALESCE(MAX(ordering), 0) AS m FROM ippon_images WHERE item_id = ?').get(albumId)?.m || 0
+      ) + 1;
+      const useManualImageId = !hasIpponImagesAutoPrimaryKey();
+      let createdId = 0;
+      if (useManualImageId) {
+        createdId = Number(db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ippon_images').get()?.next_id || 1);
+        db.prepare(`
+          INSERT INTO ippon_images (
+            id, area_id, item_id, filename, path, o_name, ordering, c_time,
+            comment_ru, comment_lv, comment_en
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          createdId,
+          25,
+          albumId,
+          target.fileName,
+          target.storageKey,
+          String(originalName || target.fileName),
+          currentOrder,
+          ts,
+          '',
+          '',
+          ''
+        );
+      } else {
+        const info = db.prepare(`
+          INSERT INTO ippon_images (
+            area_id, item_id, filename, path, o_name, ordering, c_time,
+            comment_ru, comment_lv, comment_en
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(25, albumId, target.fileName, target.storageKey, String(originalName || target.fileName), currentOrder, ts, '', '', '');
+        createdId = Number(info.lastInsertRowid || 0);
+      }
+
+      const cover = db.prepare('SELECT id FROM ippon_images WHERE item_id = ? ORDER BY ordering DESC, id DESC LIMIT 1').get(albumId);
+      db.prepare('UPDATE ippon_galery SET image = ?, m_time = ? WHERE id = ?').run(Number(cover?.id || 0), ts, albumId);
+      const created = db.prepare('SELECT * FROM ippon_images WHERE id = ? LIMIT 1').get(createdId);
+      return mapGalleryImageRow(created);
+    };
+
+    const contentType = String(req.headers['content-type'] || '').toLowerCase();
+    if (!contentType.startsWith('application/json')) {
+      try {
+        const filename = decodeUploadHeaderValue(req.headers['x-upload-filename']) || 'gallery-image';
+        const uploaded = await handleBinaryManagedUpload(req, res, {
+          kind: 'image',
+          meta: {
+            filename,
+            category: 'gallery',
+            entityId: String(albumId)
+          }
+        });
+        const item = await saveGalleryImageRecord({
+          originalName: filename,
+          ext: normalizeFileExtension(path.extname(uploaded.fileName)),
+          uploadAction: async () => uploaded.url
+        });
+        sendJson(res, 201, { item });
+      } catch (error) {
+        sendErrorJson(res, error, 400);
+      }
+      return true;
+    }
+
+    parseBody(req, {
+      limitBytes: UPLOAD_MAX_REQUEST_SIZE_BYTES,
+      tooLargeMessage: `Photo gallery request is too large. Max ${formatBytes(UPLOAD_MAX_REQUEST_SIZE_BYTES)} per request.`
+    })
       .then(async (body) => {
         const files = Array.isArray(body.files) ? body.files : [];
         if (!files.length) {
-          sendJson(res, 400, { error: 'Nav augšupielādējamu failu' });
-          return;
+          throw createHttpError(400, 'No photos were provided for upload.');
         }
-        const ts = nowTs();
+        if (files.length > UPLOAD_MAX_FILES) {
+          throw createHttpError(413, `Too many files. Max ${UPLOAD_MAX_FILES} files per request.`, { maxFiles: UPLOAD_MAX_FILES });
+        }
+
         const inserted = [];
-        let currentOrder = Number(
-          db.prepare('SELECT COALESCE(MAX(ordering), 0) AS m FROM ippon_images WHERE item_id = ?').get(albumId)?.m || 0
-        );
-        const useManualImageId = !hasIpponImagesAutoPrimaryKey();
-        let nextImageId = useManualImageId
-          ? Number(db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM ippon_images').get()?.next_id || 1)
-          : 0;
+        const failed = [];
         for (const file of files) {
-          const parsed = parseDataUrlImage(file?.dataUrl);
-          if (!parsed) continue;
-          const target = resolveUploadTarget({
-            category: 'gallery',
-            entityId: albumId,
-            fileName: file?.filename || 'gallery-image',
-            ext: parsed.ext,
-            fallbackStem: 'gallery-image'
-          });
-          await uploadBufferToSpaces(target.storageKey, Buffer.from(parsed.base64, 'base64'), parsed.mime);
-          currentOrder += 1;
-          let createdId = 0;
-          if (useManualImageId) {
-            createdId = nextImageId++;
-            db.prepare(`
-              INSERT INTO ippon_images (
-                id, area_id, item_id, filename, path, o_name, ordering, c_time,
-                comment_ru, comment_lv, comment_en
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-              createdId,
-              25,
-              albumId,
-              target.fileName,
-              target.storageKey,
-              String(file?.filename || target.fileName),
-              currentOrder,
-              ts,
-              '',
-              '',
-              ''
-            );
-          } else {
-            const info = db.prepare(`
-              INSERT INTO ippon_images (
-                area_id, item_id, filename, path, o_name, ordering, c_time,
-                comment_ru, comment_lv, comment_en
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(25, albumId, target.fileName, target.storageKey, String(file?.filename || target.fileName), currentOrder, ts, '', '', '');
-            createdId = Number(info.lastInsertRowid || 0);
+          const originalName = String(file?.filename || 'gallery-image').trim() || 'gallery-image';
+          try {
+            const parsed = parseDataUrlImage(file?.dataUrl);
+            if (!parsed) {
+              throw createHttpError(400, 'Invalid image format.');
+            }
+            const buffer = Buffer.from(parsed.base64, 'base64');
+            if (buffer.length > UPLOAD_MAX_FILE_SIZE_BYTES) {
+              throw createHttpError(413, `File is too large. Max ${formatBytes(UPLOAD_MAX_FILE_SIZE_BYTES)} per file.`);
+            }
+            const detected = detectUploadedFileKindFromBuffer(buffer, 'image', originalName, parsed.mime);
+            const item = await saveGalleryImageRecord({
+              originalName,
+              ext: detected.ext,
+              uploadAction: async (target) => {
+                if (shouldUploadCategoryToSpaces(target.category)) {
+                  return uploadBufferToSpaces(target.storageKey, buffer, detected.mime);
+                }
+                ensureDir(path.dirname(target.localPath));
+                fs.writeFileSync(target.localPath, buffer);
+                return buildLocalUploadUrl(target.storageKey);
+              }
+            });
+            inserted.push(item);
+          } catch (error) {
+            failed.push({
+              fileName: originalName,
+              error: String(error?.message || error)
+            });
           }
-          const created = db.prepare('SELECT * FROM ippon_images WHERE id = ? LIMIT 1').get(createdId);
-          inserted.push(mapGalleryImageRow(created));
         }
-        if (inserted.length) {
-          const cover = db.prepare('SELECT id FROM ippon_images WHERE item_id = ? ORDER BY ordering DESC, id DESC LIMIT 1').get(albumId);
-          db.prepare('UPDATE ippon_galery SET image = ?, m_time = ? WHERE id = ?').run(Number(cover?.id || 0), ts, albumId);
+
+        if (!inserted.length) {
+          throw createHttpError(400, 'No gallery photos were uploaded.', { failed });
         }
-        sendJson(res, 201, { items: inserted });
+
+        sendJson(res, 201, { items: inserted, failed });
       })
-      .catch((error) => sendJson(res, 400, { error: error.message }));
+      .catch((error) => sendErrorJson(res, error, 400));
     return true;
   }
 
@@ -6835,8 +7424,14 @@ const server = http.createServer(async (req, res) => {
         '.jpeg': 'image/jpeg',
         '.webp': 'image/webp',
         '.gif': 'image/gif',
+        '.avif': 'image/avif',
+        '.heic': 'image/heic',
+        '.heif': 'image/heif',
         '.svg': 'image/svg+xml',
-        '.pdf': 'application/pdf'
+        '.pdf': 'application/pdf',
+        '.csv': 'text/csv; charset=utf-8',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       };
 
       const contentType = mimeTypes[ext] || 'application/octet-stream';
@@ -6882,7 +7477,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
+        'Access-Control-Allow-Headers': 'Content-Type, X-Upload-Filename, X-Upload-Category, X-Upload-Entity-Id, X-Upload-Sub-Path'
       });
       res.end();
       return;
@@ -7010,6 +7605,10 @@ const server = http.createServer(async (req, res) => {
 
   sendFile(res, candidate);
 });
+
+server.headersTimeout = UPLOAD_TIMEOUT_MS + 5000;
+server.requestTimeout = UPLOAD_TIMEOUT_MS;
+server.keepAliveTimeout = 65000;
 
 server.on('error', (error) => {
   console.error(`[server] startup failed: ${error.message}`);

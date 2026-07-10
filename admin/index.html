@@ -756,7 +756,7 @@
               <div class="rez-inline">
                 <input id="rezManualImage" type="hidden" />
                 <label id="rezMainImageLabel" style="margin:0;">Fotogrāfija
-                  <input id="rezSacMainImageFile" type="file" accept="image/*" />
+                  <input id="rezSacMainImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,.heic,.heif" />
                 </label>
               </div>
               <div class="rez-preview-box" id="rezSacMainPreview"></div>
@@ -793,7 +793,7 @@
               </div>
               <div>
                 <label id="rezGalleryLabel">Galerija</label>
-                <input id="rezSacGalleryFiles" type="file" accept="image/*" multiple />
+                <input id="rezSacGalleryFiles" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,.heic,.heif" multiple />
                 <div id="rezSacGalleryPreview" class="rez-gallery-preview"></div>
               </div>
 
@@ -850,7 +850,7 @@
                 <input id="kalImage" type="hidden" />
               </div>
               <label style="margin:0;">Attēls
-                <input id="kalImageFile" type="file" accept="image/*" />
+                <input id="kalImageFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif,.heic,.heif" />
               </label>
               <div id="kalImagePreview" class="rez-preview-box"></div>
 
@@ -1104,7 +1104,9 @@
       return '';
     }
 
-    function buildUploadRequestBody(file, dataUrl, extra = {}) {
+    const ADMIN_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif,.heic,.heif';
+
+    function buildUploadRequestMeta(file, extra = {}) {
       const category = extra.category || getUploadCategoryForTable(extra.tableName);
       const entityId = extra.entityId || getUploadEntityIdForTable(extra.tableName);
       if (!category) {
@@ -1115,10 +1117,16 @@
       }
       return {
         filename: file.name,
-        dataUrl,
         category,
         entityId,
         subPath: extra.subPath || undefined
+      };
+    }
+
+    function buildUploadRequestBody(file, dataUrl, extra = {}) {
+      return {
+        ...buildUploadRequestMeta(file, extra),
+        dataUrl
       };
     }
 
@@ -1544,37 +1552,27 @@
     async function uploadFotoGalerijaImagesIfNeeded() {
       if (currentTable !== FOTO_GALERIJA_TABLE) return;
       if (!selectedRow || !selectedRow[currentPk] || !selectedFotoGalerijaFiles.length) return;
-      const files = [];
-      for (const file of selectedFotoGalerijaFiles) {
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result || ''));
-          reader.onerror = () => reject(new Error('Neizdevās nolasīt attēla failu'));
-          reader.readAsDataURL(file);
+      const { uploaded, failed } = await uploadFilesSequentially(selectedFotoGalerijaFiles, async (file) => {
+        const data = await apiUploadBinary(`/api/foto-galerija/admin/${selectedRow[currentPk]}/photos`, file, {
+          'X-Upload-Filename': encodeURIComponent(file.name || 'gallery-image')
         });
-        files.push({ filename: file.name, dataUrl });
-      }
-      await api(`/api/foto-galerija/admin/${selectedRow[currentPk]}/photos`, {
-        method: 'POST',
-        body: JSON.stringify({ files })
+        return data?.item || null;
       });
       selectedFotoGalerijaFiles = [];
+      const fileInput = document.getElementById('fotoGalerijaFiles');
+      if (fileInput) fileInput.value = '';
       await loadFotoGalerijaPhotos(selectedRow[currentPk]);
+      if (failed.length > 0) {
+        setStatus(`Ne visi galerijas faili augšupielādējās: ${buildFailedUploadMessage(failed)}`, 'error');
+      } else if (uploaded.length > 0) {
+        setStatus('Foto galerijas faili augšupielādēti.', 'ok');
+      }
     }
 
     async function uploadRezultatiImageFile(file, extra = {}) {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Neizdevās nolasīt attēla failu'));
-        reader.readAsDataURL(file);
-      });
-      const data = await api('/api/upload-image', {
-        method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, {
-          tableName: currentTable === KALENDARS_TABLE ? KALENDARS_TABLE : REZULTATI_TABLE,
-          subPath: extra.subPath
-        }))
+      const data = await uploadManagedBinaryFile('/api/upload-image', file, {
+        tableName: currentTable === KALENDARS_TABLE ? KALENDARS_TABLE : REZULTATI_TABLE,
+        subPath: extra.subPath
       });
       return data.relativeUrl || data.url || '';
     }
@@ -2299,6 +2297,82 @@
       throw lastError;
     }
 
+    async function apiUploadBinary(path, file, headers = {}) {
+      const candidates = buildApiCandidates(path);
+      let lastError = new Error('API unavailable');
+      let lastHttpError = null;
+
+      for (const url of candidates) {
+        try {
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream',
+              ...headers
+            },
+            body: file
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            const message = data.error || `HTTP ${response.status}`;
+            lastHttpError = new Error(message);
+            if (response.status === 404) {
+              lastError = new Error(message);
+              continue;
+            }
+            throw new Error(message);
+          }
+
+          const absolute = new URL(url, window.location.origin);
+          apiBase = `${absolute.protocol}//${absolute.host}`;
+          if (apiMeta) {
+            apiMeta.textContent = `API: ${apiBase}`;
+          }
+          return data;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (lastHttpError) {
+        throw lastHttpError;
+      }
+      throw lastError;
+    }
+
+    async function uploadManagedBinaryFile(apiPath, file, extra = {}) {
+      const meta = buildUploadRequestMeta(file, extra);
+      return apiUploadBinary(apiPath, file, {
+        'X-Upload-Filename': encodeURIComponent(meta.filename),
+        'X-Upload-Category': encodeURIComponent(meta.category),
+        'X-Upload-Entity-Id': encodeURIComponent(meta.entityId),
+        ...(meta.subPath ? { 'X-Upload-Sub-Path': encodeURIComponent(meta.subPath) } : {})
+      });
+    }
+
+    async function uploadFilesSequentially(files, uploader) {
+      const uploaded = [];
+      const failed = [];
+      for (const file of files) {
+        try {
+          uploaded.push(await uploader(file));
+        } catch (error) {
+          failed.push({
+            fileName: file?.name || 'file',
+            error: String(error?.message || error)
+          });
+        }
+      }
+      return { uploaded, failed };
+    }
+
+    function buildFailedUploadMessage(failed) {
+      return failed
+        .slice(0, 5)
+        .map((item) => `${item.fileName}: ${item.error}`)
+        .join(' | ');
+    }
+
     async function loadTables() {
       const data = await api('/api/tables');
       tablesMeta = [...data.tables].sort((a, b) => {
@@ -2501,7 +2575,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.id = 'newsImageFile';
           fileInput.style.marginBottom = '6px';
           uploadRow.appendChild(fileInput);
@@ -2528,7 +2602,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.multiple = true;
           fileInput.id = 'newsGalleryFiles';
           fileInput.style.marginBottom = '6px';
@@ -2558,7 +2632,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.id = 'trainerMainImageFile';
           fileInput.style.marginBottom = '6px';
           wrap.appendChild(fileInput);
@@ -2583,7 +2657,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.multiple = true;
           fileInput.id = 'trainerGalleryFiles';
           fileInput.style.marginBottom = '6px';
@@ -2794,7 +2868,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.multiple = true;
           fileInput.id = 'fotoGalerijaFiles';
           fileInput.style.marginBottom = '6px';
@@ -2822,7 +2896,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.id = 'hallMainImageFile';
           fileInput.style.marginBottom = '6px';
           wrap.appendChild(fileInput);
@@ -2866,7 +2940,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.id = 'nodarbibasImageFile';
           fileInput.style.marginBottom = '6px';
           wrap.appendChild(fileInput);
@@ -2892,7 +2966,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.multiple = true;
           fileInput.id = 'hallGalleryFiles';
           fileInput.style.marginBottom = '6px';
@@ -2926,7 +3000,7 @@
 
           const fileInput = document.createElement('input');
           fileInput.type = 'file';
-          fileInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+          fileInput.accept = ADMIN_IMAGE_ACCEPT;
           fileInput.id = 'rakstiPreseImageFile';
           fileInput.style.marginBottom = '6px';
           uploadRow.appendChild(fileInput);
@@ -3186,17 +3260,7 @@
     }
 
     async function uploadNewsImageFile(file, extra = {}) {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Neizdevās nolasīt failu'));
-        reader.readAsDataURL(file);
-      });
-
-      const uploaded = await api('/api/upload-image', {
-        method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable, subPath: extra.subPath }))
-      });
+      const uploaded = await uploadManagedBinaryFile('/api/upload-image', file, { tableName: currentTable, subPath: extra.subPath });
       return uploaded.relativeUrl || uploaded.url;
     }
 
@@ -3220,14 +3284,17 @@
         const galleryFileInput = document.getElementById('newsGalleryFiles');
         if (galleryInput) {
           if (selectedNewsGalleryFiles.length > 0) {
-            const uploaded = [];
-            for (const galleryFile of selectedNewsGalleryFiles) {
-              uploaded.push(await uploadNewsImageFile(galleryFile, { subPath: 'gallery' }));
-            }
+            const { uploaded, failed } = await uploadFilesSequentially(
+              selectedNewsGalleryFiles,
+              (galleryFile) => uploadNewsImageFile(galleryFile, { subPath: 'gallery' })
+            );
             setNewsGalleryValue(uploaded);
             selectedNewsGalleryFiles = [];
             if (galleryFileInput) galleryFileInput.value = '';
             renderNewsGalleryPreview();
+            if (failed.length > 0) {
+              setStatus(`Ne visi galerijas faili augšupielādējās: ${buildFailedUploadMessage(failed)}`, 'error');
+            }
           } else {
             setNewsGalleryValue(parseNewsGalleryValue(galleryInput.value));
           }
@@ -3268,19 +3335,9 @@
     }
 
     async function uploadRulesFile(file) {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Neizdevās nolasīt failu'));
-        reader.readAsDataURL(file);
-      });
-
-      const uploaded = await api('/api/upload-file', {
-        method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, {
-          tableName: currentTable,
-          category: getPdfUploadCategory(currentTable)
-        }))
+      const uploaded = await uploadManagedBinaryFile('/api/upload-file', file, {
+        tableName: currentTable,
+        category: getPdfUploadCategory(currentTable)
       });
       return uploaded.relativeUrl || uploaded.url;
     }
@@ -4525,17 +4582,7 @@
     }
 
     async function uploadHallImageFile(file, extra = {}) {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Neizdevās nolasīt failu'));
-        reader.readAsDataURL(file);
-      });
-
-      const uploaded = await api('/api/upload-image', {
-        method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable, subPath: extra.subPath }))
-      });
+      const uploaded = await uploadManagedBinaryFile('/api/upload-image', file, { tableName: currentTable, subPath: extra.subPath });
       return uploaded.relativeUrl || uploaded.url;
     }
 
@@ -4551,11 +4598,14 @@
       }
 
       if (selectedHallGalleryFiles.length > 0 && galleryInput) {
-        const uploaded = [];
-        for (const file of selectedHallGalleryFiles) {
-          uploaded.push(await uploadHallImageFile(file, { subPath: 'gallery' }));
-        }
+        const { uploaded, failed } = await uploadFilesSequentially(
+          selectedHallGalleryFiles,
+          (file) => uploadHallImageFile(file, { subPath: 'gallery' })
+        );
         setHallGalleryValue(uploaded);
+        if (failed.length > 0) {
+          setStatus(`Ne visi galerijas faili augšupielādējās: ${buildFailedUploadMessage(failed)}`, 'error');
+        }
       } else if (galleryInput) {
         setHallGalleryValue(parseHallGalleryValue(galleryInput.value));
       }
@@ -4637,17 +4687,7 @@
     }
 
     async function uploadTrainerImageFile(file, extra = {}) {
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Neizdevas nolasit failu'));
-        reader.readAsDataURL(file);
-      });
-
-      const uploaded = await api('/api/upload-image', {
-        method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(file, dataUrl, { tableName: currentTable, subPath: extra.subPath }))
-      });
+      const uploaded = await uploadManagedBinaryFile('/api/upload-image', file, { tableName: currentTable, subPath: extra.subPath });
       return uploaded.relativeUrl || uploaded.url;
     }
 
@@ -4663,11 +4703,14 @@
       }
 
       if (selectedTrainerGalleryFiles.length > 0 && galleryInput) {
-        const uploaded = [];
-        for (const file of selectedTrainerGalleryFiles) {
-          uploaded.push(await uploadTrainerImageFile(file, { subPath: 'gallery' }));
-        }
+        const { uploaded, failed } = await uploadFilesSequentially(
+          selectedTrainerGalleryFiles,
+          (file) => uploadTrainerImageFile(file, { subPath: 'gallery' })
+        );
         setTrainerGalleryValue(uploaded);
+        if (failed.length > 0) {
+          setStatus(`Ne visi galerijas faili augšupielādējās: ${buildFailedUploadMessage(failed)}`, 'error');
+        }
       } else if (galleryInput) {
         setTrainerGalleryValue(parseTrainerGalleryValue(galleryInput.value));
       }
@@ -4746,18 +4789,11 @@
     async function uploadSelectedNodarbibasImageIfNeeded() {
       if (!NODARBIBAS_TABLES.has(currentTable)) return;
       if (!selectedNodarbibasFile) return;
-
-      const dataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Neizdevas nolasit failu'));
-        reader.readAsDataURL(selectedNodarbibasFile);
-      });
-
-      const uploaded = await api(currentTable === NODARBIBAS_SARAKSTS_TABLE ? '/api/upload-file' : '/api/upload-image', {
-        method: 'POST',
-        body: JSON.stringify(buildUploadRequestBody(selectedNodarbibasFile, dataUrl, { tableName: currentTable }))
-      });
+      const uploaded = await uploadManagedBinaryFile(
+        currentTable === NODARBIBAS_SARAKSTS_TABLE ? '/api/upload-file' : '/api/upload-image',
+        selectedNodarbibasFile,
+        { tableName: currentTable }
+      );
       const valueInput = document.getElementById(currentTable === NODARBIBAS_SARAKSTS_TABLE ? 'f_excel_file' : 'f_attels');
       if (valueInput) {
         valueInput.value = uploaded.relativeUrl || uploaded.url;
