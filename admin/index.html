@@ -1464,6 +1464,44 @@
       return null;
     }
 
+    function normalizeKalendarsSheetName(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+    }
+
+    function findFirstNonEmptyWorksheetName(workbook) {
+      if (!workbook || !Array.isArray(workbook.SheetNames)) return '';
+      return workbook.SheetNames.find((sheetName) => {
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) return false;
+        const sheetMatrix = window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+        return Array.isArray(sheetMatrix) && sheetMatrix.some((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
+      }) || '';
+    }
+
+    function selectKalendarsWorksheetName(workbook, fileName) {
+      if (!workbook || !Array.isArray(workbook.SheetNames) || !workbook.SheetNames.length) return '';
+      const expectedYear = String(extractKalendarsYear([
+        kalTitle?.value,
+        kalSelectedSource?.title,
+        kalSelectedSource?.nosaukums,
+        kalSelectedManual?.title,
+        kalSelectedManual?.nosaukums,
+        fileName
+      ]) || '').trim();
+      const byYear = workbook.SheetNames.find((sheetName) =>
+        expectedYear && normalizeKalendarsSheetName(sheetName).includes(expectedYear)
+      );
+      if (byYear) return byYear;
+      const byKeyword = workbook.SheetNames.find((sheetName) =>
+        /kalendar|calendar/.test(normalizeKalendarsSheetName(sheetName))
+      );
+      if (byKeyword) return byKeyword;
+      return findFirstNonEmptyWorksheetName(workbook);
+    }
+
     function compareKalendarsItems(a, b) {
       const yearA = Number(a?.calendar_year || a?.year || extractKalendarsYear([
         a?.title, a?.nosaukums, a?.slug, a?.date, a?.datums, a?.custom_html
@@ -6155,16 +6193,12 @@
             const workbook = window.XLSX.read(arr, { type: 'array' });
             kalImportedWorkbook = workbook;
             console.log('WORKBOOK SHEETS', workbook.SheetNames);
-            const firstNonEmptySheet = workbook.SheetNames.find((sheetName) => {
-              const sheet = workbook.Sheets[sheetName];
-              if (!sheet) return false;
-              const sheetMatrix = window.XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
-              return Array.isArray(sheetMatrix) && sheetMatrix.some((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
-            });
-            if (!firstNonEmptySheet) {
+            const selectedWorksheetName = selectKalendarsWorksheetName(workbook, file.name || '');
+            console.log('SELECTED WORKSHEET', selectedWorksheetName);
+            if (!selectedWorksheetName) {
               throw new Error('Excel failā nav nevienas nepustas lapas importam.');
             }
-            matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[firstNonEmptySheet], { header: 1, raw: false });
+            matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[selectedWorksheetName], { header: 1, raw: false });
           }
           kalImportedMatrix = Array.isArray(matrix) ? matrix : [];
           console.log('FIRST ROWS', kalImportedMatrix.slice(0, 10));
