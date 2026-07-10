@@ -37,6 +37,16 @@
   font-weight: 400 !important;
 }
 
+.elementor-location-header .ippon-logo-link {
+  display: inline-flex !important;
+  align-items: center !important;
+  color: inherit !important;
+  text-decoration: none !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10002 !important;
+}
+
 /* Global responsive layer for IPPON site */
 html, body {
   overflow-x: hidden;

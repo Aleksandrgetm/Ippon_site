@@ -138,23 +138,29 @@ function ensureTranslateElement() {
   }
 
   function bindLogoHome() {
-    var logoTitle = Array.from(
-      document.querySelectorAll(".elementor-location-header .elementor-heading-title")
-    ).find(function (el) {
-      return /^ippon\./i.test((el.textContent || "").trim());
-    });
+    var logoWidget = document.querySelector(".elementor-location-header .elementor-element-a4b8bf8");
+    if (!logoWidget) return;
 
+    var logoTitle = logoWidget.querySelector(".elementor-heading-title");
     if (!logoTitle) return;
 
-    if (logoTitle.closest("a")) {
-      logoTitle.closest("a").setAttribute("href", "/");
-      return;
+    var logoLink = logoTitle.closest("a");
+    if (!logoLink) {
+      logoLink = document.createElement("a");
+      logoLink.className = "ippon-logo-link";
+      logoTitle.parentNode.insertBefore(logoLink, logoTitle);
+      logoLink.appendChild(logoTitle);
     }
 
-    logoTitle.style.cursor = "pointer";
-    logoTitle.addEventListener("click", function () {
-      window.location.href = "/";
-    });
+    logoLink.setAttribute("href", "index.html");
+    logoLink.setAttribute("aria-label", "Atvert galveno lapu");
+    logoLink.style.display = "inline-flex";
+    logoLink.style.alignItems = "center";
+    logoLink.style.color = "inherit";
+    logoLink.style.textDecoration = "none";
+    logoLink.style.pointerEvents = "auto";
+    logoLink.style.position = "relative";
+    logoLink.style.zIndex = "10002";
   }
 
   function initMobileHeader() {
