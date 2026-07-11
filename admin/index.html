@@ -3245,7 +3245,7 @@
         const input = document.getElementById(`f_${col.name}`);
         if (!input) return;
         if (currentTable === 'ippon_sportists' && col.name === 'is_hidden' && input.type === 'checkbox') {
-          input.checked = row ? Number(row[col.name] || 0) === 1 : false;
+          input.checked = row ? Number(row[col.name] || 0) === 1 : true;
           return;
         }
         if (currentTable === FOTO_GALERIJA_TABLE && col.name === 'date') {

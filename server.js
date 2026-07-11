@@ -1010,8 +1010,50 @@ function ensureSponsoruAtbalstsPdfColumnMigration() {
 function ensureSportistiMediaColumns() {
   ensureTableColumn('ippon_sportists', 'foto_attels', 'TEXT');
   ensureTableColumn('ippon_sportists', 'galerija', 'TEXT');
-  ensureTableColumn('ippon_sportists', 'is_hidden', 'INTEGER NOT NULL DEFAULT 0');
+  ensureTableColumn('ippon_sportists', 'is_hidden', 'INTEGER NOT NULL DEFAULT 1');
+  ensureSportistiHiddenDefault();
   ensureTableColumn('ippon_sportists', 'position', 'INTEGER NOT NULL DEFAULT 0');
+}
+
+function ensureSportistiHiddenDefault() {
+  const column = db.prepare('PRAGMA table_info(ippon_sportists)').all().find((col) => col.name === 'is_hidden');
+  if (!column || Number(String(column.dflt_value || '').replace(/[()]/g, '')) === 1) return;
+
+  const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'ippon_sportists'").get();
+  const currentSql = String(table?.sql || '');
+  const updatedSql = currentSql.replace(
+    /(\bis_hidden\b\s+INTEGER\s+NOT\s+NULL\s+DEFAULT\s+)0\b/i,
+    (_, prefix) => `${prefix}1`
+  );
+  if (!currentSql || updatedSql === currentSql) {
+    throw new Error('Unable to set ippon_sportists.is_hidden default to 1');
+  }
+
+  const existingVisibility = db.prepare('SELECT id, is_hidden FROM ippon_sportists').all();
+  const schemaVersion = Number(db.pragma('schema_version', { simple: true })) || 0;
+  db.unsafeMode(true);
+  try {
+    db.pragma('writable_schema = ON');
+    db.exec('BEGIN IMMEDIATE');
+    db.prepare("UPDATE sqlite_master SET sql = ? WHERE type = 'table' AND name = 'ippon_sportists'").run(updatedSql);
+    const preserveVisibility = db.prepare('UPDATE ippon_sportists SET is_hidden = ? WHERE id = ?');
+    for (const row of existingVisibility) {
+      preserveVisibility.run(toIntFlag(row.is_hidden, 0), row.id);
+    }
+    db.exec('COMMIT');
+  } catch (error) {
+    if (db.inTransaction) db.exec('ROLLBACK');
+    throw error;
+  } finally {
+    db.pragma('writable_schema = OFF');
+    db.unsafeMode(false);
+  }
+  db.pragma(`schema_version = ${schemaVersion + 1}`);
+
+  const integrity = db.pragma('integrity_check', { simple: true });
+  if (integrity !== 'ok') {
+    throw new Error(`SQLite integrity check failed after sportists default migration: ${integrity}`);
+  }
 }
 
 function ensureJaunumiMediaColumns() {
@@ -6296,7 +6338,7 @@ async function handleApi(req, res, reqUrl) {
             0,
             body.foto_attels ? String(body.foto_attels).trim() : null,
             JSON.stringify(parseGallery(body.galerija)),
-            toIntFlag(body.is_hidden, 0),
+            toIntFlag(body.is_hidden, 1),
             toIntValue(body.position, 0),
             1,
             0,
