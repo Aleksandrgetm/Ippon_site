@@ -1093,6 +1093,14 @@ body {
     text-align: left !important;
   }
 
+  .elementor-location-header .elementor-element-a4b8bf8 .elementor-heading-title > span:first-child {
+    margin-right: 8px !important;
+  }
+
+  .elementor-location-header .elementor-element-a4b8bf8 .elementor-heading-title {
+    font-size: 20px !important;
+  }
+
   .elementor-location-header .elementor-element-37f4c6d p {
     margin: 0 !important;
     font-size: 12px !important;
