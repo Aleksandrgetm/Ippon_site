@@ -149,6 +149,26 @@
     button.ghost { background: #0f172a; }
     button.light { background: #e2e8f0; color: #0f172a; }
     button.danger { background: var(--danger); }
+    button.is-saving {
+      opacity: 0.86;
+      cursor: wait;
+      pointer-events: none;
+    }
+    button.is-saving::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 8px;
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      border-top-color: #fff;
+      border-radius: 50%;
+      vertical-align: -2px;
+      animation: adminSpin 0.8s linear infinite;
+    }
+    @keyframes adminSpin {
+      to { transform: rotate(360deg); }
+    }
 
     .hidden { display: none !important; }
 
@@ -981,6 +1001,8 @@
     let offset = 0;
     let total = 0;
     let apiBase = '';
+    let isSavingRow = false;
+    let saveBtnDefaultText = saveBtn ? saveBtn.textContent : 'Saglabāt';
     let selectedNewsFile = null;
     let selectedNewsPreviewUrl = '';
     let selectedNewsGalleryFiles = [];
@@ -2375,6 +2397,29 @@
       if (type) formStatus.classList.add(type);
     }
 
+    function setSaveButtonLoading(isLoading) {
+      if (!saveBtn) return;
+      saveBtn.disabled = Boolean(isLoading);
+      saveBtn.classList.toggle('is-saving', Boolean(isLoading));
+      saveBtn.textContent = isLoading ? 'SAGLABĀ...' : saveBtnDefaultText;
+    }
+
+    function formatSaveErrorMessage(error) {
+      const message = String(error?.message || error || '').trim();
+      if (!message) return 'Neizdevās saglabāt ierakstu. Lūdzu, mēģini vēlreiz.';
+      if (/^HTTP\s+\d+/i.test(message)) {
+        return `Neizdevās saglabāt ierakstu (${message}). Lūdzu, mēģini vēlreiz.`;
+      }
+      return message;
+    }
+
+    function createPartialUploadError(failed) {
+      const error = new Error(`Ne visi fotoattēli augšupielādējās: ${buildFailedUploadMessage(failed)}`);
+      error.name = 'PartialUploadError';
+      error.failed = failed;
+      return error;
+    }
+
     function buildApiCandidates(path) {
       const cleanPath = path.startsWith('/') ? path : `/${path}`;
       const candidates = [
@@ -2481,17 +2526,29 @@
       });
     }
 
-    async function uploadFilesSequentially(files, uploader) {
+    async function uploadFilesSequentially(files, uploader, options = {}) {
       const uploaded = [];
       const failed = [];
-      for (const file of files) {
+      const list = Array.from(files || []);
+      const total = list.length;
+      for (let index = 0; index < list.length; index += 1) {
+        const file = list[index];
         try {
-          uploaded.push(await uploader(file));
+          const result = await uploader(file);
+          uploaded.push(result);
+          if (typeof options.onProgress === 'function') {
+            options.onProgress({ uploaded: uploaded.length, failed: failed.length, total, file, result, index });
+          }
         } catch (error) {
-          failed.push({
+          const failedItem = {
             fileName: file?.name || 'file',
+            file,
             error: String(error?.message || error)
-          });
+          };
+          failed.push(failedItem);
+          if (typeof options.onProgress === 'function') {
+            options.onProgress({ uploaded: uploaded.length, failed: failed.length, total, file, error, index });
+          }
         }
       }
       return { uploaded, failed };
@@ -3402,12 +3459,15 @@
       const valueInput = document.getElementById(isRakstiPrese ? 'f_attels' : 'f_foto_attels');
       if (!fileInput || !valueInput) return;
       const file = fileInput.files && fileInput.files[0];
-      if (file) {
+      const alreadyUploadedName = fileInput.dataset.uploadedName || '';
+      if (file && alreadyUploadedName !== file.name) {
         const url = await uploadNewsImageFile(file);
         valueInput.value = url;
+        fileInput.dataset.uploadedName = file.name;
         updateNewsImagePreview();
-        fileInput.value = '';
-        setStatus('Attēls augšupielādēts serverī.', 'ok');
+        if (currentTable !== NEWS_TABLE) {
+          setStatus('Attēls augšupielādēts serverī.', 'ok');
+        }
       }
 
       if (currentTable === NEWS_TABLE) {
@@ -3415,17 +3475,26 @@
         const galleryFileInput = document.getElementById('newsGalleryFiles');
         if (galleryInput) {
           if (selectedNewsGalleryFiles.length > 0) {
+            const existingGalleryItems = parseNewsGalleryValue(galleryInput.value);
             const { uploaded, failed } = await uploadFilesSequentially(
               selectedNewsGalleryFiles,
-              (galleryFile) => uploadNewsImageFile(galleryFile, { subPath: 'gallery' })
+              (galleryFile) => uploadNewsImageFile(galleryFile, { subPath: 'gallery' }),
+              {
+                onProgress: ({ uploaded: uploadedCount, total }) => {
+                  setStatus(`Notiek ieraksta un fotoattēlu saglabāšana... Augšupielādēts ${uploadedCount} no ${total}`, 'ok');
+                }
+              }
             );
-            setNewsGalleryValue(uploaded);
+            const mergedGalleryItems = [...new Set([...existingGalleryItems, ...uploaded])];
+            setNewsGalleryValue(mergedGalleryItems);
+            if (failed.length > 0) {
+              selectedNewsGalleryFiles = failed.map((item) => item.file).filter(Boolean);
+              renderNewsGalleryPreview();
+              throw createPartialUploadError(failed);
+            }
             selectedNewsGalleryFiles = [];
             if (galleryFileInput) galleryFileInput.value = '';
             renderNewsGalleryPreview();
-            if (failed.length > 0) {
-              setStatus(`Ne visi galerijas faili augšupielādējās: ${buildFailedUploadMessage(failed)}`, 'error');
-            }
           } else {
             setNewsGalleryValue(parseNewsGalleryValue(galleryInput.value));
           }
@@ -3497,6 +3566,7 @@
 
       valueInput.addEventListener('input', updateNewsImagePreview);
       fileInput.addEventListener('change', () => {
+        delete fileInput.dataset.uploadedName;
         const file = fileInput.files && fileInput.files[0];
         if (!file) {
           if (isRakstiPrese) {
@@ -5602,6 +5672,13 @@
 
     async function saveRow() {
       if (!currentTable) return;
+      if (isSavingRow) return;
+
+      isSavingRow = true;
+      setSaveButtonLoading(true);
+      if (currentTable === NEWS_TABLE) {
+        setStatus('Notiek ieraksta un fotoattēlu saglabāšana...', 'ok');
+      }
 
       try {
         if (currentTable === RAKSTI_PRESE_TABLE) {
@@ -5634,7 +5711,11 @@
             body: JSON.stringify(initialPayload)
           });
           selectedRow = created.row;
-          setStatus(`Izveidots melnraksts ID ${created.row[currentPk]} failu augšupielādei.`, 'ok');
+          if (currentTable === NEWS_TABLE) {
+            setStatus('Notiek ieraksta un fotoattēlu saglabāšana...', 'ok');
+          } else {
+            setStatus(`Izveidots melnraksts ID ${created.row[currentPk]} failu augšupielādei.`, 'ok');
+          }
         }
 
         if (isNewsImageTable(currentTable)) {
@@ -5661,7 +5742,11 @@
           });
           selectedRow = data.row;
            savedId = id;
-          setStatus(`Ieraksts ID ${id} atjaunināts.`, 'ok');
+          if (currentTable === NEWS_TABLE) {
+            setStatus('Ieraksts un fotoattēli veiksmīgi saglabāti.', 'ok');
+          } else {
+            setStatus(`Ieraksts ID ${id} atjaunināts.`, 'ok');
+          }
         } else {
           const data = await api(`/api/table/${currentTable}`, {
             method: 'POST',
@@ -5669,7 +5754,11 @@
           });
           selectedRow = data.row;
           savedId = data.row[currentPk];
-          setStatus(`Izveidots jauns ieraksts ID ${data.row[currentPk]}.`, 'ok');
+          if (currentTable === NEWS_TABLE) {
+            setStatus('Ieraksts un fotoattēli veiksmīgi saglabāti.', 'ok');
+          } else {
+            setStatus(`Izveidots jauns ieraksts ID ${data.row[currentPk]}.`, 'ok');
+          }
         }
         if (currentTable === FOTO_GALERIJA_TABLE) {
           await uploadFotoGalerijaImagesIfNeeded();
@@ -5689,7 +5778,10 @@
           }
         }
       } catch (error) {
-        setStatus(error.message, 'error');
+        setStatus(formatSaveErrorMessage(error), 'error');
+      } finally {
+        isSavingRow = false;
+        setSaveButtonLoading(false);
       }
     }
 
