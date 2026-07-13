@@ -9,6 +9,13 @@ const Database = require('better-sqlite3');
 const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const XLSX = require('xlsx');
 
+let sharp = null;
+let sharpLoadError = null;
+try {
+  sharp = require('sharp');
+} catch (error) {
+  sharpLoadError = error;
+}
 
 const ROOT = __dirname;
 
@@ -167,6 +174,12 @@ const UPLOAD_MAX_REQUEST_SIZE_BYTES = Math.max(
 );
 const UPLOAD_MAX_FILES = parsePositiveIntEnv('UPLOAD_MAX_FILES', 100);
 const UPLOAD_TIMEOUT_MS = parsePositiveIntEnv('UPLOAD_TIMEOUT_MS', 600000);
+const IMAGE_OPTIMIZATION_INPUT_MAX_BYTES = parseMegabytesEnv('IMAGE_OPTIMIZATION_INPUT_MAX_MB', 100);
+const IMAGE_OPTIMIZATION_MAIN_MAX_PX = parsePositiveIntEnv('IMAGE_OPTIMIZATION_MAIN_MAX_PX', 1600);
+const IMAGE_OPTIMIZATION_GALLERY_MAX_PX = parsePositiveIntEnv('IMAGE_OPTIMIZATION_GALLERY_MAX_PX', 2000);
+const IMAGE_OPTIMIZATION_JPEG_QUALITY = parsePositiveIntEnv('IMAGE_OPTIMIZATION_JPEG_QUALITY', 85);
+const IMAGE_OPTIMIZATION_WEBP_QUALITY = parsePositiveIntEnv('IMAGE_OPTIMIZATION_WEBP_QUALITY', 82);
+const IMAGE_OPTIMIZATION_CATEGORIES = new Set(['athletes', 'trainers']);
 const DEFAULT_JSON_BODY_LIMIT_BYTES = 10 * BYTES_IN_MB;
 const LEGACY_JSON_UPLOAD_MAX_BYTES = Math.max(
   Math.ceil(UPLOAD_MAX_FILE_SIZE_BYTES * 1.4),
@@ -564,6 +577,23 @@ function resolveUploadTarget(options = {}) {
     category,
     entityId,
     subPath,
+    fileName,
+    storageKey,
+    localPath: uploadKeyToLocalPath(storageKey),
+    publicUrl: buildPublicUploadUrl(storageKey)
+  };
+}
+
+function updateUploadTargetExtension(target, ext) {
+  const fileName = sanitizeUploadFileName(target.fileName, ext, 'image');
+  const storageKey = buildUploadStorageKey({
+    category: target.category,
+    entityId: target.entityId,
+    subPath: target.subPath,
+    fileName
+  });
+  return {
+    ...target,
     fileName,
     storageKey,
     localPath: uploadKeyToLocalPath(storageKey),
@@ -4104,20 +4134,26 @@ async function handleBinaryManagedUpload(req, res, options = {}) {
     throw createHttpError(400, 'Upload category and entityId are required.');
   }
 
-  const streamed = await streamRequestToTempFile(req, originalName, Math.min(UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES));
+  const normalizedCategory = normalizeUploadCategory(meta.category);
+  const maxUploadBytes = options.kind === 'image' && IMAGE_OPTIMIZATION_CATEGORIES.has(normalizedCategory)
+    ? Math.min(IMAGE_OPTIMIZATION_INPUT_MAX_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES)
+    : Math.min(UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES);
+
+  const streamed = await streamRequestToTempFile(req, originalName, maxUploadBytes);
   if (streamed.size <= 0) {
     await removeTempFile(streamed.filePath);
     throw createHttpError(400, 'Uploaded file is empty.');
   }
-  if (streamed.size > UPLOAD_MAX_FILE_SIZE_BYTES) {
+  if (streamed.size > maxUploadBytes) {
     await removeTempFile(streamed.filePath);
     throw createHttpError(
       413,
-      `File is too large. Max ${formatBytes(UPLOAD_MAX_FILE_SIZE_BYTES)} per file.`,
-      { maxFileSizeBytes: UPLOAD_MAX_FILE_SIZE_BYTES }
+      `File is too large. Max ${formatBytes(maxUploadBytes)} per file.`,
+      { maxFileSizeBytes: maxUploadBytes }
     );
   }
 
+  let uploadTempPath = streamed.filePath;
   try {
     const detected = options.kind === 'image'
       ? validateImageUpload({
@@ -4135,36 +4171,59 @@ async function handleBinaryManagedUpload(req, res, options = {}) {
         });
 
     const target = resolveUploadTarget({
-      category: meta.category,
+      category: normalizedCategory,
       entityId: meta.entityId,
       subPath: meta.subPath,
       fileName: originalName,
       ext: detected.ext,
       fallbackStem: options.kind === 'image' ? 'image' : 'file'
     });
+    const prepared = options.kind === 'image'
+      ? await optimizeManagedImageFile({
+          tempPath: streamed.filePath,
+          target,
+          contentType: detected.mime,
+          originalName,
+          originalSize: streamed.size
+        })
+      : {
+          tempPath: streamed.filePath,
+          target,
+          contentType: detected.mime,
+          size: streamed.size,
+          optimized: false,
+          optimization: null
+        };
+    uploadTempPath = prepared.tempPath;
 
     const publicUrl = await persistUploadedTempFile({
-      tempPath: streamed.filePath,
-      target,
-      contentType: detected.mime,
+      tempPath: prepared.tempPath,
+      target: prepared.target,
+      contentType: prepared.contentType,
       uploadToSpaces: options.uploadToSpaces == null
-        ? shouldUploadCategoryToSpaces(target.category)
+        ? shouldUploadCategoryToSpaces(prepared.target.category)
         : options.uploadToSpaces
     });
 
     return {
       url: publicUrl,
       relativeUrl: publicUrl,
-      publicUrl: target.publicUrl,
-      mime: detected.mime,
-      fileName: target.fileName,
-      path: target.storageKey,
-      category: target.category,
-      entityId: target.entityId,
-      size: streamed.size
+      publicUrl: prepared.target.publicUrl,
+      mime: prepared.contentType,
+      fileName: prepared.target.fileName,
+      path: prepared.target.storageKey,
+      category: prepared.target.category,
+      entityId: prepared.target.entityId,
+      size: prepared.size,
+      originalSize: streamed.size,
+      optimized: prepared.optimized,
+      optimization: prepared.optimization
     };
   } finally {
     await removeTempFile(streamed.filePath);
+    if (uploadTempPath !== streamed.filePath) {
+      await removeTempFile(uploadTempPath);
+    }
   }
 }
 
@@ -4566,6 +4625,149 @@ function validateGenericFileUpload({ fileName, declaredMime, detected }) {
     mime: detected.mime,
     ext: detected.ext
   };
+}
+
+function shouldOptimizeManagedImageTarget(target) {
+  return IMAGE_OPTIMIZATION_CATEGORIES.has(String(target?.category || '').trim());
+}
+
+function isGalleryImageTarget(target) {
+  return Array.isArray(target?.subPath) && target.subPath.includes('gallery');
+}
+
+function getOptimizedImageOutput(metadata = {}) {
+  const format = String(metadata.format || '').toLowerCase();
+  const hasAlpha = Boolean(metadata.hasAlpha || metadata.channels === 4);
+
+  if (format === 'png') {
+    return {
+      ext: 'png',
+      mime: 'image/png',
+      format,
+      apply: (image) => image.png({ compressionLevel: 9, effort: 7 })
+    };
+  }
+  if (format === 'webp') {
+    return {
+      ext: 'webp',
+      mime: 'image/webp',
+      format,
+      apply: (image) => image.webp({ quality: IMAGE_OPTIMIZATION_WEBP_QUALITY, effort: 4 })
+    };
+  }
+  if (format === 'jpeg' || format === 'jpg') {
+    return {
+      ext: 'jpg',
+      mime: 'image/jpeg',
+      format: 'jpeg',
+      apply: (image) => image.jpeg({ quality: IMAGE_OPTIMIZATION_JPEG_QUALITY, mozjpeg: true })
+    };
+  }
+  if (hasAlpha) {
+    return {
+      ext: 'png',
+      mime: 'image/png',
+      format: format || 'png',
+      apply: (image) => image.png({ compressionLevel: 9, effort: 7 })
+    };
+  }
+  return {
+    ext: 'jpg',
+    mime: 'image/jpeg',
+    format: format || 'jpeg',
+    apply: (image) => image.jpeg({ quality: IMAGE_OPTIMIZATION_JPEG_QUALITY, mozjpeg: true })
+  };
+}
+
+async function optimizeManagedImageFile({ tempPath, target, contentType, originalName, originalSize }) {
+  if (!shouldOptimizeManagedImageTarget(target)) {
+    return {
+      tempPath,
+      target,
+      contentType,
+      size: originalSize,
+      optimized: false,
+      optimization: null
+    };
+  }
+  if (!sharp) {
+    const message = sharpLoadError?.message
+      ? `Foto optimizācija nav pieejama: sharp nav instalēts (${sharpLoadError.message}).`
+      : 'Foto optimizācija nav pieejama: sharp nav instalēts.';
+    throw createHttpError(500, message, { code: 'SHARP_NOT_AVAILABLE' });
+  }
+
+  let metadata;
+  try {
+    metadata = await sharp(tempPath, { failOn: 'error', limitInputPixels: false }).metadata();
+  } catch (error) {
+    throw createHttpError(400, `Fotoattēlu neizdevās nolasīt vai tas ir bojāts: ${error.message}`, {
+      code: 'IMAGE_METADATA_FAILED'
+    });
+  }
+
+  const output = getOptimizedImageOutput(metadata);
+  const nextTarget = output.ext === normalizeFileExtension(path.extname(target.fileName))
+    ? target
+    : updateUploadTargetExtension(target, output.ext);
+  const optimizedPath = createTempUploadPath(nextTarget.fileName);
+  const maxSide = isGalleryImageTarget(target)
+    ? IMAGE_OPTIMIZATION_GALLERY_MAX_PX
+    : IMAGE_OPTIMIZATION_MAIN_MAX_PX;
+
+  try {
+    const image = sharp(tempPath, { failOn: 'error', limitInputPixels: false })
+      .rotate()
+      .resize({
+        width: maxSide,
+        height: maxSide,
+        fit: 'inside',
+        withoutEnlargement: true
+      });
+    await output.apply(image).toFile(optimizedPath);
+
+    const finalStats = await fs.promises.stat(optimizedPath);
+    const finalMetadata = await sharp(optimizedPath, { failOn: 'error', limitInputPixels: false }).metadata();
+    const optimization = {
+      format: output.format,
+      originalWidth: metadata.width || null,
+      originalHeight: metadata.height || null,
+      finalWidth: finalMetadata.width || null,
+      finalHeight: finalMetadata.height || null,
+      originalSize,
+      finalSize: finalStats.size
+    };
+
+    console.log('[image-optimization] optimized photo:', {
+      filename: String(originalName || target.fileName),
+      key: nextTarget.storageKey,
+      category: nextTarget.category,
+      recordId: nextTarget.entityId,
+      subPath: nextTarget.subPath,
+      format: optimization.format,
+      originalWidth: optimization.originalWidth,
+      originalHeight: optimization.originalHeight,
+      finalWidth: optimization.finalWidth,
+      finalHeight: optimization.finalHeight,
+      originalFileSize: optimization.originalSize,
+      finalFileSize: optimization.finalSize
+    });
+
+    await removeTempFile(tempPath);
+    return {
+      tempPath: optimizedPath,
+      target: nextTarget,
+      contentType: output.mime,
+      size: finalStats.size,
+      optimized: true,
+      optimization
+    };
+  } catch (error) {
+    await removeTempFile(optimizedPath);
+    throw createHttpError(400, `Fotoattēla optimizācija neizdevās: ${error.message}`, {
+      code: 'IMAGE_OPTIMIZATION_FAILED'
+    });
+  }
 }
 
 async function uploadLocalFileToSpaces(storageKey, filePath, contentType, fileName = '') {

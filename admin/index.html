@@ -1377,6 +1377,10 @@
         || tableName === SADARBIBA_MUSU_PARTNERI_TABLE;
     }
 
+    function isOptimizedPhotoTable(tableName = currentTable) {
+      return tableName === TRAINERS_TABLE || tableName === 'ippon_sportists';
+    }
+
     function isHiddenField(tableName, colName) {
       if (tableName === NEWS_TABLE && NEWS_HIDDEN_FIELDS.has(colName)) return true;
       if (tableName === TRAINERS_TABLE && TRAINERS_HIDDEN_FIELDS.has(colName)) return true;
@@ -4933,8 +4937,23 @@
     }
 
     async function uploadTrainerImageFile(file, extra = {}) {
-      const uploaded = await uploadManagedBinaryFile('/api/upload-image', file, { tableName: currentTable, subPath: extra.subPath });
-      return uploaded.relativeUrl || uploaded.url;
+      const showOptimizationStatus = isOptimizedPhotoTable(currentTable);
+      let uploadStatusTimer = null;
+      if (showOptimizationStatus) {
+        setStatus('Fotoattēls tiek optimizēts...', 'ok');
+        uploadStatusTimer = setTimeout(() => {
+          setStatus('Fotoattēls tiek augšupielādēts...', 'ok');
+        }, 700);
+      }
+      try {
+        const uploaded = await uploadManagedBinaryFile('/api/upload-image', file, { tableName: currentTable, subPath: extra.subPath });
+        if (showOptimizationStatus) {
+          setStatus('Fotoattēls veiksmīgi saglabāts.', 'ok');
+        }
+        return uploaded.relativeUrl || uploaded.url;
+      } finally {
+        if (uploadStatusTimer) clearTimeout(uploadStatusTimer);
+      }
     }
 
     async function uploadSelectedTrainerMediaIfNeeded() {
