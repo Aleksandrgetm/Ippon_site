@@ -2492,11 +2492,14 @@
           if (!response.ok) {
             const message = data.error || `HTTP ${response.status}`;
             lastHttpError = new Error(message);
+            if (data.details && typeof data.details === 'object') {
+              lastHttpError.details = data.details;
+            }
             if (response.status === 404) {
               lastError = new Error(message);
               continue;
             }
-            throw new Error(message);
+            throw lastHttpError;
           }
 
           const absolute = new URL(url, window.location.origin);
@@ -2531,7 +2534,13 @@
       const failed = [];
       const list = Array.from(files || []);
       const total = list.length;
-      for (let index = 0; index < list.length; index += 1) {
+      const concurrency = Math.max(1, Math.min(3, Number(options.concurrency) || 1));
+      let nextIndex = 0;
+
+      async function uploadNext() {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= list.length) return;
         const file = list[index];
         try {
           const result = await uploader(file);
@@ -2543,21 +2552,32 @@
           const failedItem = {
             fileName: file?.name || 'file',
             file,
-            error: String(error?.message || error)
+            error: String(error?.message || error),
+            attempts: error?.details?.attempts || null,
+            errorCode: error?.details?.errorCode || error?.code || null
           };
           failed.push(failedItem);
           if (typeof options.onProgress === 'function') {
             options.onProgress({ uploaded: uploaded.length, failed: failed.length, total, file, error, index });
           }
         }
+        await uploadNext();
       }
+
+      await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, uploadNext));
       return { uploaded, failed };
     }
 
     function buildFailedUploadMessage(failed) {
       return failed
         .slice(0, 5)
-        .map((item) => `${item.fileName}: ${item.error}`)
+        .map((item) => {
+          const details = [
+            item.attempts ? `attempts: ${item.attempts}` : '',
+            item.errorCode ? `code: ${item.errorCode}` : ''
+          ].filter(Boolean).join(', ');
+          return `${item.fileName}: ${item.error}${details ? ` (${details})` : ''}`;
+        })
         .join(' | ');
     }
 
@@ -3480,6 +3500,7 @@
               selectedNewsGalleryFiles,
               (galleryFile) => uploadNewsImageFile(galleryFile, { subPath: 'gallery' }),
               {
+                concurrency: 2,
                 onProgress: ({ uploaded: uploadedCount, total }) => {
                   setStatus(`Notiek ieraksta un fotoattēlu saglabāšana... Augšupielādēts ${uploadedCount} no ${total}`, 'ok');
                 }

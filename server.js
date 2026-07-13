@@ -30,6 +30,10 @@ const SPACES_REGION = String(process.env.SPACES_REGION || 'fra1').trim();
 const SPACES_ENDPOINT = String(process.env.SPACES_ENDPOINT || `https://${SPACES_REGION}.digitaloceanspaces.com`).replace(/\/+$/, '');
 const SPACES_ACCESS_KEY_ID = String(process.env.SPACES_KEY || process.env.AWS_ACCESS_KEY_ID || '').trim();
 const SPACES_SECRET_ACCESS_KEY = String(process.env.SPACES_SECRET || process.env.AWS_SECRET_ACCESS_KEY || '').trim();
+const SPACES_UPLOAD_CONCURRENCY = Math.max(1, Math.min(3, Number(process.env.SPACES_UPLOAD_CONCURRENCY) || 2));
+const SPACES_UPLOAD_RETRY_DELAYS_MS = [1000, 2500, 5000, 10000];
+const SPACES_RETRYABLE_ERROR_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN']);
+const SPACES_RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const BYTES_IN_MB = 1024 * 1024;
 const UPLOADS_DIR = path.join(ROOT, 'uploads');
 const NEWS_UPLOADS_DIR = path.join(UPLOADS_DIR, 'news');
@@ -1722,6 +1726,8 @@ function isImageFileName(name) {
 let spacesS3Client = null;
 const spacesObjectExistsCache = new Map();
 const SPACES_EXISTS_TTL_MS = 5 * 60 * 1000;
+let activeSpacesUploads = 0;
+const spacesUploadQueue = [];
 
 function isSpacesConfigured() {
   return Boolean(
@@ -1748,6 +1754,60 @@ function getSpacesS3Client() {
     }
   });
   return spacesS3Client;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getSpacesErrorCode(error) {
+  return String(
+    error?.code
+    || error?.Code
+    || error?.name
+    || error?.$metadata?.httpStatusCode
+    || 'UNKNOWN'
+  );
+}
+
+function getSpacesHttpStatus(error) {
+  return Number(error?.$metadata?.httpStatusCode || error?.statusCode || error?.status || 0);
+}
+
+function isRetryableSpacesError(error) {
+  const status = getSpacesHttpStatus(error);
+  const code = getSpacesErrorCode(error).toUpperCase();
+  return SPACES_RETRYABLE_STATUS_CODES.has(status) || SPACES_RETRYABLE_ERROR_CODES.has(code);
+}
+
+function attachSpacesUploadDetails(error, details) {
+  if (error && typeof error === 'object') {
+    error.details = {
+      ...(error.details && typeof error.details === 'object' ? error.details : {}),
+      ...details
+    };
+  }
+  return error;
+}
+
+async function acquireSpacesUploadSlot() {
+  if (activeSpacesUploads < SPACES_UPLOAD_CONCURRENCY) {
+    activeSpacesUploads += 1;
+    return releaseSpacesUploadSlot;
+  }
+
+  return new Promise((resolve) => {
+    spacesUploadQueue.push(() => {
+      activeSpacesUploads += 1;
+      resolve(releaseSpacesUploadSlot);
+    });
+  });
+}
+
+function releaseSpacesUploadSlot() {
+  activeSpacesUploads = Math.max(0, activeSpacesUploads - 1);
+  const next = spacesUploadQueue.shift();
+  if (next) next();
 }
 
 function shouldUploadCategoryToSpaces(category) {
@@ -4256,7 +4316,7 @@ function validateGenericFileUpload({ fileName, declaredMime, detected }) {
   };
 }
 
-async function uploadLocalFileToSpaces(storageKey, filePath, contentType) {
+async function uploadLocalFileToSpaces(storageKey, filePath, contentType, fileName = '') {
   const normalizedKey = String(storageKey || '').replace(/^\/+/, '').trim();
   if (!normalizedKey) {
     throw createHttpError(400, 'Storage key is required');
@@ -4266,46 +4326,95 @@ async function uploadLocalFileToSpaces(storageKey, filePath, contentType) {
   const stats = await fs.promises.stat(filePath);
   const logContext = {
     key: normalizedKey,
+    filename: String(fileName || path.basename(filePath)),
     bucket: SPACES_BUCKET,
     endpoint: SPACES_ENDPOINT,
     contentType: normalizedContentType,
     fileSize: stats.size
   };
 
+  const releaseUploadSlot = await acquireSpacesUploadSlot();
   try {
-    await client.send(new PutObjectCommand({
-      Bucket: SPACES_BUCKET,
-      Key: normalizedKey,
-      Body: fs.createReadStream(filePath),
-      ContentType: normalizedContentType,
-      ACL: 'public-read',
-      CacheControl: 'public, max-age=31536000, immutable'
-    }));
+    for (let attemptIndex = 0; attemptIndex <= SPACES_UPLOAD_RETRY_DELAYS_MS.length; attemptIndex += 1) {
+      const attempt = attemptIndex + 1;
+      try {
+        console.log('[spaces-upload] uploading file:', {
+          ...logContext,
+          attempt
+        });
 
-    spacesObjectExistsCache.set(normalizedKey, {
-      exists: true,
-      expiresAt: Date.now() + SPACES_EXISTS_TTL_MS
-    });
+        await client.send(new PutObjectCommand({
+          Bucket: SPACES_BUCKET,
+          Key: normalizedKey,
+          Body: fs.createReadStream(filePath),
+          ContentType: normalizedContentType,
+          ACL: 'public-read',
+          CacheControl: 'public, max-age=31536000, immutable'
+        }));
 
-    return buildSpacesObjectUrl(normalizedKey);
-  } catch (error) {
-    spacesObjectExistsCache.delete(normalizedKey);
-    console.error('[spaces-upload] upload failed:', {
-      ...logContext,
-      error: {
-        name: error?.name || null,
-        message: error?.message || String(error),
-        code: error?.Code || error?.code || null,
-        statusCode: error?.$metadata?.httpStatusCode || null
+        spacesObjectExistsCache.set(normalizedKey, {
+          exists: true,
+          expiresAt: Date.now() + SPACES_EXISTS_TTL_MS
+        });
+
+        return buildSpacesObjectUrl(normalizedKey);
+      } catch (error) {
+        spacesObjectExistsCache.delete(normalizedKey);
+        const errorCode = getSpacesErrorCode(error);
+        const retryDelayMs = SPACES_UPLOAD_RETRY_DELAYS_MS[attemptIndex] || 0;
+        const retryableByCode = isRetryableSpacesError(error);
+        const retryable = retryDelayMs > 0 && retryableByCode;
+
+        console.error('[spaces-upload] upload attempt failed:', {
+          ...logContext,
+          attempt,
+          errorCode,
+          statusCode: getSpacesHttpStatus(error) || null,
+          retryDelayMs,
+          retryable,
+          error: {
+            name: error?.name || null,
+            message: error?.message || String(error),
+            code: error?.Code || error?.code || null,
+            statusCode: error?.$metadata?.httpStatusCode || null
+          }
+        });
+
+        if (retryable) {
+          await wait(retryDelayMs);
+          continue;
+        }
+
+        if (retryableByCode && !error.statusCode && !error.status) {
+          error.statusCode = 503;
+        }
+        throw attachSpacesUploadDetails(error, {
+          attempts: attempt,
+          errorCode,
+          key: normalizedKey,
+          filename: logContext.filename
+        });
       }
+    }
+
+    const error = new Error('Spaces upload failed after retry attempts.');
+    error.statusCode = 503;
+    attachSpacesUploadDetails(error, {
+      attempts: SPACES_UPLOAD_RETRY_DELAYS_MS.length + 1,
+      errorCode: 'UPLOAD_RETRIES_EXHAUSTED',
+      key: normalizedKey,
+      filename: logContext.filename
     });
+    spacesObjectExistsCache.delete(normalizedKey);
     throw error;
+  } finally {
+    releaseUploadSlot();
   }
 }
 
 async function persistUploadedTempFile({ tempPath, target, contentType, uploadToSpaces = true }) {
   if (uploadToSpaces) {
-    return uploadLocalFileToSpaces(target.storageKey, tempPath, contentType);
+    return uploadLocalFileToSpaces(target.storageKey, tempPath, contentType, target.fileName);
   }
   ensureDir(path.dirname(target.localPath));
   await pipeline(fs.createReadStream(tempPath), fs.createWriteStream(target.localPath));
