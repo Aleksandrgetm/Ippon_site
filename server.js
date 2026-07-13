@@ -386,6 +386,18 @@ function createHttpError(statusCode, message, details = null) {
   return error;
 }
 
+function backupDatabaseBeforeMigration(label) {
+  if (!fs.existsSync(DB_PATH)) return null;
+  const backupDir = path.join(DB_DIR, 'backups');
+  ensureDir(backupDir);
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const safeLabel = sanitizeStorageSegment(label || 'migration', 'migration');
+  const backupPath = path.join(backupDir, `${path.basename(DB_PATH)}.${stamp}.${safeLabel}.bak`);
+  fs.copyFileSync(DB_PATH, backupPath);
+  console.log('[db-migration] backup created:', backupPath);
+  return backupPath;
+}
+
 function normalizeHeaderValue(value) {
   const text = Array.isArray(value) ? value[0] : value;
   return String(text || '').trim();
@@ -1390,6 +1402,33 @@ function ensureSportistiSasniegumiTable() {
       updated_at INTEGER NOT NULL
     )
   `);
+}
+
+function ensureCompetitionSportistResultsTable() {
+  const exists = db.prepare(`
+    SELECT name FROM sqlite_master
+    WHERE type = 'table' AND name = 'competition_sportist_results'
+    LIMIT 1
+  `).get();
+  if (!exists) {
+    backupDatabaseBeforeMigration('competition-sportist-results');
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS competition_sportist_results (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      competition_id INTEGER NOT NULL,
+      sportist_id INTEGER NOT NULL,
+      athlete_name TEXT,
+      place TEXT,
+      information TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(competition_id, sportist_id)
+    )
+  `);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_competition_sportist_results_sportist ON competition_sportist_results (sportist_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_competition_sportist_results_competition ON competition_sportist_results (competition_id)');
 }
 
 function parseGallery(value) {
@@ -3469,6 +3508,16 @@ function normalizeAchievementValue(value) {
     .toLowerCase();
 }
 
+function normalizeAthleteLinkName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function mergeAchievementsLists(...lists) {
   const out = [];
   const seen = new Set();
@@ -3505,7 +3554,208 @@ function mergeAchievementsLists(...lists) {
     }
   }
 
-  return out;
+  return out.sort((a, b) => {
+    const da = dateSortValue(a.datums);
+    const dbv = dateSortValue(b.datums);
+    if (da !== dbv) return dbv - da;
+    return normalizeAchievementValue(b.nosaukums).localeCompare(normalizeAchievementValue(a.nosaukums));
+  });
+}
+
+function getSportistNameIndex() {
+  const rows = db.prepare(`
+    SELECT id, name_lv, name_ru, name_en
+    FROM ippon_sportists
+    WHERE COALESCE(remove_date, 0) = 0
+  `).all();
+  const byId = new Map();
+  const byName = new Map();
+  for (const row of rows) {
+    const name = pickLang(row, 'name_lv', 'name_ru', 'name_en');
+    const item = { id: Number(row.id), name };
+    byId.set(Number(row.id), item);
+    const normalized = normalizeAthleteLinkName(name);
+    if (!normalized) continue;
+    if (!byName.has(normalized)) byName.set(normalized, []);
+    byName.get(normalized).push(item);
+  }
+  return { byId, byName };
+}
+
+function resolveSportistForCompetitionRow(row, index) {
+  const sportists = getSportistNameIndex();
+  const rawId = Number(row?.sportist_id || row?.sportistId || row?.athlete_id || 0) || 0;
+  const athleteName = safeText(row?.sportists || row?.athlete_name || row?.athleteName);
+  if (rawId) {
+    const found = sportists.byId.get(rawId);
+    if (found) {
+      return { sportistId: found.id, athleteName: athleteName || found.name, unmatched: null };
+    }
+    return {
+      sportistId: null,
+      athleteName,
+      unmatched: { index, athlete_name: athleteName, sportist_id: rawId, reason: 'sportist_id_not_found' }
+    };
+  }
+
+  const normalized = normalizeAthleteLinkName(athleteName);
+  if (!normalized) {
+    return { sportistId: null, athleteName, unmatched: { index, athlete_name: athleteName, reason: 'missing_athlete' } };
+  }
+  const matches = sportists.byName.get(normalized) || [];
+  if (matches.length === 1) {
+    return { sportistId: matches[0].id, athleteName: matches[0].name || athleteName, unmatched: null };
+  }
+  return {
+    sportistId: null,
+    athleteName,
+    unmatched: {
+      index,
+      athlete_name: athleteName,
+      reason: matches.length > 1 ? 'ambiguous_name' : 'not_found'
+    }
+  };
+}
+
+function getCompetitionStructuredRows(structuredData) {
+  const parsed = parseStructuredDataObject(structuredData);
+  const rows = parsed && Array.isArray(parsed.rows) ? parsed.rows : [];
+  return rows
+    .map((row) => ({
+      sportist_id: Number(row?.sportist_id || row?.sportistId || row?.athlete_id || 0) || null,
+      sportists: safeText(row?.sportists || row?.athlete_name || row?.athleteName),
+      vieta: safeText(row?.vieta || row?.place),
+      informacija: safeText(row?.informacija || row?.information)
+    }))
+    .filter((row) => row.sportist_id || row.sportists || row.vieta || row.informacija);
+}
+
+function syncCompetitionSportistResults(competitionId, structuredData) {
+  const id = Number(competitionId || 0);
+  if (!id) return { synced: 0, unmatched: [] };
+
+  const rows = getCompetitionStructuredRows(structuredData);
+  const unmatched = [];
+  const resolvedBySportist = new Map();
+  rows.forEach((row, index) => {
+    const resolved = resolveSportistForCompetitionRow(row, index);
+    if (resolved.unmatched) {
+      unmatched.push(resolved.unmatched);
+      return;
+    }
+    resolvedBySportist.set(Number(resolved.sportistId), {
+      sportistId: Number(resolved.sportistId),
+      athleteName: resolved.athleteName || row.sportists,
+      place: row.vieta,
+      information: row.informacija
+    });
+  });
+
+  const now = nowTs();
+  const keepIds = Array.from(resolvedBySportist.keys());
+  db.exec('BEGIN');
+  try {
+    if (keepIds.length) {
+      const placeholders = keepIds.map(() => '?').join(',');
+      db.prepare(`
+        DELETE FROM competition_sportist_results
+        WHERE competition_id = ?
+          AND sportist_id NOT IN (${placeholders})
+      `).run(id, ...keepIds);
+    } else {
+      db.prepare('DELETE FROM competition_sportist_results WHERE competition_id = ?').run(id);
+    }
+
+    const updateStmt = db.prepare(`
+      UPDATE competition_sportist_results
+      SET athlete_name = ?, place = ?, information = ?, updated_at = ?
+      WHERE competition_id = ? AND sportist_id = ?
+    `);
+    const insertStmt = db.prepare(`
+      INSERT INTO competition_sportist_results (
+        competition_id, sportist_id, athlete_name, place, information, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const row of resolvedBySportist.values()) {
+      const updated = updateStmt.run(row.athleteName, row.place, row.information, now, id, row.sportistId);
+      if (!updated.changes) {
+        insertStmt.run(id, row.sportistId, row.athleteName, row.place, row.information, now, now);
+      }
+    }
+
+    db.exec('COMMIT');
+  } catch (error) {
+    if (db.inTransaction) db.exec('ROLLBACK');
+    throw error;
+  }
+
+  if (unmatched.length) {
+    console.warn('[competition-results-sync] unmatched rows:', { competition_id: id, unmatched });
+  }
+  return { synced: resolvedBySportist.size, unmatched };
+}
+
+function getCompetitionSportistResults(sportistId) {
+  return db.prepare(`
+    SELECT
+      csr.id,
+      csr.competition_id,
+      csr.sportist_id,
+      csr.athlete_name,
+      csr.place,
+      csr.information,
+      ev.date AS event_date,
+      ev.name_lv AS event_name_lv,
+      ev.name_ru AS event_name_ru,
+      ev.name_en AS event_name_en,
+      ev.location_lv AS event_location_lv,
+      ev.location_ru AS event_location_ru,
+      ev.location_en AS event_location_en,
+      ev.status_id AS event_status_id
+    FROM competition_sportist_results csr
+    LEFT JOIN ippon_sorevnovanija ev ON ev.id = csr.competition_id
+    WHERE csr.sportist_id = ?
+    ORDER BY ev.date DESC, csr.updated_at DESC, csr.id DESC
+  `).all(Number(sportistId)).map((item) => ({
+    id: `competition:${item.id}`,
+    competition_id: item.competition_id,
+    title: pickLang(item, 'event_name_lv', 'event_name_ru', 'event_name_en'),
+    date: item.event_date || '',
+    location: pickLang(item, 'event_location_lv', 'event_location_ru', 'event_location_en'),
+    place: item.place || '',
+    status: item.event_status_id != null ? String(item.event_status_id) : '',
+    information: item.information || '',
+    datums: item.event_date || '',
+    nosaukums: pickLang(item, 'event_name_lv', 'event_name_ru', 'event_name_en'),
+    rezultats: item.place || '',
+    vieta: pickLang(item, 'event_location_lv', 'event_location_ru', 'event_location_en'),
+    statuss: item.event_status_id != null ? String(item.event_status_id) : '',
+    informacija: item.information || ''
+  }));
+}
+
+function syncAllCompetitionSportistResultsFromStructuredData() {
+  const overrideMap = getSourceOverrideMap();
+  const rows = db.prepare(`
+    SELECT id, structured_data
+    FROM ippon_sorevnovanija
+  `).all();
+  let synced = 0;
+  const unmatched = [];
+  for (const row of rows) {
+    const override = overrideMap.get(`ippon_sorevnovanija:${row.id}`);
+    const structured = override?.structured_data || row.structured_data;
+    const result = syncCompetitionSportistResults(row.id, structured);
+    synced += result.synced;
+    if (result.unmatched.length) {
+      unmatched.push(...result.unmatched.map((item) => ({ ...item, competition_id: row.id })));
+    }
+  }
+  if (unmatched.length) {
+    console.warn('[competition-results-sync] unmatched existing rows:', unmatched);
+  }
+  return { synced, unmatched };
 }
 
 function translitLv(input) {
@@ -4087,9 +4337,11 @@ function initializeDatabase() {
   ensureVideoGalerijaTable();
   ensureRakstiPreseTable();
   ensureSportistiSasniegumiTable();
+  ensureCompetitionSportistResultsTable();
   ensureSportistiMediaColumns();
   ensureRezultatiSchema();
   ensureRezultatiManualTables();
+  syncAllCompetitionSportistResultsFromStructuredData();
   ensureKalendarsTables();
   ensureIpponImagesAutoincrementId();
 }
@@ -5615,7 +5867,10 @@ async function handleApi(req, res, reqUrl) {
           WHERE source_table = ? AND source_id = ?
           LIMIT 1
         `).get(v.source_table, v.source_id);
-        sendJson(res, 200, { row, warning: prepared.warning || null });
+        const competitionSync = v.source_table === 'ippon_sorevnovanija' && v.record_type === 'sacensibas'
+          ? syncCompetitionSportistResults(v.source_id, v.structured_data)
+          : null;
+        sendJson(res, 200, { row, warning: prepared.warning || null, competition_results_sync: competitionSync });
       })
       .catch((error) => sendJson(res, 400, { error: error.message }));
     return true;
@@ -6065,6 +6320,26 @@ async function handleApi(req, res, reqUrl) {
     return true;
   }
 
+  const sportistCompetitionResultsMatch = pathname.match(/^\/api\/sportisti\/([0-9]+)\/results$/i);
+  if (sportistCompetitionResultsMatch && req.method === 'GET') {
+    const sportistId = Number(sportistCompetitionResultsMatch[1]);
+    if (!sportistId) {
+      sendJson(res, 400, { error: 'Invalid sportist id' });
+      return true;
+    }
+    const items = getCompetitionSportistResults(sportistId).map((item) => ({
+      competition_id: item.competition_id,
+      title: item.title,
+      date: item.date,
+      location: item.location,
+      place: item.place,
+      status: item.status,
+      information: item.information
+    }));
+    sendJson(res, 200, { sportist_id: sportistId, items });
+    return true;
+  }
+
   const sportistAchievementsMatch = pathname.match(/^\/api\/sportisti\/([0-9]+)\/sasniegumi$/i);
   if (sportistAchievementsMatch && req.method === 'GET') {
     const sportistId = Number(sportistAchievementsMatch[1]);
@@ -6116,9 +6391,8 @@ async function handleApi(req, res, reqUrl) {
       informacija: pickLang(item, 'info_lv', 'info_ru', 'info_en')
     }));
 
-    const items = itemsCustom.length > 0
-      ? mergeAchievementsLists(itemsCustom)
-      : mergeAchievementsLists(itemsCustom, itemsLegacy);
+    const itemsCompetition = getCompetitionSportistResults(sportistId);
+    const items = mergeAchievementsLists(itemsCustom, itemsLegacy, itemsCompetition);
     sendJson(res, 200, { sportist_id: sportistId, items });
     return true;
   }
@@ -6220,9 +6494,8 @@ async function handleApi(req, res, reqUrl) {
           informacija: pickLang(item, 'info_lv', 'info_ru', 'info_en')
         }));
 
-        const mergedItems = savedItemsCustom.length > 0
-          ? mergeAchievementsLists(savedItemsCustom)
-          : mergeAchievementsLists(savedItemsCustom, savedItemsLegacy);
+        const savedItemsCompetition = getCompetitionSportistResults(sportistId);
+        const mergedItems = mergeAchievementsLists(savedItemsCustom, savedItemsLegacy, savedItemsCompetition);
 
         sendJson(res, 200, { sportist_id: sportistId, items: mergedItems });
       })
@@ -6298,13 +6571,13 @@ async function handleApi(req, res, reqUrl) {
       statuss: item.event_status_id != null ? String(item.event_status_id) : '',
       informacija: pickLang(item, 'info_lv', 'info_ru', 'info_en')
     }));
-    const achievements = achievementsCustom.length > 0
-      ? mergeAchievementsLists(achievementsCustom)
-      : mergeAchievementsLists(
-          achievementsCustom,
-          parseSportistAchievementsJson(row.dostizhenija_lv),
-          achievementsLegacy
-        );
+    const achievementsCompetition = getCompetitionSportistResults(id);
+    const achievements = mergeAchievementsLists(
+      achievementsCustom,
+      parseSportistAchievementsJson(row.dostizhenija_lv),
+      achievementsLegacy,
+      achievementsCompetition
+    );
 
     sendJson(res, 200, {
       item: withResolvedMedia({
@@ -6779,7 +7052,8 @@ async function handleApi(req, res, reqUrl) {
             VALUES (${placeholders})
           `).run(...insertValues);
           const row = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ?`).get(info.lastInsertRowid);
-          sendJson(res, 201, { row, warning: prepared.warning || null });
+          const competitionSync = syncCompetitionSportistResults(row.id, v.structured_data);
+          sendJson(res, 201, { row, warning: prepared.warning || null, competition_results_sync: competitionSync });
           return;
         }
 
@@ -7509,7 +7783,8 @@ async function handleApi(req, res, reqUrl) {
             WHERE id = ?
           `).run(...updateValues);
           const row = db.prepare(`SELECT * FROM ${table} WHERE ${pk} = ?`).get(id);
-          sendJson(res, 200, { row, warning: prepared.warning || null });
+          const competitionSync = syncCompetitionSportistResults(row.id, v.structured_data);
+          sendJson(res, 200, { row, warning: prepared.warning || null, competition_results_sync: competitionSync });
           return;
         }
         const allowedColumns = columns.map((c) => c.name).filter((name) => name !== pk);

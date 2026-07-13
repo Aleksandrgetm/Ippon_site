@@ -1811,10 +1811,11 @@
     function rezNormalizeRows(rows) {
       if (!Array.isArray(rows)) return [];
       return rows.map((row) => ({
+        sportist_id: Number(row?.sportist_id || row?.sportistId || 0) || null,
         sportists: String(row?.sportists || '').trim(),
         vieta: String(row?.vieta || '').trim(),
         informacija: String(row?.informacija || '').trim()
-      })).filter((row) => row.sportists || row.vieta || row.informacija);
+      })).filter((row) => row.sportist_id || row.sportists || row.vieta || row.informacija);
     }
 
     function rezApplyStructuredRowsToHidden() {
@@ -1826,6 +1827,7 @@
     function rezResetInlineResultForm() {
       rezInlineEditIndex = -1;
       if (rezInlineSportists) rezInlineSportists.value = '';
+      if (rezInlineSportists) delete rezInlineSportists.dataset.sportistId;
       if (rezInlineVieta) rezInlineVieta.value = '';
       if (rezInlineInfo) rezInlineInfo.value = '';
       if (rezInlineAddBtn) rezInlineAddBtn.textContent = 'Pievienot rezultatu';
@@ -1837,7 +1839,7 @@
       const q = String(term || '').trim().toLowerCase();
       if (!q) return source.slice(0, 120);
       return source
-        .filter((name) => String(name || '').toLowerCase().includes(q))
+        .filter((item) => String(item?.name || '').toLowerCase().includes(q))
         .slice(0, 120);
     }
 
@@ -1855,12 +1857,13 @@
         rezHideSportistiDropdown();
         return;
       }
-      options.forEach((name) => {
+      options.forEach((sportist) => {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'rez-sportists-option';
-        item.setAttribute('data-name', String(name));
-        item.textContent = String(name);
+        item.setAttribute('data-id', String(sportist?.id || ''));
+        item.setAttribute('data-name', String(sportist?.name || ''));
+        item.textContent = String(sportist?.name || '');
         rezSportistiDropdown.appendChild(item);
       });
       rezSportistiDropdown.classList.remove('hidden');
@@ -1872,11 +1875,19 @@
         const rows = Array.isArray(data?.rows) ? data.rows : [];
         if (!rows || !Array.isArray(rows)) return;
         rezSportistiOptions = rows
-          .map((r) => r?.name_lv || r?.vards_uzvards || r?.name_ru || r?.name_en)
-          .filter(Boolean)
-          .map((v) => String(v).trim())
-          .filter(Boolean);
-        rezSportistiOptions = Array.from(new Set(rezSportistiOptions)).sort((a, b) => a.localeCompare(b, 'lv'));
+          .map((r) => ({
+            id: Number(r?.id || 0) || null,
+            name: String(r?.name_lv || r?.vards_uzvards || r?.name_ru || r?.name_en || '').trim()
+          }))
+          .filter((item) => item.id && item.name);
+        const seen = new Set();
+        rezSportistiOptions = rezSportistiOptions
+          .filter((item) => {
+            if (seen.has(item.id)) return false;
+            seen.add(item.id);
+            return true;
+          })
+          .sort((a, b) => a.name.localeCompare(b.name, 'lv'));
         console.log('SPORTISTI LOADED:', rezSportistiOptions);
       } catch (e) {
         console.error('LOAD ERROR', e);
@@ -2579,6 +2590,19 @@
           return `${item.fileName}: ${item.error}${details ? ` (${details})` : ''}`;
         })
         .join(' | ');
+    }
+
+    function formatCompetitionSyncMessage(sync) {
+      if (!sync || typeof sync !== 'object') return '';
+      const synced = Number(sync.synced || 0);
+      const unmatched = Array.isArray(sync.unmatched) ? sync.unmatched : [];
+      const parts = [`Saistīti rezultāti: ${synced}`];
+      if (unmatched.length) {
+        parts.push(`Nesasaistīti: ${unmatched.slice(0, 5).map((item) =>
+          `${item.athlete_name || item.sportist_id || '#'} (${item.reason || 'nav atrasts'})`
+        ).join(', ')}`);
+      }
+      return parts.join('. ');
     }
 
     async function loadTables() {
@@ -5880,11 +5904,12 @@
             body: JSON.stringify(sourceBody)
           });
         }
-        await api('/api/rezultati/admin/source-override', {
+        const saved = await api('/api/rezultati/admin/source-override', {
           method: 'POST',
           body: JSON.stringify(payload)
         });
-        setStatus('Rezultātu ieraksts saglabāts.', 'ok');
+        const syncMessage = formatCompetitionSyncMessage(saved?.competition_results_sync);
+        setStatus(syncMessage ? `Rezultātu ieraksts saglabāts. ${syncMessage}` : 'Rezultātu ieraksts saglabāts.', 'ok');
         await loadRezultatiCompositeData();
       } catch (error) {
         setStatus(error.message, 'error');
@@ -5940,7 +5965,8 @@
             method: 'POST',
             body: JSON.stringify(sourceBody)
           });
-          setStatus('Sacensību ieraksts izveidots.', 'ok');
+          const syncMessage = formatCompetitionSyncMessage(created?.competition_results_sync);
+          setStatus(syncMessage ? `Sacensību ieraksts izveidots. ${syncMessage}` : 'Sacensību ieraksts izveidots.', 'ok');
           await loadRezultatiCompositeData();
           const createdId = created?.row?.id;
           if (createdId) {
@@ -6475,6 +6501,7 @@
 
       rezInlineSportists.addEventListener('input', async () => {
         try {
+          delete rezInlineSportists.dataset.sportistId;
           await ensureSportistiOptions();
           const filtered = rezFilterSportistiOptions(rezInlineSportists.value || '');
           rezRenderSportistiDropdown(filtered);
@@ -6489,7 +6516,9 @@
         const target = event.target instanceof HTMLElement ? event.target.closest('[data-name]') : null;
         if (!target) return;
         const name = String(target.getAttribute('data-name') || '').trim();
+        const id = Number(target.getAttribute('data-id') || 0) || 0;
         if (rezInlineSportists) rezInlineSportists.value = name;
+        if (rezInlineSportists && id) rezInlineSportists.dataset.sportistId = String(id);
         rezHideSportistiDropdown();
       });
 
@@ -6504,10 +6533,11 @@
     if (rezInlineAddBtn) {
       rezInlineAddBtn.addEventListener('click', () => {
         const sportists = String(rezInlineSportists?.value || '').trim();
+        const sportistId = Number(rezInlineSportists?.dataset?.sportistId || 0) || null;
         const vieta = String(rezInlineVieta?.value || '').trim();
         const informacija = String(rezInlineInfo?.value || '').trim();
-        if (!sportists && !vieta && !informacija) return;
-        const next = { sportists, vieta, informacija };
+        if (!sportistId && !sportists && !vieta && !informacija) return;
+        const next = { sportist_id: sportistId, sportists, vieta, informacija };
         const rows = rezSacRows.slice();
         if (rezInlineEditIndex >= 0 && rezInlineEditIndex < rows.length) {
           rows[rezInlineEditIndex] = next;
@@ -6529,6 +6559,11 @@
           if (Number.isInteger(index) && rezSacRows[index]) {
             rezInlineEditIndex = index;
             if (rezInlineSportists) rezInlineSportists.value = String(rezSacRows[index].sportists || '');
+            if (rezInlineSportists) {
+              const sportistId = Number(rezSacRows[index].sportist_id || 0) || 0;
+              if (sportistId) rezInlineSportists.dataset.sportistId = String(sportistId);
+              else delete rezInlineSportists.dataset.sportistId;
+            }
             if (rezInlineVieta) rezInlineVieta.value = String(rezSacRows[index].vieta || '');
             if (rezInlineInfo) rezInlineInfo.value = String(rezSacRows[index].informacija || '');
             if (rezInlineAddBtn) rezInlineAddBtn.textContent = 'Saglabat rezultatu';
