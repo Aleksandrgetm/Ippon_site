@@ -1840,10 +1840,10 @@
 
     function rezFilterSportistiOptions(term) {
       const source = Array.isArray(rezSportistiOptions) ? rezSportistiOptions : [];
-      const q = String(term || '').trim().toLowerCase();
+      const q = normalizeSearchValue(term);
       if (!q) return source.slice(0, 120);
       return source
-        .filter((item) => String(item?.name || '').toLowerCase().includes(q))
+        .filter((item) => normalizeSearchValue(item?.name).includes(q))
         .slice(0, 120);
     }
 
