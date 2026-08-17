@@ -3569,6 +3569,11 @@ function mergeAchievementsLists(...lists) {
         continue;
       }
 
+      if (rawItem?.preserveDuplicate) {
+        out.push(item);
+        continue;
+      }
+
       const key = [
         normalizeAchievementValue(item.datums),
         normalizeAchievementValue(item.nosaukums),
@@ -3589,6 +3594,60 @@ function mergeAchievementsLists(...lists) {
     const dbv = dateSortValue(b.datums);
     if (da !== dbv) return dbv - da;
     return normalizeAchievementValue(b.nosaukums).localeCompare(normalizeAchievementValue(a.nosaukums));
+  });
+}
+
+function getStructuredCompetitionSportistResults(sportistId) {
+  const id = Number(sportistId || 0);
+  if (!id) return [];
+
+  const competitions = queryRezultatiSourceSacensibas(getSourceOverrideMap());
+  const items = [];
+
+  competitions.forEach((competition) => {
+    const rows = Array.isArray(competition?.structured_data?.rows)
+      ? competition.structured_data.rows
+      : [];
+    rows.forEach((row, index) => {
+      const resolved = resolveSportistForCompetitionRow(row, index);
+      if (Number(resolved?.sportistId || 0) !== id) return;
+
+      const title = competition.title || competition.nosaukums || '';
+      const date = competition.date || competition.datums || '';
+      const location = competition.location || competition.vieta || '';
+      const status = competition.statuss != null ? String(competition.statuss) : '';
+      const place = safeText(row?.vieta || row?.place);
+      const information = safeText(row?.informacija || row?.information);
+
+      items.push({
+        id: `competition-structured:${competition.source_id || competition.id}:${index}`,
+        competition_id: competition.source_id || competition.id,
+        title,
+        date,
+        location,
+        place,
+        status,
+        information,
+        datums: date,
+        nosaukums: title,
+        rezultats: place,
+        vieta: location,
+        statuss: status,
+        informacija: information,
+        row_index: index,
+        preserveDuplicate: true
+      });
+    });
+  });
+
+  return items.sort((a, b) => {
+    const da = dateSortValue(a.datums);
+    const dbv = dateSortValue(b.datums);
+    if (da !== dbv) return dbv - da;
+    if (Number(a.competition_id || 0) !== Number(b.competition_id || 0)) {
+      return Number(b.competition_id || 0) - Number(a.competition_id || 0);
+    }
+    return Number(a.row_index || 0) - Number(b.row_index || 0);
   });
 }
 
@@ -3727,7 +3786,11 @@ function syncCompetitionSportistResults(competitionId, structuredData) {
 }
 
 function getCompetitionSportistResults(sportistId) {
-  return db.prepare(`
+  const structuredItems = getStructuredCompetitionSportistResults(sportistId);
+  const structuredCompetitionIds = new Set(
+    structuredItems.map((item) => Number(item.competition_id || 0)).filter(Boolean)
+  );
+  const fallbackItems = db.prepare(`
     SELECT
       csr.id,
       csr.competition_id,
@@ -3747,22 +3810,37 @@ function getCompetitionSportistResults(sportistId) {
     LEFT JOIN ippon_sorevnovanija ev ON ev.id = csr.competition_id
     WHERE csr.sportist_id = ?
     ORDER BY ev.date DESC, csr.updated_at DESC, csr.id DESC
-  `).all(Number(sportistId)).map((item) => ({
-    id: `competition:${item.id}`,
-    competition_id: item.competition_id,
-    title: pickLang(item, 'event_name_lv', 'event_name_ru', 'event_name_en'),
-    date: item.event_date || '',
-    location: pickLang(item, 'event_location_lv', 'event_location_ru', 'event_location_en'),
-    place: item.place || '',
-    status: item.event_status_id != null ? String(item.event_status_id) : '',
-    information: item.information || '',
-    datums: item.event_date || '',
-    nosaukums: pickLang(item, 'event_name_lv', 'event_name_ru', 'event_name_en'),
-    rezultats: item.place || '',
-    vieta: pickLang(item, 'event_location_lv', 'event_location_ru', 'event_location_en'),
-    statuss: item.event_status_id != null ? String(item.event_status_id) : '',
-    informacija: item.information || ''
-  }));
+  `).all(Number(sportistId))
+    .filter((item) => !structuredCompetitionIds.has(Number(item.competition_id || 0)))
+    .map((item) => ({
+      id: `competition:${item.id}`,
+      competition_id: item.competition_id,
+      title: pickLang(item, 'event_name_lv', 'event_name_ru', 'event_name_en'),
+      date: item.event_date || '',
+      location: pickLang(item, 'event_location_lv', 'event_location_ru', 'event_location_en'),
+      place: item.place || '',
+      status: item.event_status_id != null ? String(item.event_status_id) : '',
+      information: item.information || '',
+      datums: item.event_date || '',
+      nosaukums: pickLang(item, 'event_name_lv', 'event_name_ru', 'event_name_en'),
+      rezultats: item.place || '',
+      vieta: pickLang(item, 'event_location_lv', 'event_location_ru', 'event_location_en'),
+      statuss: item.event_status_id != null ? String(item.event_status_id) : '',
+      informacija: item.information || ''
+    }));
+
+  return [...structuredItems, ...fallbackItems].sort((a, b) => {
+    const da = dateSortValue(a.datums);
+    const dbv = dateSortValue(b.datums);
+    if (da !== dbv) return dbv - da;
+    if (Number(a.competition_id || 0) !== Number(b.competition_id || 0)) {
+      return Number(b.competition_id || 0) - Number(a.competition_id || 0);
+    }
+    if (a.row_index != null && b.row_index != null) {
+      return Number(a.row_index || 0) - Number(b.row_index || 0);
+    }
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
 }
 
 function syncAllCompetitionSportistResultsFromStructuredData() {
