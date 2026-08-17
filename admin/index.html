@@ -1019,6 +1019,7 @@
     let selectedNodarbibasPreviewUrl = '';
     let selectedRezMainFile = null;
     let selectedRezMainPreviewUrl = '';
+    let selectedRezMainUploadPromise = null;
     let rezInlineEditIndex = -1;
     let rezSacRows = [];
     let rezSportistiOptions = [];
@@ -1683,9 +1684,29 @@
     async function uploadRezultatiImageFile(file, extra = {}) {
       const data = await uploadManagedBinaryFile('/api/upload-image', file, {
         tableName: currentTable === KALENDARS_TABLE ? KALENDARS_TABLE : REZULTATI_TABLE,
-        subPath: extra.subPath
+        ...extra
       });
       return data.relativeUrl || data.url || '';
+    }
+
+    async function uploadSelectedRezMainImageIfNeeded(extra = {}) {
+      if (!selectedRezMainFile && !selectedRezMainUploadPromise) {
+        return String(rezManualImage?.value || '').trim();
+      }
+
+      if (selectedRezMainUploadPromise) {
+        const uploaded = await selectedRezMainUploadPromise;
+        if (uploaded && rezManualImage) rezManualImage.value = uploaded;
+        return uploaded || String(rezManualImage?.value || '').trim();
+      }
+
+      const file = selectedRezMainFile;
+      const uploaded = await uploadRezultatiImageFile(file, extra);
+      if (uploaded && rezManualImage) rezManualImage.value = uploaded;
+      if (selectedRezMainFile === file) {
+        selectedRezMainFile = null;
+      }
+      return uploaded || String(rezManualImage?.value || '').trim();
     }
 
     function normalizeRezHeader(text) {
@@ -3448,6 +3469,7 @@
       updateNodarbibasPreview();
 
       selectedRezMainFile = null;
+      selectedRezMainUploadPromise = null;
       if (selectedRezMainPreviewUrl) {
         URL.revokeObjectURL(selectedRezMainPreviewUrl);
         selectedRezMainPreviewUrl = '';
@@ -5891,6 +5913,7 @@
         }
         structuredForLayout = normalizeRezStructuredByLayout(layoutType, parsedStructured);
       }
+      await uploadSelectedRezMainImageIfNeeded();
       const photoValue = String(rezManualImage.value || '').trim();
       const galleryValue = rezCurrentCategory === 'sacensibas' ? [...selectedRezGalleryItems] : [];
       const payload = {
@@ -5966,6 +5989,10 @@
           await saveSourceOverride();
           return;
         }
+        if (rezSelectedManual) {
+          await uploadSelectedRezMainImageIfNeeded();
+          payload.image = String(rezManualImage.value || '').trim();
+        }
         if (recordType === 'sacensibas' && !rezSelectedManual) {
           const sourceBody = {
             nosaukums: String(rezManualTitle.value || '').trim(),
@@ -5984,10 +6011,23 @@
             method: 'POST',
             body: JSON.stringify(sourceBody)
           });
-          const syncMessage = formatCompetitionSyncMessage(created?.competition_results_sync);
+          const createdId = created?.row?.id;
+          let syncMessage = formatCompetitionSyncMessage(created?.competition_results_sync);
+          if (createdId && (selectedRezMainFile || selectedRezMainUploadPromise)) {
+            const uploaded = await uploadSelectedRezMainImageIfNeeded({
+              entityId: `ippon_sorevnovanija-${createdId}`
+            });
+            if (uploaded) {
+              sourceBody.foto_attels = uploaded;
+              const updated = await api(`/api/table/ippon_sorevnovanija/${createdId}`, {
+                method: 'PUT',
+                body: JSON.stringify(sourceBody)
+              });
+              syncMessage = formatCompetitionSyncMessage(updated?.competition_results_sync) || syncMessage;
+            }
+          }
           setStatus(syncMessage ? `Sacensību ieraksts izveidots. ${syncMessage}` : 'Sacensību ieraksts izveidots.', 'ok');
           await loadRezultatiCompositeData();
-          const createdId = created?.row?.id;
           if (createdId) {
             const found = (rezCompositeData.sacensibas || []).find((it) =>
               it.source_table === 'ippon_sorevnovanija' && Number(it.source_id) === Number(createdId)
@@ -6426,21 +6466,34 @@
       rezSacMainImageFile.addEventListener('change', async (event) => {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
+        selectedRezMainFile = file;
+        selectedRezMainUploadPromise = null;
+        if (selectedRezMainPreviewUrl) {
+          URL.revokeObjectURL(selectedRezMainPreviewUrl);
+        }
+        selectedRezMainPreviewUrl = URL.createObjectURL(file);
+        updateRezMainPreview();
+
+        if (!getUploadEntityIdForTable(REZULTATI_TABLE)) {
+          setStatus('Fotogrāfija izvēlēta. Nospied Saglabāt.', 'ok');
+          return;
+        }
+
+        const uploadPromise = uploadRezultatiImageFile(file);
+        selectedRezMainUploadPromise = uploadPromise;
         try {
-          selectedRezMainFile = file;
-          if (selectedRezMainPreviewUrl) {
-            URL.revokeObjectURL(selectedRezMainPreviewUrl);
-          }
-          selectedRezMainPreviewUrl = URL.createObjectURL(file);
-          updateRezMainPreview();
-          const uploaded = await uploadRezultatiImageFile(file);
-          if (uploaded) {
+          const uploaded = await uploadPromise;
+          if (uploaded && selectedRezMainFile === file && selectedRezMainUploadPromise === uploadPromise) {
             rezManualImage.value = uploaded;
             selectedRezMainFile = null;
             setStatus('Fotogrāfija augšupielādēta.', 'ok');
           }
         } catch (error) {
           setStatus(error.message, 'error');
+        } finally {
+          if (selectedRezMainUploadPromise === uploadPromise) {
+            selectedRezMainUploadPromise = null;
+          }
         }
       });
     }
