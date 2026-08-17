@@ -1709,6 +1709,16 @@
       return uploaded || String(rezManualImage?.value || '').trim();
     }
 
+    function updateCurrentRezultatiTableRow(row) {
+      if (currentTable !== REZULTATI_TABLE || !row || row.id == null) return;
+      const rowId = Number(row.id);
+      const index = currentRows.findIndex((item) => Number(item?.id) === rowId);
+      if (index >= 0) {
+        currentRows[index] = row;
+        renderTable();
+      }
+    }
+
     function normalizeRezHeader(text) {
       return String(text || '')
         .toLowerCase()
@@ -5927,6 +5937,7 @@
         custom_html: normalizeHtmlText(String(rezSourceCustomHtml.value || '').trim() || String(rezManualCustomHtml.value || ''))
       };
       try {
+        let savedSourceRow = null;
         if (rezSelectedSource.source_table === 'ippon_sorevnovanija') {
           const sourceBody = {
             nosaukums: String(rezManualTitle.value || '').trim(),
@@ -5941,10 +5952,12 @@
             structured_data: structuredForLayout,
             custom_html: normalizeHtmlText(String(rezManualCustomHtml.value || ''))
           };
-          await api(`/api/table/ippon_sorevnovanija/${rezSelectedSource.source_id}`, {
+          const sourceSaved = await api(`/api/table/ippon_sorevnovanija/${rezSelectedSource.source_id}`, {
             method: 'PUT',
             body: JSON.stringify(sourceBody)
           });
+          savedSourceRow = sourceSaved?.row || null;
+          updateCurrentRezultatiTableRow(savedSourceRow);
         }
         const saved = await api('/api/rezultati/admin/source-override', {
           method: 'POST',
@@ -5953,6 +5966,7 @@
         const syncMessage = formatCompetitionSyncMessage(saved?.competition_results_sync);
         setStatus(syncMessage ? `Rezultātu ieraksts saglabāts. ${syncMessage}` : 'Rezultātu ieraksts saglabāts.', 'ok');
         await loadRezultatiCompositeData();
+        updateCurrentRezultatiTableRow(savedSourceRow);
       } catch (error) {
         setStatus(error.message, 'error');
       }
