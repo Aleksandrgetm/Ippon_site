@@ -323,12 +323,25 @@ h1, h2, h3, h4, h5, h6,
     width: 100%;
     border-collapse: collapse;
     min-width: 760px;
+    max-width: none !important;
+    display: table !important;
+    overflow: visible !important;
     background: #050505;
     color: #fff;
     font-family: Roboto, sans-serif;
   }
+  .saraksts-table thead {
+    display: table-header-group !important;
+  }
+  .saraksts-table tbody {
+    display: table-row-group !important;
+  }
+  .saraksts-table tr {
+    display: table-row !important;
+  }
   .saraksts-table th,
   .saraksts-table td {
+    display: table-cell !important;
     border: 1px solid rgba(255,255,255,0.16);
     padding: 14px 16px;
     text-align: left;
@@ -355,6 +368,7 @@ h1, h2, h3, h4, h5, h6,
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: #fff;
+    text-align: center;
   }
   .saraksts-table .saraksts-section-divider {
     background: rgba(238, 43, 43, 0.16);
@@ -391,6 +405,12 @@ h1, h2, h3, h4, h5, h6,
       .replace(/"/g, '&quot;');
 
     const highlightedLocations = new Map([
+      ['IPPON.LV IMANTA ZALE NR.1', 'IPPON.LV IMANTA ZĀLE Nr.1'],
+      ['IPPON.LV IMANTA ZALE NR.2', 'IPPON.LV IMANTA ZĀLE Nr.2'],
+      ['IPPON.LV ZOLITUDE', 'IPPON.LV ZOLITŪDE'],
+      ['IPPON.LV JURMALA', 'IPPON.LV JŪRMALA'],
+      ['IPPON.LV SLOKA', 'IPPON.LV SLOKA'],
+      ['IPPON.LV PINKI', 'IPPON.LV PIŅĶI'],
       ['IMANTA, SPORTA ZALE NR.1', 'IMANTA, SPORTA ZĀLE NR.1'],
       ['IMANTA, SPORTA ZALE NR.2', 'IMANTA, SPORTA ZĀLE NR.2'],
       ['ZOLITUDE', 'ZOLITŪDE'],
@@ -412,6 +432,11 @@ h1, h2, h3, h4, h5, h6,
       ['JURMALA', 'JŪRMALA']
     ]);
 
+    const locationHeaderLabels = new Map([
+      ...highlightedLocations,
+      ...sectionDividerLabels
+    ]);
+
     const renderCell = (cell, tagName) => {
       const raw = String(cell == null ? '' : cell);
       const highlighted = highlightedLocations.get(normalizeLocationKey(raw));
@@ -423,9 +448,9 @@ h1, h2, h3, h4, h5, h6,
     const renderBodyRow = (row, colCount) => {
       const nonEmptyCells = row.filter((cell) => String(cell == null ? '' : cell).trim() !== '');
       if (nonEmptyCells.length === 1) {
-        const divider = sectionDividerLabels.get(normalizeLocationKey(nonEmptyCells[0]));
-        if (divider) {
-          return `<tr><td class="saraksts-section-divider" colspan="${colCount}">${escapeHtml(divider)}</td></tr>`;
+        const locationHeader = locationHeaderLabels.get(normalizeLocationKey(nonEmptyCells[0]));
+        if (locationHeader) {
+          return `<tr><td class="saraksts-location-highlight" colspan="${colCount}">${escapeHtml(locationHeader)}</td></tr>`;
         }
       }
       return `<tr>${row.map((cell) => renderCell(cell, 'td')).join('')}</tr>`;
