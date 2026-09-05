@@ -3488,6 +3488,11 @@
           input.value = toDateInputValue(raw) || raw;
           return;
         }
+        if (HALL_TABLES.has(currentTable) && col.name === 'grafiki') {
+          const value = row ? row[col.name] : '';
+          input.value = Array.isArray(value) ? JSON.stringify(value) : String(value || '');
+          return;
+        }
         input.value = row && row[col.name] != null ? String(row[col.name]) : '';
       });
       selectedNewsFile = null;
@@ -3529,6 +3534,7 @@
       updateHallMainPreview();
       renderHallGalleryPreview();
       refreshHallIevadsEditorFromHidden();
+      renderHallSchedulesEditor();
       refreshSadarbibaSatursEditorFromHidden();
       refreshMusuPartneriInformacijaEditorFromHidden();
 
@@ -4899,6 +4905,7 @@
 
     function parseHallSchedulesValue(value) {
       if (!value) return [];
+      if (Array.isArray(value)) return normalizeHallSchedules(value);
       try {
         const parsed = JSON.parse(String(value));
         return normalizeHallSchedules(parsed);

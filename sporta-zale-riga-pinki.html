@@ -451,6 +451,60 @@ h1, h2, h3, h4, h5, h6,
   .hall-schedule-table tbody tr:nth-child(even) td {
     background: rgba(255,255,255,0.02);
   }
+  @media (max-width: 768px) {
+    .hall-schedules-wrap {
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .hall-schedules {
+      max-width: 100%;
+    }
+    .hall-schedule-table-wrap {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      margin-bottom: 30px;
+      border-radius: 10px;
+    }
+    .hall-schedule-table {
+      width: max-content;
+      min-width: 820px;
+    }
+    .hall-schedule-table th,
+    .hall-schedule-table td {
+      padding: 13px 14px;
+      font-size: 15px;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
+    .hall-schedule-table th:first-child,
+    .hall-schedule-table td:first-child {
+      width: 240px;
+      min-width: 240px;
+      white-space: normal;
+    }
+    .hall-schedule-title {
+      white-space: normal !important;
+      text-align: center !important;
+    }
+  }
+  @media (max-width: 480px) {
+    .hall-schedule-table {
+      min-width: 780px;
+    }
+    .hall-schedule-table th,
+    .hall-schedule-table td {
+      padding: 12px 13px;
+      font-size: 14px;
+    }
+    .hall-schedule-table th:first-child,
+    .hall-schedule-table td:first-child {
+      width: 220px;
+      min-width: 220px;
+    }
+  }
   .hall-individual-lessons {
     margin-top: 6px;
     padding: 18px 20px;
