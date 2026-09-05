@@ -381,6 +381,81 @@ h1, h2, h3, h4, h5, h6,
     padding-top: 18px;
     padding-bottom: 18px;
   }
+  .saraksts-mobile-list {
+    display: none;
+  }
+  .saraksts-mobile-section + .saraksts-mobile-section {
+    margin-top: 18px;
+  }
+  .saraksts-mobile-location {
+    margin: 0;
+    padding: 15px 14px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(238, 43, 43, 0.16);
+    color: #fff;
+    font-family: "Oswald", sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  .saraksts-mobile-group {
+    border: 1px solid rgba(255,255,255,0.16);
+    border-top: 0;
+    background: #050505;
+  }
+  .saraksts-mobile-group-title {
+    margin: 0;
+    padding: 14px;
+    color: #fff;
+    font-family: Roboto, sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+  .saraksts-mobile-times {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .saraksts-mobile-time {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: start;
+    padding: 11px 14px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .saraksts-mobile-day,
+  .saraksts-mobile-value {
+    color: #fff;
+    font-family: Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.35;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  .saraksts-mobile-day {
+    font-weight: 800;
+  }
+  .saraksts-mobile-value {
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .saraksts-mobile-note {
+    margin: 0;
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-top: 0;
+    background: #050505;
+    color: #fff;
+    font-family: Roboto, sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.4;
+  }
   .saraksts-table-empty {
     margin: 0;
     padding: 18px 20px;
@@ -391,6 +466,36 @@ h1, h2, h3, h4, h5, h6,
     .saraksts-shell { padding: 130px 0 70px; }
     .saraksts-container { width: min(1320px, calc(100% - 22px)); }
     .saraksts-table-host { padding: 12px; }
+  }
+  @media (max-width: 768px) {
+    .saraksts-shell {
+      padding: 104px 0 46px;
+    }
+    .saraksts-container {
+      width: min(100%, calc(100% - 20px));
+    }
+    .saraksts-hero h1 {
+      font-size: clamp(34px, 10.8vw, 46px);
+      line-height: 0.96;
+    }
+    .saraksts-hero p {
+      font-size: 18px;
+      line-height: 1.25;
+    }
+    .saraksts-table-wrap {
+      margin-top: 20px;
+      border-radius: 14px;
+    }
+    .saraksts-table-host {
+      overflow: visible;
+      padding: 10px;
+    }
+    .saraksts-table {
+      display: none !important;
+    }
+    .saraksts-mobile-list {
+      display: block;
+    }
   }
 </style>
 <script>
@@ -459,6 +564,88 @@ h1, h2, h3, h4, h5, h6,
       return `<tr>${row.map((cell) => renderCell(cell, 'td')).join('')}</tr>`;
     };
 
+    const isScheduleHeaderRow = (row) => normalizeLocationKey(row[0]) === 'GRAFIKS';
+
+    const buildMobileSections = (rows) => {
+      const sections = [];
+      let currentSection = null;
+      let currentHeader = null;
+
+      const ensureSection = (location) => {
+        currentSection = {
+          location,
+          items: []
+        };
+        sections.push(currentSection);
+      };
+
+      rows.forEach((row, rowIndex) => {
+        const locationHeader = getLocationHeader(row);
+        if (locationHeader) {
+          ensureSection(locationHeader);
+          currentHeader = null;
+          return;
+        }
+
+        if (!currentSection) {
+          ensureSection('');
+        }
+
+        if (!currentHeader || isScheduleHeaderRow(row)) {
+          currentHeader = row;
+          return;
+        }
+
+        const groupName = String(row[0] == null ? '' : row[0]).trim();
+        const times = row
+          .slice(1)
+          .map((value, index) => ({
+            day: String(currentHeader[index + 1] == null ? '' : currentHeader[index + 1]).trim(),
+            value: String(value == null ? '' : value).trim()
+          }))
+          .filter((item) => item.day && item.value);
+
+        if (groupName || times.length) {
+          currentSection.items.push({
+            groupName: groupName || String(currentHeader[0] || `Grafiks ${rowIndex + 1}`),
+            times
+          });
+        }
+      });
+
+      return sections.filter((section) => section.location || section.items.length);
+    };
+
+    const renderMobileSchedule = (rows) => {
+      const sections = buildMobileSections(rows);
+      if (!sections.length) return '';
+
+      return `
+        <div class="saraksts-mobile-list">
+          ${sections.map((section) => `
+            <section class="saraksts-mobile-section">
+              ${section.location ? `<h2 class="saraksts-mobile-location">${escapeHtml(section.location)}</h2>` : ''}
+              ${section.items.map((item) => item.times.length ? `
+                <article class="saraksts-mobile-group">
+                  <h3 class="saraksts-mobile-group-title">${escapeHtml(item.groupName)}</h3>
+                  <div class="saraksts-mobile-times">
+                    ${item.times.map((time) => `
+                      <div class="saraksts-mobile-time">
+                        <span class="saraksts-mobile-day">${escapeHtml(time.day)}</span>
+                        <span class="saraksts-mobile-value">${escapeHtml(time.value)}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </article>
+              ` : `
+                <p class="saraksts-mobile-note">${escapeHtml(item.groupName)}</p>
+              `).join('')}
+            </section>
+          `).join('')}
+        </div>
+      `;
+    };
+
     const renderMessage = (text) => {
       host.innerHTML = `<p class="saraksts-table-empty">${escapeHtml(text)}</p>`;
     };
@@ -499,6 +686,7 @@ h1, h2, h3, h4, h5, h6,
             ${bodyRows.map((row) => renderBodyRow(row, maxCols)).join('')}
           </tbody>
         </table>
+        ${renderMobileSchedule(normalizedRows)}
       `;
     };
 
