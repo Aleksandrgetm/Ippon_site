@@ -445,13 +445,16 @@ h1, h2, h3, h4, h5, h6,
       return `<${tagName}${className}>${escapeHtml(display)}</${tagName}>`;
     };
 
-    const renderBodyRow = (row, colCount) => {
+    const getLocationHeader = (row) => {
       const nonEmptyCells = row.filter((cell) => String(cell == null ? '' : cell).trim() !== '');
-      if (nonEmptyCells.length === 1) {
-        const locationHeader = locationHeaderLabels.get(normalizeLocationKey(nonEmptyCells[0]));
-        if (locationHeader) {
-          return `<tr><td class="saraksts-location-highlight" colspan="${colCount}">${escapeHtml(locationHeader)}</td></tr>`;
-        }
+      if (nonEmptyCells.length !== 1) return null;
+      return locationHeaderLabels.get(normalizeLocationKey(nonEmptyCells[0])) || null;
+    };
+
+    const renderBodyRow = (row, colCount) => {
+      const locationHeader = getLocationHeader(row);
+      if (locationHeader) {
+        return `<tr><td class="saraksts-location-highlight" colspan="${colCount}">${escapeHtml(locationHeader)}</td></tr>`;
       }
       return `<tr>${row.map((cell) => renderCell(cell, 'td')).join('')}</tr>`;
     };
@@ -479,10 +482,17 @@ h1, h2, h3, h4, h5, h6,
         return next;
       });
 
-      const [headRow, ...bodyRows] = normalizedRows;
+      const firstLocationHeader = getLocationHeader(normalizedRows[0]);
+      const headRowIndex = firstLocationHeader && normalizedRows.length > 1 ? 1 : 0;
+      const headRow = normalizedRows[headRowIndex];
+      const bodyRows = normalizedRows.slice(headRowIndex + 1);
+      const locationHeadRow = firstLocationHeader
+        ? `<tr><th class="saraksts-location-highlight" colspan="${maxCols}">${escapeHtml(firstLocationHeader)}</th></tr>`
+        : '';
       host.innerHTML = `
         <table class="saraksts-table">
           <thead>
+            ${locationHeadRow}
             <tr>${headRow.map((cell) => renderCell(cell, 'th')).join('')}</tr>
           </thead>
           <tbody>
