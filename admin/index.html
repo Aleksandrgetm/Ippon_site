@@ -285,6 +285,70 @@
       border-radius: 8px;
       line-height: 1;
     }
+    .hall-schedules-editor {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #f8fafc;
+      margin-bottom: 12px;
+    }
+    .hall-schedules-head,
+    .hall-schedule-head,
+    .hall-schedule-row-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .hall-schedules-head h3 {
+      font-size: 22px;
+      text-transform: uppercase;
+    }
+    .hall-schedule-card {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px;
+    }
+    .hall-schedule-title {
+      margin-bottom: 8px;
+    }
+    .hall-schedule-table-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      margin-bottom: 8px;
+    }
+    .hall-schedule-table {
+      min-width: 860px;
+      margin: 0;
+    }
+    .hall-schedule-table th,
+    .hall-schedule-table td {
+      padding: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+    .hall-schedule-table input {
+      margin: 0;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .hall-schedule-table .hall-group-input {
+      min-width: 210px;
+    }
+    .hall-schedule-table .hall-time-input {
+      min-width: 96px;
+    }
+    .hall-schedule-empty {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
 
     .records {
       border: 1px solid var(--line);
@@ -1188,7 +1252,7 @@
     const NEWS_HIDDEN_FIELDS = new Set(['slug', 'created_at', 'updated_at']);
     const TRAINERS_HIDDEN_FIELDS = new Set(['slug', 'created_at', 'updated_at']);
     const RULES_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
-    const HALL_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
+    const HALL_HIDDEN_FIELDS = new Set(['attels', 'created_at', 'updated_at']);
     const SADARBIBA_HIDDEN_FIELDS = new Set(['created_at', 'updated_at']);
     const SPONSORU_ATBALSTS_HIDDEN_FIELDS = new Set(['saturs', 'foto_attels', 'galerija']);
     const GALERIJA_HIDDEN_FIELDS = new Set([
@@ -1246,6 +1310,7 @@
       nosaukums: 'Nosaukums',
       ievads: 'Ievads',
       attels: 'Attels',
+      grafiki: 'Nodarbību grafiki',
       galerija: 'Galerej',
       created_at: 'Izveidots',
       updated_at: 'Atjaunots'
@@ -3154,6 +3219,17 @@
           preview.style.gap = '6px';
           preview.style.marginBottom = '8px';
           wrap.appendChild(preview);
+        } else if (HALL_TABLES.has(currentTable) && col.name === 'grafiki') {
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.dataset.col = col.name;
+          field.id = `f_${col.name}`;
+          wrap.appendChild(field);
+
+          const editor = document.createElement('div');
+          editor.id = 'hallSchedulesEditor';
+          editor.className = 'hall-schedules-editor';
+          wrap.appendChild(editor);
         } else if (HALL_TABLES.has(currentTable) && col.name === 'attels') {
           const field = document.createElement('input');
           field.type = 'hidden';
@@ -3369,6 +3445,7 @@
       setupRakstiPreseEditors();
       setupRezultatiEditor();
       setupTrainerTextEditors();
+      setupHallSchedulesEditor();
       setupHallTools();
       setupTrainerTools();
       setupNodarbibasTools();
@@ -4811,6 +4888,200 @@
       });
     }
 
+    const HALL_SCHEDULE_DAYS = [
+      { key: 'pirmdiena', label: 'Pirmdiena' },
+      { key: 'otrdiena', label: 'Otrdiena' },
+      { key: 'tresdiena', label: 'Trešdiena' },
+      { key: 'ceturtdiena', label: 'Ceturtdiena' },
+      { key: 'piektdiena', label: 'Piektdiena' },
+      { key: 'sestdiena', label: 'Sestdiena' }
+    ];
+
+    function parseHallSchedulesValue(value) {
+      if (!value) return [];
+      try {
+        const parsed = JSON.parse(String(value));
+        return normalizeHallSchedules(parsed);
+      } catch {
+        return [];
+      }
+    }
+
+    function normalizeHallSchedules(value) {
+      if (!Array.isArray(value)) return [];
+      return value.map((schedule) => ({
+        nosaukums: String(schedule?.nosaukums || schedule?.title || schedule?.name || '').trim(),
+        rows: (Array.isArray(schedule?.rows) ? schedule.rows : [])
+          .map((row) => {
+            const next = { grupa: String(row?.grupa || row?.group || row?.name || '').trim() };
+            HALL_SCHEDULE_DAYS.forEach((day) => {
+              next[day.key] = String(row?.[day.key] || '').trim();
+            });
+            return next;
+          })
+          .filter((row) => row.grupa || HALL_SCHEDULE_DAYS.some((day) => row[day.key]))
+      })).filter((schedule) => schedule.nosaukums || schedule.rows.length);
+    }
+
+    function emptyHallSchedule(title = '') {
+      return {
+        nosaukums: title,
+        rows: [emptyHallScheduleRow()]
+      };
+    }
+
+    function emptyHallScheduleRow() {
+      const row = { grupa: '' };
+      HALL_SCHEDULE_DAYS.forEach((day) => {
+        row[day.key] = '';
+      });
+      return row;
+    }
+
+    function collectHallSchedulesEditor() {
+      const editor = document.getElementById('hallSchedulesEditor');
+      if (!editor) return [];
+      return [...editor.querySelectorAll('.hall-schedule-card')].map((card) => ({
+        nosaukums: String(card.querySelector('[data-schedule-title]')?.value || '').trim(),
+        rows: [...card.querySelectorAll('[data-schedule-row]')].map((rowEl) => {
+          const row = {
+            grupa: String(rowEl.querySelector('[data-day-key="grupa"]')?.value || '').trim()
+          };
+          HALL_SCHEDULE_DAYS.forEach((day) => {
+            row[day.key] = String(rowEl.querySelector(`[data-day-key="${day.key}"]`)?.value || '').trim();
+          });
+          return row;
+        })
+      }));
+    }
+
+    function syncHallSchedulesToHidden() {
+      const input = document.getElementById('f_grafiki');
+      if (!input) return;
+      input.value = JSON.stringify(normalizeHallSchedules(collectHallSchedulesEditor()));
+    }
+
+    function renderHallSchedulesEditor(schedules = null) {
+      const editor = document.getElementById('hallSchedulesEditor');
+      if (!editor) return;
+      const source = (schedules || parseHallSchedulesValue(document.getElementById('f_grafiki')?.value || '')).map((schedule) => ({
+        nosaukums: String(schedule?.nosaukums || '').trim(),
+        rows: Array.isArray(schedule?.rows) ? schedule.rows : []
+      }));
+
+      editor.innerHTML = `
+        <div class="hall-schedules-head">
+          <h3>Nodarbību grafiki</h3>
+          <button type="button" id="hallAddScheduleBtn">+ Pievienot grafiku</button>
+        </div>
+        <div id="hallSchedulesList"></div>
+      `;
+
+      const list = editor.querySelector('#hallSchedulesList');
+      if (!source.length) {
+        list.innerHTML = '<p class="hall-schedule-empty">Grafiki nav pievienoti.</p>';
+      } else {
+        list.innerHTML = source.map((schedule, scheduleIndex) => `
+          <section class="hall-schedule-card" data-schedule-index="${scheduleIndex}">
+            <div class="hall-schedule-head">
+              <input class="hall-schedule-title" data-schedule-title value="${escapeAttr(schedule.nosaukums)}" placeholder="Nosaukums" />
+              <div class="row-actions">
+                <button type="button" class="light" data-schedule-up="${scheduleIndex}">↑</button>
+                <button type="button" class="light" data-schedule-down="${scheduleIndex}">↓</button>
+                <button type="button" class="danger" data-schedule-remove="${scheduleIndex}">Dzēst</button>
+              </div>
+            </div>
+            <div class="hall-schedule-table-wrap">
+              <table class="hall-schedule-table">
+                <thead>
+                  <tr>
+                    <th>Grupa</th>
+                    ${HALL_SCHEDULE_DAYS.map((day) => `<th>${day.label}</th>`).join('')}
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${(schedule.rows.length ? schedule.rows : [emptyHallScheduleRow()]).map((row, rowIndex) => `
+                    <tr data-schedule-row="${rowIndex}">
+                      <td><input class="hall-group-input" data-day-key="grupa" value="${escapeAttr(row.grupa)}" placeholder="Grupa / nosaukums" /></td>
+                      ${HALL_SCHEDULE_DAYS.map((day) => `<td><input class="hall-time-input" data-day-key="${day.key}" value="${escapeAttr(row[day.key])}" placeholder="-" /></td>`).join('')}
+                      <td>
+                        <div class="hall-schedule-row-actions">
+                          <button type="button" class="light" data-row-up="${rowIndex}">↑</button>
+                          <button type="button" class="light" data-row-down="${rowIndex}">↓</button>
+                          <button type="button" class="danger" data-row-remove="${rowIndex}">×</button>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            <button type="button" class="light" data-row-add="${scheduleIndex}">+ Rinda</button>
+          </section>
+        `).join('');
+      }
+
+      syncHallSchedulesToHidden();
+    }
+
+    function escapeAttr(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function setupHallSchedulesEditor() {
+      if (!HALL_TABLES.has(currentTable)) return;
+      const editor = document.getElementById('hallSchedulesEditor');
+      if (!editor) return;
+
+      renderHallSchedulesEditor();
+      editor.addEventListener('input', syncHallSchedulesToHidden);
+      editor.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        const schedules = collectHallSchedulesEditor();
+
+        if (button.id === 'hallAddScheduleBtn') {
+          schedules.push(emptyHallSchedule());
+        } else if (button.dataset.scheduleRemove != null) {
+          schedules.splice(Number(button.dataset.scheduleRemove), 1);
+        } else if (button.dataset.scheduleUp != null) {
+          const index = Number(button.dataset.scheduleUp);
+          if (index > 0) [schedules[index - 1], schedules[index]] = [schedules[index], schedules[index - 1]];
+        } else if (button.dataset.scheduleDown != null) {
+          const index = Number(button.dataset.scheduleDown);
+          if (index < schedules.length - 1) [schedules[index + 1], schedules[index]] = [schedules[index], schedules[index + 1]];
+        } else {
+          const card = button.closest('.hall-schedule-card');
+          const scheduleIndex = Number(card?.dataset.scheduleIndex);
+          if (!Number.isInteger(scheduleIndex) || !schedules[scheduleIndex]) return;
+          if (button.dataset.rowAdd != null) {
+            schedules[scheduleIndex].rows.push(emptyHallScheduleRow());
+          } else if (button.dataset.rowRemove != null) {
+            schedules[scheduleIndex].rows.splice(Number(button.dataset.rowRemove), 1);
+          } else if (button.dataset.rowUp != null) {
+            const index = Number(button.dataset.rowUp);
+            if (index > 0) {
+              [schedules[scheduleIndex].rows[index - 1], schedules[scheduleIndex].rows[index]] = [schedules[scheduleIndex].rows[index], schedules[scheduleIndex].rows[index - 1]];
+            }
+          } else if (button.dataset.rowDown != null) {
+            const index = Number(button.dataset.rowDown);
+            if (index < schedules[scheduleIndex].rows.length - 1) {
+              [schedules[scheduleIndex].rows[index + 1], schedules[scheduleIndex].rows[index]] = [schedules[scheduleIndex].rows[index], schedules[scheduleIndex].rows[index + 1]];
+            }
+          } else {
+            return;
+          }
+        }
+
+        renderHallSchedulesEditor(schedules);
+      });
+    }
+
     function setupHallTools() {
       if (!HALL_TABLES.has(currentTable)) return;
 
@@ -5475,7 +5746,7 @@
               ? ['id', 'excel_file'].includes(c.name)
               : ['id', 'ievads', 'attels'].includes(c.name))
           : HALL_TABLES.has(currentTable)
-            ? visibleColumns.filter((c) => ['id', 'nosaukums', 'attels', 'galerija'].includes(c.name))
+            ? visibleColumns.filter((c) => ['id', 'nosaukums', 'grafiki', 'galerija'].includes(c.name))
             : visibleColumns.slice(0, 6);
 
       displayColumns.forEach((col) => {
@@ -5790,6 +6061,7 @@
           }
         } else if (HALL_TABLES.has(currentTable)) {
           syncHallIevadsEditorToHidden();
+          syncHallSchedulesToHidden();
         } else if (SADARBIBA_TABLES.has(currentTable)) {
           syncSadarbibaSatursEditorToHidden();
           syncMusuPartneriInformacijaEditorToHidden();

@@ -270,14 +270,55 @@ function mapCalendar(array $row): array
 function mapContentPage(array $row): array
 {
     $image = publicImage(pickValue($row, ['attels', 'foto_attels', 'image']));
-    return $row + [
+    $mapped = $row + [
         'nosaukums' => pickValue($row, ['nosaukums', 'title', 'name']),
         'ievads' => pickValue($row, ['ievads', 'intro', 'description']),
         'saturs' => pickValue($row, ['saturs', 'content', 'teksts']),
         'attels' => $image,
         'foto_attels' => $image,
-        'galerija' => parseGallery($row['galerija'] ?? ''),
     ];
+    $mapped['attels'] = $image;
+    $mapped['foto_attels'] = $image;
+    $mapped['grafiki'] = parseHallSchedules($row['grafiki'] ?? '');
+    $mapped['galerija'] = parseGallery($row['galerija'] ?? '');
+    return $mapped;
+}
+
+function parseHallSchedules($value): array
+{
+    if (is_array($value)) {
+        $parsed = $value;
+    } else {
+        $text = trim((string) $value);
+        if ($text === '') return [];
+        $parsed = json_decode($text, true);
+    }
+    if (!is_array($parsed)) return [];
+
+    $days = ['pirmdiena', 'otrdiena', 'tresdiena', 'ceturtdiena', 'piektdiena', 'sestdiena'];
+    $result = [];
+    foreach ($parsed as $schedule) {
+        if (!is_array($schedule)) continue;
+        $title = trim((string) ($schedule['nosaukums'] ?? $schedule['title'] ?? $schedule['name'] ?? ''));
+        $sourceRows = $schedule['rows'] ?? $schedule['rindas'] ?? [];
+        $rows = [];
+        if (is_array($sourceRows)) {
+            foreach ($sourceRows as $row) {
+                if (!is_array($row)) continue;
+                $next = ['grupa' => trim((string) ($row['grupa'] ?? $row['group'] ?? $row['name'] ?? ''))];
+                foreach ($days as $day) {
+                    $next[$day] = trim((string) ($row[$day] ?? ''));
+                }
+                if ($next['grupa'] !== '' || array_filter(array_map(fn($day) => $next[$day], $days))) {
+                    $rows[] = $next;
+                }
+            }
+        }
+        if ($title !== '' || count($rows) > 0) {
+            $result[] = ['nosaukums' => $title, 'rows' => $rows];
+        }
+    }
+    return $result;
 }
 
 function latestItem(PDO $pdo, array $tables, callable $mapper): ?array

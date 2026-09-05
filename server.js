@@ -918,11 +918,13 @@ function ensureSingleHallTable(tableName, seedTitle, seedIntro) {
       nosaukums TEXT NOT NULL,
       ievads TEXT,
       attels TEXT,
+      grafiki TEXT,
       galerija TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
   `);
+  ensureTableColumn(tableName, 'grafiki', 'TEXT');
 
   const count = db.prepare(`SELECT COUNT(*) AS c FROM ${tableName}`).get().c;
   if (count > 0) return;
@@ -1476,6 +1478,45 @@ function parseGallery(value) {
     .split(/[\n,;]/)
     .map((v) => normalizeStoredMediaUrl(v))
     .filter(Boolean);
+}
+
+const HALL_SCHEDULE_DAY_KEYS = ['pirmdiena', 'otrdiena', 'tresdiena', 'ceturtdiena', 'piektdiena', 'sestdiena'];
+
+function parseHallSchedules(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return normalizeHallSchedules(value);
+  const text = String(value).trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    return normalizeHallSchedules(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function normalizeHallSchedules(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((schedule) => {
+    const title = String(schedule?.nosaukums ?? schedule?.title ?? schedule?.name ?? '').trim();
+    const rows = Array.isArray(schedule?.rows)
+      ? schedule.rows
+      : Array.isArray(schedule?.rindas)
+        ? schedule.rindas
+        : [];
+    return {
+      nosaukums: title,
+      rows: rows.map((row) => {
+        const next = {
+          grupa: String(row?.grupa ?? row?.group ?? row?.name ?? '').trim()
+        };
+        HALL_SCHEDULE_DAY_KEYS.forEach((key) => {
+          next[key] = String(row?.[key] ?? '').trim();
+        });
+        return next;
+      }).filter((row) => row.grupa || HALL_SCHEDULE_DAY_KEYS.some((key) => row[key]))
+    };
+  }).filter((schedule) => schedule.nosaukums || schedule.rows.length);
 }
 
 function normalizeStoredMediaUrl(value) {
@@ -2520,6 +2561,7 @@ function mapHallRow(slug, row) {
     nosaukums: row.nosaukums,
     ievads: row.ievads,
     attels: normalizeStoredMediaUrl(row.attels),
+    grafiki: parseHallSchedules(row.grafiki),
     galerija: parseGallery(row.galerija),
     created_at: row.created_at,
     updated_at: row.updated_at
@@ -7177,12 +7219,13 @@ async function handleApi(req, res, reqUrl) {
 
           const ts = nowTs();
           const info = db.prepare(`
-            INSERT INTO ${table} (nosaukums, ievads, attels, galerija, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO ${table} (nosaukums, ievads, attels, grafiki, galerija, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
           `).run(
             title,
             body.ievads ? String(body.ievads).trim() : null,
             body.attels ? String(body.attels).trim() : null,
+            JSON.stringify(parseHallSchedules(body.grafiki)),
             JSON.stringify(parseGallery(body.galerija)),
             ts,
             ts
@@ -7874,14 +7917,16 @@ async function handleApi(req, res, reqUrl) {
           }
 
           const galleryValue = body.galerija != null ? body.galerija : existing.galerija;
+          const schedulesValue = body.grafiki != null ? body.grafiki : existing.grafiki;
           db.prepare(`
             UPDATE ${table}
-            SET nosaukums = ?, ievads = ?, attels = ?, galerija = ?, updated_at = ?
+            SET nosaukums = ?, ievads = ?, attels = ?, grafiki = ?, galerija = ?, updated_at = ?
             WHERE ${pk} = ?
           `).run(
             title,
             body.ievads != null ? String(body.ievads).trim() : existing.ievads,
             body.attels != null ? String(body.attels).trim() : existing.attels,
+            JSON.stringify(parseHallSchedules(schedulesValue)),
             JSON.stringify(parseGallery(galleryValue)),
             nowTs(),
             id

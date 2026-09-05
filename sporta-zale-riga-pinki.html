@@ -275,8 +275,13 @@ h1, h2, h3, h4, h5, h6,
         </div>
         <div class="hall-main">
           <div class="hall-text hall-intro" id="hallText"></div>
-          <div class="hall-image-wrap">
-            <img id="hallMainImage" src="" alt="Sporta zāle" />
+        </div>
+        <div class="hall-schedules-wrap" id="hallSchedulesWrap">
+          <h2>NODARBĪBU <span>GRAFIKS</span></h2>
+          <div id="hallSchedules" class="hall-schedules"></div>
+          <div class="hall-individual-lessons">
+            <h3>INDIVIDUĀLĀS NODARBĪBAS</h3>
+            <p>(vienam sportistam vai nelielai grupai) iespējamas, saskaņojot ar treneri.</p>
           </div>
         </div>
         <div class="hall-gallery-wrap">
@@ -316,7 +321,7 @@ h1, h2, h3, h4, h5, h6,
   .hall-main {
     margin-top: 26px;
     display: grid;
-    grid-template-columns: 1fr minmax(320px, 42%);
+    grid-template-columns: 1fr;
     gap: 28px;
     align-items: start;
   }
@@ -379,6 +384,94 @@ h1, h2, h3, h4, h5, h6,
     height: auto;
     max-height: min(70vh, 640px);
     object-fit: contain;
+  }
+  .hall-schedules-wrap {
+    margin-top: 34px;
+  }
+  .hall-schedules-wrap h2 {
+    margin: 0 0 18px;
+    color: #fff;
+    font-family: "Oswald", sans-serif;
+    font-size: clamp(30px, 3vw, 46px);
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .hall-schedules-wrap h2 span {
+    color: #ee2b2b;
+  }
+  .hall-schedule-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 26px;
+    border: 1px solid rgba(238, 43, 43, 0.72);
+    border-radius: 14px;
+    background: #000;
+  }
+  .hall-schedule-table {
+    width: 100%;
+    min-width: 760px;
+    display: table !important;
+    max-width: none !important;
+    overflow: visible !important;
+    border-collapse: collapse;
+    background: #050505;
+    color: #fff;
+    font-family: Roboto, sans-serif;
+  }
+  .hall-schedule-table th,
+  .hall-schedule-table td {
+    display: table-cell !important;
+    border: 1px solid rgba(255,255,255,0.16);
+    padding: 14px 16px;
+    color: #fff;
+    text-align: left;
+    vertical-align: top;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .hall-schedule-table thead { display: table-header-group !important; }
+  .hall-schedule-table tbody { display: table-row-group !important; }
+  .hall-schedule-table tr { display: table-row !important; }
+  .hall-schedule-title {
+    background: rgba(238, 43, 43, 0.16);
+    font-family: "Oswald", sans-serif;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-align: center !important;
+    text-transform: uppercase;
+  }
+  .hall-schedule-table thead tr:nth-child(2) th {
+    background: rgba(238, 43, 43, 0.16);
+    font-family: "Oswald", sans-serif;
+    font-size: 16px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .hall-schedule-table tbody tr:nth-child(even) td {
+    background: rgba(255,255,255,0.02);
+  }
+  .hall-individual-lessons {
+    margin-top: 6px;
+    padding: 18px 20px;
+    border: 1px solid rgba(255,255,255,0.16);
+    border-left: 3px solid #ee2b2b;
+    background: rgba(255,255,255,0.03);
+  }
+  .hall-individual-lessons h3 {
+    margin: 0 0 6px;
+    color: #fff;
+    font-family: "Oswald", sans-serif;
+    font-size: 24px;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+  .hall-individual-lessons p {
+    margin: 0;
+    color: #fff;
+    font-family: Roboto, sans-serif;
+    font-size: 17px;
+    line-height: 1.45;
   }
   .hall-gallery-wrap {
     margin-top: 26px;
@@ -521,7 +614,7 @@ h1, h2, h3, h4, h5, h6,
     const titleEl = document.getElementById('hallTitle');
     const introEl = document.getElementById('hallIntro');
     const textEl = document.getElementById('hallText');
-    const mainImageEl = document.getElementById('hallMainImage');
+    const schedulesEl = document.getElementById('hallSchedules');
     const galleryEl = document.getElementById('hallGallery');
 
     let hallGalleryItems = [];
@@ -615,6 +708,52 @@ h1, h2, h3, h4, h5, h6,
         .trim();
     }
 
+    const scheduleDays = [
+      { key: 'pirmdiena', label: 'PIRMDIENA' },
+      { key: 'otrdiena', label: 'OTRDIENA' },
+      { key: 'tresdiena', label: 'TREŠDIENA' },
+      { key: 'ceturtdiena', label: 'CETURTDIENA' },
+      { key: 'piektdiena', label: 'PIEKTDIENA' },
+      { key: 'sestdiena', label: 'SESTDIENA' }
+    ];
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderSchedules(schedules) {
+      const items = Array.isArray(schedules) ? schedules : [];
+      if (!items.length) {
+        schedulesEl.innerHTML = '<p style="color:#94a3b8;font-family:Roboto,sans-serif;">Grafiks nav pievienots.</p>';
+        return;
+      }
+      schedulesEl.innerHTML = items.map((schedule) => `
+        <div class="hall-schedule-table-wrap">
+          <table class="hall-schedule-table">
+            <thead>
+              <tr><th class="hall-schedule-title" colspan="7">${escapeHtml(schedule.nosaukums || 'Nodarbību grafiks')}</th></tr>
+              <tr>
+                <th>GRAFIKS</th>
+                ${scheduleDays.map((day) => `<th>${day.label}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${(Array.isArray(schedule.rows) ? schedule.rows : []).map((row) => `
+                <tr>
+                  <td>${escapeHtml(row.grupa)}</td>
+                  ${scheduleDays.map((day) => `<td>${escapeHtml(row[day.key])}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `).join('');
+    }
+
     try {
       const res = await fetch('/api/zales/' + slug);
       const data = await res.json();
@@ -631,12 +770,7 @@ h1, h2, h3, h4, h5, h6,
       introEl.style.display = 'none';
       textEl.innerHTML = sanitizeLegacyHtml(item.saturs || item.ievads || '');
 
-      const mainImage = resolveImageUrl(item.mainImage || item.attels || item.foto_attels || item.image || '');
-      if (mainImage) {
-        mainImageEl.src = mainImage;
-      } else {
-        mainImageEl.removeAttribute('src');
-      }
+      renderSchedules(item.grafiki);
 
       galleryEl.innerHTML = '';
       hallGalleryItems = Array.isArray(item.galerija)
