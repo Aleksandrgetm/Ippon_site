@@ -619,7 +619,6 @@ h1, h2, h3, h4, h5, h6,
     if (item.datums) chips.push(`Datums: ${fmtDate(item.datums)}`);
     if (item.vieta) chips.push(`Vieta: ${item.vieta}`);
     if (item.statuss != null && item.statuss !== '') chips.push(`Statuss: ${STATUS_MAP[item.statuss] || item.statuss}`);
-    if (item.vietu_skaits != null && item.vietu_skaits !== '') chips.push(`Vietu skaits: ${item.vietu_skaits}`);
 
     let content = '';
     const layout = item.layout_type || 'competition_default';

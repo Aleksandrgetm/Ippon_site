@@ -834,9 +834,6 @@
                   <option value="5">2.līga (turnīrs iesācējiem)</option>
                 </select>
               </div>
-              <div class="rez-inline rez-only-sac">
-                <input id="rezManualPlacesCount" type="text" placeholder="Vietu skaits" />
-              </div>
               <div class="rez-inline">
                 <input id="rezManualImage" type="hidden" />
                 <label id="rezMainImageLabel" style="margin:0;">Fotogrāfija
@@ -1011,7 +1008,6 @@
     const rezManualDate = document.getElementById('rezManualDate');
     const rezManualPlace = document.getElementById('rezManualPlace');
     const rezManualStatus = document.getElementById('rezManualStatus');
-    const rezManualPlacesCount = document.getElementById('rezManualPlacesCount');
     const rezManualRecordType = document.getElementById('rezManualRecordType');
     const rezManualLayoutType = document.getElementById('rezManualLayoutType');
     const rezManualImage = document.getElementById('rezManualImage');
@@ -2111,8 +2107,7 @@
           : item.record_type === 'eksamens'
             ? 'Eksāmens'
             : 'Reitings';
-        const extra = item.vietu_skaits != null ? ` | vietu skaits: ${item.vietu_skaits}` : '';
-        meta.textContent = `${typeLabel} | ${item.date || '-'}${extra}`;
+        meta.textContent = `${typeLabel} | ${item.date || '-'}`;
         wrap.appendChild(meta);
 
         const actions = document.createElement('div');
@@ -2144,7 +2139,6 @@
         rezManualDate.value = '';
         rezManualPlace.value = '';
         setRezManualStatusValue("");
-        rezManualPlacesCount.value = '';
         rezManualImage.value = '';
         selectedRezGalleryItems = [];
                 if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
@@ -2168,7 +2162,6 @@
       rezManualDate.value = toDateInputValue(item.date || item.datums || '');
       rezManualPlace.value = item.location || '';
       setRezManualStatusValue(item.statuss || "");
-      rezManualPlacesCount.value = item.vietu_skaits != null ? String(item.vietu_skaits) : '';
       rezManualImage.value = item.image || item.foto_attels || '';
       const structuredGallery = Array.isArray(item?.structured_data?.gallery) ? item.structured_data.gallery : [];
       selectedRezGalleryItems = Array.isArray(item.galerija) && item.galerija.length ? [...item.galerija] : [...structuredGallery];
@@ -2193,7 +2186,6 @@
         Datums: ${item.date || '-'}<br>
         ${item.location ? `Vieta: ${item.location}<br>` : ''}
         ${item.statuss ? `Statuss: ${item.statuss}<br>` : ''}
-        ${item.vietu_skaits != null ? `Vietu skaits: ${item.vietu_skaits}` : ''}
       `;
       rezSourceSlugOverride.value = item.slug || '';
       rezSourceImageOverride.value = item.image || '';
@@ -2214,7 +2206,6 @@
       rezManualDate.value = '';
       rezManualPlace.value = '';
       setRezManualStatusValue("");
-      rezManualPlacesCount.value = '';
       rezManualImage.value = '';
       selectedRezGalleryItems = [];
             if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
@@ -2248,7 +2239,6 @@
       rezManualDate.value = toDateInputValue(item.date || '');
       rezManualPlace.value = item.location || '';
       setRezManualStatusValue(item.statuss || "");
-      rezManualPlacesCount.value = item.vietu_skaits != null ? String(item.vietu_skaits) : '';
       rezManualImage.value = item.image || '';
       const structuredGallery = Array.isArray(item?.structured_data?.gallery) ? item.structured_data.gallery : [];
       selectedRezGalleryItems = [...structuredGallery];
@@ -6223,7 +6213,6 @@
             datums: String(rezManualDate.value || '').trim(),
             vieta: String(rezManualPlace.value || '').trim(),
             statuss: String(rezManualStatus.value || '').trim(),
-            vietu_skaits: Number(rezManualPlacesCount.value) || 0,
             foto_attels: photoValue,
             galerija: galleryValue,
             record_type: recordType,
@@ -6292,7 +6281,6 @@
             datums: String(rezManualDate.value || '').trim(),
             vieta: String(rezManualPlace.value || '').trim(),
             statuss: String(rezManualStatus.value || '').trim(),
-            vietu_skaits: Number(rezManualPlacesCount.value) || 0,
             foto_attels: String(rezManualImage.value || '').trim(),
             galerija: [...selectedRezGalleryItems],
             record_type: 'sacensibas',

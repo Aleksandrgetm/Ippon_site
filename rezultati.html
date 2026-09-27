@@ -903,7 +903,6 @@ h1, h2, h3, h4, h5, h6,
           <td><a class="rez-sac-link" href="/rezultati-single.html?slug=${slug}">${title}</a></td>
           <td>${esc(item.location || '-')}</td>
           <td>${esc(item.statuss || '-')}</td>
-          <td>${esc(item.vietu_skaits != null ? String(item.vietu_skaits) : '-')}</td>
           <td>${foto}</td>
         </tr>`;
     }).join('');
@@ -917,7 +916,6 @@ h1, h2, h3, h4, h5, h6,
             <span class="rez-chip">Nosaukums</span>
             <span class="rez-chip">Vieta</span>
             <span class="rez-chip">Statuss</span>
-            <span class="rez-chip">Vietu skaits</span>
             <span class="rez-chip">Fotografija</span>
           </div>
         </div>
@@ -932,11 +930,10 @@ h1, h2, h3, h4, h5, h6,
                 <th>Nosaukums</th>
                 <th>Vieta</th>
                 <th>Statuss</th>
-                <th>Vietu skaits</th>
                 <th>Fotografija</th>
               </tr>
             </thead>
-            <tbody>${rows || '<tr><td colspan="6">Nav sacensibu ierakstu.</td></tr>'}</tbody>
+            <tbody>${rows || '<tr><td colspan="5">Nav sacensibu ierakstu.</td></tr>'}</tbody>
           </table>
         </div>
       </section>`;
