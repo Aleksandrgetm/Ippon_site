@@ -3208,6 +3208,13 @@ function dateSortValue(dateText) {
   return 0;
 }
 
+function compareNewsRowsByDateDesc(a, b) {
+  const da = dateSortValue(a?.datums);
+  const dbv = dateSortValue(b?.datums);
+  if (da !== dbv) return dbv - da;
+  return Number(b?.id || 0) - Number(a?.id || 0);
+}
+
 function queryRezultatiSourceSacensibas(overrideMap) {
   const hasVietuSkaitsColumn = hasRezultatiVietuSkaitsColumn();
   const vietuSkaitsSelect = hasVietuSkaitsColumn
@@ -6489,12 +6496,9 @@ async function handleApi(req, res, reqUrl) {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const page = Math.min(requestedPage, totalPages);
     const offset = (page - 1) * limit;
-    const rows = db.prepare(`
-      SELECT * FROM jaunumi
-      ORDER BY COALESCE(position, 0) DESC, id DESC
-      LIMIT ?
-      OFFSET ?
-    `).all(limit, offset);
+    const rows = db.prepare('SELECT * FROM jaunumi').all()
+      .sort(compareNewsRowsByDateDesc)
+      .slice(offset, offset + limit);
     sendJson(res, 200, {
       total,
       page,

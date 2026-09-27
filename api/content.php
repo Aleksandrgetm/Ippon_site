@@ -124,6 +124,19 @@ function defaultOrderSql(array $cols): string
     return '';
 }
 
+function newsOrderSql(PDO $pdo, array $tables): string
+{
+    $table = firstTable($pdo, $tables);
+    if (!$table) return '';
+    $cols = tableColumns($pdo, $table);
+    $dateCol = hasCol($cols, 'datums') ? 'datums' : (hasCol($cols, 'date') ? 'date' : '');
+    if ($dateCol === '') return defaultOrderSql($cols);
+
+    $quotedDate = quoteIdentifier($dateCol);
+    $dateExpr = "COALESCE(STR_TO_DATE({$quotedDate}, '%Y-%m-%d'), STR_TO_DATE({$quotedDate}, '%d.%m.%Y'), STR_TO_DATE({$quotedDate}, '%e.%c.%Y'))";
+    return "ORDER BY {$dateExpr} DESC, " . (hasCol($cols, 'id') ? quoteIdentifier('id') . ' DESC' : $quotedDate . ' DESC');
+}
+
 function findItem(PDO $pdo, array $tables, string $key, callable $mapper): ?array
 {
     $table = firstTable($pdo, $tables);
