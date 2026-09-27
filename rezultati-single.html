@@ -631,8 +631,8 @@ h1, h2, h3, h4, h5, h6,
       const rows = sourceRows.map((r) => [r.sportists || '', r.vieta || '', r.informacija || '']);
       content += `
         <section class="rez-block">
-          <h2 class="rez-block-title">Sacensibu rezultati</h2>
-          ${renderTable(['Sportists', 'Vieta', 'Informacija'], rows)}
+          <h2 class="rez-block-title">Sacensību rezultāti</h2>
+          ${renderTable(['Sportists', 'Vieta', 'Informācija'], rows)}
         </section>`;
     } else if (layout === 'exam_simple_table') {
       const rows = toArray(structured.rows).map((r) => [r.uzvards_vards || '', r.kju || '']);
