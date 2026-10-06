@@ -1075,6 +1075,7 @@
     let selectedTrainerMainFile = null;
     let selectedTrainerMainPreviewUrl = '';
     let selectedTrainerGalleryFiles = [];
+    let selectedTrainerVideoFile = null;
     let selectedNodarbibasFile = null;
     let selectedNodarbibasPreviewUrl = '';
     let selectedRezMainFile = null;
@@ -1193,6 +1194,7 @@
     }
 
     const ADMIN_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,image/avif,.heic,.heif';
+    const ADMIN_VIDEO_ACCEPT = 'video/mp4,video/webm,.mp4,.webm';
 
     function buildUploadRequestMeta(file, extra = {}) {
       const category = extra.category || getUploadCategoryForTable(extra.tableName);
@@ -1228,7 +1230,7 @@
         );
       }
       if (isTrainerMediaTable(currentTable)) {
-        return Boolean(selectedTrainerMainFile || selectedTrainerGalleryFiles.length);
+        return Boolean(selectedTrainerMainFile || selectedTrainerGalleryFiles.length || selectedTrainerVideoFile);
       }
       if (isPdfUploadTable(currentTable)) {
         const fileInput = document.getElementById('rulesFileInput');
@@ -1337,6 +1339,7 @@
       dzimsanas_datums: 'Dzimšanas datums',
       foto_attels: 'Fotoattēls',
       galerija: 'Galerija',
+      video_path: 'Trenera video',
       izglitiba: 'Izglītība',
       josta: 'Josta',
       saka_studet: 'Sāka studēt',
@@ -1437,6 +1440,10 @@
         || tableName === 'ippon_sportists'
         || tableName === SADARBIBA_SPORTA_ZALES_IRE_TABLE
         || tableName === SADARBIBA_MUSU_PARTNERI_TABLE;
+    }
+
+    function isTrainerVideoTable(tableName) {
+      return tableName === TRAINERS_TABLE;
     }
 
     function isOptimizedPhotoTable(tableName = currentTable) {
@@ -3000,6 +3007,33 @@
           preview.style.gap = '6px';
           preview.style.marginBottom = '8px';
           wrap.appendChild(preview);
+        } else if (isTrainerVideoTable(currentTable) && col.name === 'video_path') {
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.dataset.col = col.name;
+          field.id = `f_${col.name}`;
+          wrap.appendChild(field);
+
+          const fileInput = document.createElement('input');
+          fileInput.type = 'file';
+          fileInput.accept = ADMIN_VIDEO_ACCEPT;
+          fileInput.id = 'trainerVideoFile';
+          fileInput.style.marginBottom = '6px';
+          wrap.appendChild(fileInput);
+
+          const preview = document.createElement('div');
+          preview.id = 'trainerVideoPreview';
+          preview.className = 'small';
+          preview.style.marginBottom = '8px';
+          wrap.appendChild(preview);
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.id = 'trainerVideoClearBtn';
+          clearBtn.className = 'light';
+          clearBtn.style.marginBottom = '8px';
+          clearBtn.textContent = 'Dzēst video';
+          wrap.appendChild(clearBtn);
         } else if (currentTable === TRAINERS_TABLE && TRAINER_RICH_FIELDS.includes(col.name)) {
           const field = document.createElement('input');
           field.type = 'hidden';
@@ -3534,13 +3568,17 @@
         selectedTrainerMainPreviewUrl = '';
       }
       selectedTrainerGalleryFiles = [];
+      selectedTrainerVideoFile = null;
       const trainerMainInput = document.getElementById('trainerMainImageFile');
       if (trainerMainInput) trainerMainInput.value = '';
       const trainerGalleryInput = document.getElementById('trainerGalleryFiles');
       if (trainerGalleryInput) trainerGalleryInput.value = '';
+      const trainerVideoInput = document.getElementById('trainerVideoFile');
+      if (trainerVideoInput) trainerVideoInput.value = '';
       refreshTrainerTextEditorsFromHidden();
       updateTrainerMainPreview();
       renderTrainerGalleryPreview();
+      updateTrainerVideoPreview();
 
       selectedNodarbibasFile = null;
       if (selectedNodarbibasPreviewUrl) {
@@ -4797,6 +4835,29 @@
       preview.style.display = 'block';
     }
 
+    function updateTrainerVideoPreview() {
+      if (!isTrainerVideoTable(currentTable)) return;
+      const valueInput = document.getElementById('f_video_path');
+      const preview = document.getElementById('trainerVideoPreview');
+      const clearBtn = document.getElementById('trainerVideoClearBtn');
+      if (!valueInput || !preview) return;
+
+      const stored = String(valueInput.value || '').trim();
+      if (selectedTrainerVideoFile) {
+        preview.textContent = `Izvēlēts video: ${selectedTrainerVideoFile.name}`;
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+        return;
+      }
+      if (stored) {
+        const fileName = decodeURIComponent((stored.split('/').pop() || stored).split('?')[0]);
+        preview.innerHTML = `Pašreizējais video: <a href="${resolveImageUrl(stored)}" target="_blank" rel="noopener">${fileName}</a>`;
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+        return;
+      }
+      preview.textContent = 'Video nav pievienots';
+      if (clearBtn) clearBtn.style.display = 'none';
+    }
+
     function renderTrainerGalleryPreview() {
       if (!isTrainerMediaTable(currentTable)) return;
       const valueInput = document.getElementById('f_galerija');
@@ -5191,6 +5252,9 @@
       const galleryFile = document.getElementById('trainerGalleryFiles');
       const clearGalleryBtn = document.getElementById('trainerGalleryClearBtn');
       const photoInput = document.getElementById('f_foto_attels');
+      const videoFile = document.getElementById('trainerVideoFile');
+      const clearVideoBtn = document.getElementById('trainerVideoClearBtn');
+      const videoInput = document.getElementById('f_video_path');
 
       if (photoInput) {
         photoInput.addEventListener('input', updateTrainerMainPreview);
@@ -5232,8 +5296,34 @@
         });
       }
 
+      if (videoInput) {
+        videoInput.addEventListener('input', updateTrainerVideoPreview);
+      }
+
+      if (videoFile) {
+        videoFile.addEventListener('change', () => {
+          const file = videoFile.files && videoFile.files[0];
+          selectedTrainerVideoFile = file || null;
+          if (file) {
+            setStatus('Trenera video izvelets. Nospied Saglabat.', 'ok');
+          }
+          updateTrainerVideoPreview();
+        });
+      }
+
+      if (clearVideoBtn) {
+        clearVideoBtn.addEventListener('click', () => {
+          selectedTrainerVideoFile = null;
+          if (videoFile) videoFile.value = '';
+          if (videoInput) videoInput.value = '';
+          updateTrainerVideoPreview();
+          setStatus('Video tiks dzests pec saglabasanas.', 'ok');
+        });
+      }
+
       updateTrainerMainPreview();
       renderTrainerGalleryPreview();
+      updateTrainerVideoPreview();
     }
 
     async function uploadTrainerImageFile(file, extra = {}) {
@@ -5256,11 +5346,22 @@
       }
     }
 
+    async function uploadTrainerVideoFile(file) {
+      setStatus('Video tiek augšupielādēts...', 'ok');
+      const uploaded = await uploadManagedBinaryFile('/api/upload-video', file, {
+        tableName: currentTable,
+        subPath: 'video'
+      });
+      setStatus('Video veiksmīgi saglabāts.', 'ok');
+      return uploaded.relativeUrl || uploaded.url;
+    }
+
     async function uploadSelectedTrainerMediaIfNeeded() {
       if (!isTrainerMediaTable(currentTable)) return;
 
       const photoInput = document.getElementById('f_foto_attels');
       const galleryInput = document.getElementById('f_galerija');
+      const videoInput = document.getElementById('f_video_path');
 
       if (selectedTrainerMainFile && photoInput) {
         const url = await uploadTrainerImageFile(selectedTrainerMainFile);
@@ -5280,14 +5381,23 @@
         setTrainerGalleryValue(parseTrainerGalleryValue(galleryInput.value));
       }
 
+      if (selectedTrainerVideoFile && videoInput) {
+        const url = await uploadTrainerVideoFile(selectedTrainerVideoFile);
+        videoInput.value = url;
+      }
+
       selectedTrainerMainFile = null;
       selectedTrainerGalleryFiles = [];
+      selectedTrainerVideoFile = null;
       const mainFile = document.getElementById('trainerMainImageFile');
       if (mainFile) mainFile.value = '';
       const galleryFile = document.getElementById('trainerGalleryFiles');
       if (galleryFile) galleryFile.value = '';
+      const videoFile = document.getElementById('trainerVideoFile');
+      if (videoFile) videoFile.value = '';
       updateTrainerMainPreview();
       renderTrainerGalleryPreview();
+      updateTrainerVideoPreview();
     }
 
     function updateNodarbibasPreview() {
@@ -5723,7 +5833,7 @@
         : currentTable === RAKSTI_PRESE_TABLE
           ? visibleColumns.filter((c) => ['id', 'datums', 'nosaukums', 'attels', 'ievads', 'saite'].includes(c.name))
         : currentTable === TRAINERS_TABLE
-          ? visibleColumns.filter((c) => ['id', 'vards_uzvards', 'josta', 'dzimsanas_datums', 'foto_attels', 'galerija'].includes(c.name))
+          ? visibleColumns.filter((c) => ['id', 'vards_uzvards', 'josta', 'dzimsanas_datums', 'foto_attels', 'video_path', 'galerija'].includes(c.name))
         : currentTable === FOTO_GALERIJA_TABLE
           ? visibleColumns.filter((c) => ['id', 'date', 'name_lv', 'content_lv', 'image'].includes(c.name))
         : currentTable === SADARBIBA_MUSU_PARTNERI_TABLE
@@ -5832,6 +5942,11 @@
           } else if (currentTable === TRAINERS_TABLE && col.name === 'foto_attels') {
             td.innerHTML = val
               ? buildResolvedImageHtml(val, '', 'width:62px;height:62px;object-fit:cover;border-radius:6px;border:1px solid #d8dee9;')
+              : '—';
+          } else if (currentTable === TRAINERS_TABLE && col.name === 'video_path') {
+            const href = String(val || '').trim();
+            td.innerHTML = href
+              ? `<a href="${resolveImageUrl(href).replace(/"/g, '&quot;')}" target="_blank" rel="noopener">Video</a>`
               : '—';
           } else if (currentTable === TRAINERS_TABLE && col.name === 'galerija') {
             const count = parseTrainerGalleryValue(val).length;

@@ -284,6 +284,21 @@ h1, h2, h3, h4, h5, h6,
           <div id="trenerisParMani" class="treneris-text"></div>
         </section>
 
+        <section class="treneris-section treneris-video-section" id="trenerisVideoSection" style="display:none;">
+          <h2>Treniņš ar treneri</h2>
+          <div class="treneris-video-layout">
+            <div class="treneris-video-frame">
+              <video id="trenerisVideo" controls playsinline preload="metadata">
+                Jūsu pārlūkprogramma neatbalsta video atskaņošanu.
+              </video>
+            </div>
+            <div class="treneris-video-copy">
+              <h3>Treniņš darbībā</h3>
+              <p>Iepazīstieties ar trenera darbu un treniņu procesu.</p>
+            </div>
+          </div>
+        </section>
+
         <section class="treneris-section">
           <h2>Sasniegumi</h2>
           <div id="trenerisSasniegumi" class="treneris-text"></div>
@@ -400,6 +415,37 @@ h1, h2, h3, h4, h5, h6,
     font:400 16px/1.55 "Roboto",sans-serif;
     white-space:pre-line;
   }
+  .treneris-video-layout {
+    display:grid;
+    grid-template-columns: minmax(260px, 400px) 1fr;
+    gap:22px;
+    align-items:center;
+  }
+  .treneris-video-frame {
+    width:100%;
+    max-width:420px;
+  }
+  .treneris-video-frame video {
+    display:block;
+    width:100%;
+    max-height:min(72vh, 680px);
+    aspect-ratio:9/16;
+    object-fit:contain;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.14);
+    background:#000;
+  }
+  .treneris-video-copy h3 {
+    margin:0 0 10px;
+    font:700 24px/1 "Oswald",sans-serif;
+    color:#fff;
+    text-transform:uppercase;
+  }
+  .treneris-video-copy p {
+    margin:0;
+    color:#fff;
+    font:400 16px/1.55 "Roboto",sans-serif;
+  }
   .treneris-gallery {
     display:grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -489,6 +535,8 @@ h1, h2, h3, h4, h5, h6,
   }
   @media (max-width: 1080px) {
     .treneris-main { grid-template-columns: 1fr; }
+    .treneris-video-layout { grid-template-columns: 1fr; }
+    .treneris-video-frame { max-width:390px; }
     .treneris-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .treneris-photo { height: clamp(280px, 40vh, 420px); }
   }
@@ -497,6 +545,9 @@ h1, h2, h3, h4, h5, h6,
     .treneris-container { width:min(1220px, calc(100% - 24px)); }
     .treneris-back { font-size:16px; }
     .treneris-field-value, .treneris-text { font-size:15px; }
+    .treneris-video-frame { max-width:min(100%, 360px); }
+    .treneris-video-copy h3 { font-size:20px; }
+    .treneris-video-copy p { font-size:15px; }
     .treneris-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .treneris-gallery img { height:150px; }
     .treneris-photo { height: clamp(240px, 34vh, 340px); }
@@ -576,6 +627,13 @@ h1, h2, h3, h4, h5, h6,
       return;
     }
     target.innerHTML = html;
+  }
+
+  function getVideoMime(src) {
+    const clean = String(src || '').split('?')[0].toLowerCase();
+    if (clean.endsWith('.webm')) return 'video/webm';
+    if (clean.endsWith('.mp4')) return 'video/mp4';
+    return '';
   }
 
   let trenerisLightboxEl = null;
@@ -689,6 +747,19 @@ h1, h2, h3, h4, h5, h6,
         item.par_mani || '',
         'Apraksts vel nav pievienots.'
       );
+
+      const videoSection = document.getElementById('trenerisVideoSection');
+      const videoEl = document.getElementById('trenerisVideo');
+      const videoPath = String(item.video_path || '').trim();
+      if (videoSection && videoEl && videoPath) {
+        const mime = getVideoMime(videoPath);
+        videoEl.innerHTML = `${mime ? `<source src="${escapeHtml(videoPath)}" type="${escapeHtml(mime)}">` : `<source src="${escapeHtml(videoPath)}">`}Jūsu pārlūkprogramma neatbalsta video atskaņošanu.`;
+        videoSection.style.display = 'block';
+      } else if (videoSection && videoEl) {
+        videoEl.removeAttribute('src');
+        videoEl.innerHTML = 'Jūsu pārlūkprogramma neatbalsta video atskaņošanu.';
+        videoSection.style.display = 'none';
+      }
 
       setRichContent(
         document.getElementById('trenerisSasniegumi'),

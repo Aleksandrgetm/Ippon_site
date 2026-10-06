@@ -127,6 +127,8 @@ const MIME = {
   '.csv': 'text/csv; charset=utf-8',
   '.xls': 'application/vnd.ms-excel',
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2'
 };
@@ -154,6 +156,12 @@ const FILE_ALLOWED_MIME_TYPES = new Set([
   'application/zip',
   'application/octet-stream'
 ]);
+const VIDEO_TYPE_DEFS = [
+  { ext: 'mp4', mime: 'video/mp4', aliases: ['mp4'] },
+  { ext: 'webm', mime: 'video/webm', aliases: ['webm'] }
+];
+const VIDEO_ALLOWED_MIME_TYPES = new Set(VIDEO_TYPE_DEFS.map((item) => item.mime));
+const VIDEO_ALLOWED_EXTENSIONS = new Set(VIDEO_TYPE_DEFS.flatMap((item) => item.aliases));
 
 function parsePositiveIntEnv(name, fallback) {
   const raw = String(process.env[name] || '').trim();
@@ -168,9 +176,11 @@ function parseMegabytesEnv(name, fallbackMb) {
 }
 
 const UPLOAD_MAX_FILE_SIZE_BYTES = parseMegabytesEnv('UPLOAD_MAX_FILE_SIZE_MB', 100);
+const VIDEO_UPLOAD_MAX_FILE_SIZE_BYTES = parseMegabytesEnv('VIDEO_UPLOAD_MAX_FILE_SIZE_MB', 250);
 const UPLOAD_MAX_REQUEST_SIZE_BYTES = Math.max(
   parseMegabytesEnv('UPLOAD_MAX_REQUEST_SIZE_MB', 500),
-  UPLOAD_MAX_FILE_SIZE_BYTES
+  UPLOAD_MAX_FILE_SIZE_BYTES,
+  VIDEO_UPLOAD_MAX_FILE_SIZE_BYTES
 );
 const UPLOAD_MAX_FILES = parsePositiveIntEnv('UPLOAD_MAX_FILES', 100);
 const UPLOAD_TIMEOUT_MS = parsePositiveIntEnv('UPLOAD_TIMEOUT_MS', 600000);
@@ -511,6 +521,25 @@ function detectGenericFileTypeFromBuffer(buffer, normalizedExt) {
   return null;
 }
 
+function detectVideoTypeFromBuffer(buffer, normalizedExt) {
+  if (!Buffer.isBuffer(buffer) || !normalizedExt) return null;
+  if (normalizedExt === 'mp4') {
+    return buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp'
+      ? { mime: 'video/mp4', ext: 'mp4' }
+      : null;
+  }
+  if (normalizedExt === 'webm') {
+    return buffer.length >= 4
+      && buffer[0] === 0x1a
+      && buffer[1] === 0x45
+      && buffer[2] === 0xdf
+      && buffer[3] === 0xa3
+      ? { mime: 'video/webm', ext: 'webm' }
+      : null;
+  }
+  return null;
+}
+
 function stripExtensionArtifacts(baseName, normalizedExt) {
   let next = String(baseName || '').trim();
   if (!next) return next;
@@ -582,6 +611,27 @@ function resolveUploadTarget(options = {}) {
     localPath: uploadKeyToLocalPath(storageKey),
     publicUrl: buildPublicUploadUrl(storageKey)
   };
+}
+
+async function removeLocalUploadFileIfSafe(fileUrl, expectedPrefix = '') {
+  const storageKey = extractUploadStorageKey(fileUrl);
+  if (!storageKey) return false;
+  const normalizedKey = storageKey.replace(/\\/g, '/').replace(/^\/+/, '');
+  const normalizedPrefix = String(expectedPrefix || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (normalizedPrefix && !normalizedKey.startsWith(`${normalizedPrefix}/`)) return false;
+
+  const uploadsRoot = path.resolve(ROOT, 'uploads');
+  const filePath = path.resolve(uploadKeyToLocalPath(normalizedKey));
+  if (!filePath.startsWith(`${uploadsRoot}${path.sep}`)) return false;
+
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile()) return false;
+    await fs.promises.unlink(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function updateUploadTargetExtension(target, ext) {
@@ -840,6 +890,7 @@ function ensureTreneriTable() {
       dzimsanas_datums TEXT,
       foto_attels TEXT,
       galerija TEXT,
+      video_path TEXT,
       izglitiba TEXT,
       josta TEXT,
       saka_studet TEXT,
@@ -853,10 +904,12 @@ function ensureTreneriTable() {
   `);
 
   ensureTableColumn('treneri', 'position', 'INTEGER');
+  ensureTableColumn('treneri', 'video_path', 'TEXT');
 }
 
 function ensureTreneriPositionColumn() {
   ensureTableColumn('treneri', 'position', 'INTEGER');
+  ensureTableColumn('treneri', 'video_path', 'TEXT');
 }
 
 function ensureKlubaNoteikumiTable() {
@@ -2710,6 +2763,7 @@ function mapTrainerRow(row) {
     dzimsanas_datums: row.dzimsanas_datums || '',
     foto_attels: normalizeStoredMediaUrl(row.foto_attels) || null,
     galerija: parseGallery(row.galerija),
+    video_path: normalizeStoredMediaUrl(row.video_path) || null,
     izglitiba: row.izglitiba || '',
     josta: row.josta || '',
     saka_studet: row.saka_studet || '',
@@ -4245,6 +4299,13 @@ function detectUploadedFileKindFromBuffer(buffer, expectedType, originalName, de
       detected: detectImageTypeFromBuffer(buffer)
     });
   }
+  if (expectedType === 'video') {
+    return validateVideoUpload({
+      fileName: originalName,
+      declaredMime,
+      detected: detectVideoTypeFromBuffer(buffer, normalizeFileExtension(path.extname(originalName)))
+    });
+  }
   return validateGenericFileUpload({
     fileName: originalName,
     declaredMime,
@@ -4264,7 +4325,9 @@ async function handleBinaryManagedUpload(req, res, options = {}) {
   const normalizedCategory = normalizeUploadCategory(meta.category);
   const maxUploadBytes = options.kind === 'image' && IMAGE_OPTIMIZATION_CATEGORIES.has(normalizedCategory)
     ? Math.min(IMAGE_OPTIMIZATION_INPUT_MAX_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES)
-    : Math.min(UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES);
+    : options.kind === 'video'
+      ? Math.min(VIDEO_UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES)
+      : Math.min(UPLOAD_MAX_FILE_SIZE_BYTES, UPLOAD_MAX_REQUEST_SIZE_BYTES);
 
   const streamed = await streamRequestToTempFile(req, originalName, maxUploadBytes);
   if (streamed.size <= 0) {
@@ -4282,20 +4345,30 @@ async function handleBinaryManagedUpload(req, res, options = {}) {
 
   let uploadTempPath = streamed.filePath;
   try {
-    const detected = options.kind === 'image'
-      ? validateImageUpload({
-          fileName: originalName,
-          declaredMime: requestContentType,
-          detected: detectImageTypeFromBuffer(readFileSignature(streamed.filePath, 64))
-        })
-      : validateGenericFileUpload({
-          fileName: originalName,
-          declaredMime: requestContentType,
-          detected: detectGenericFileTypeFromBuffer(
-            readFileSignature(streamed.filePath, 64),
-            normalizeFileExtension(path.extname(originalName))
-          )
-        });
+    let detected;
+    const signature = readFileSignature(streamed.filePath, 64);
+    if (options.kind === 'image') {
+      detected = validateImageUpload({
+        fileName: originalName,
+        declaredMime: requestContentType,
+        detected: detectImageTypeFromBuffer(signature)
+      });
+    } else if (options.kind === 'video') {
+      detected = validateVideoUpload({
+        fileName: originalName,
+        declaredMime: requestContentType,
+        detected: detectVideoTypeFromBuffer(signature, normalizeFileExtension(path.extname(originalName)))
+      });
+    } else {
+      detected = validateGenericFileUpload({
+        fileName: originalName,
+        declaredMime: requestContentType,
+        detected: detectGenericFileTypeFromBuffer(
+          signature,
+          normalizeFileExtension(path.extname(originalName))
+        )
+      });
+    }
 
     const target = resolveUploadTarget({
       category: normalizedCategory,
@@ -4303,7 +4376,7 @@ async function handleBinaryManagedUpload(req, res, options = {}) {
       subPath: meta.subPath,
       fileName: originalName,
       ext: detected.ext,
-      fallbackStem: options.kind === 'image' ? 'image' : 'file'
+      fallbackStem: options.kind === 'image' ? 'image' : options.kind === 'video' ? 'video' : 'file'
     });
     const prepared = options.kind === 'image'
       ? await optimizeManagedImageFile({
@@ -4747,6 +4820,28 @@ function validateGenericFileUpload({ fileName, declaredMime, detected }) {
   const normalizedDeclaredMime = String(declaredMime || '').trim().toLowerCase();
   if (normalizedDeclaredMime && !FILE_ALLOWED_MIME_TYPES.has(normalizedDeclaredMime)) {
     throw createHttpError(400, `Unsupported file MIME type: ${normalizedDeclaredMime}`);
+  }
+  return {
+    mime: detected.mime,
+    ext: detected.ext
+  };
+}
+
+function validateVideoUpload({ fileName, declaredMime, detected }) {
+  const normalizedExt = normalizeFileExtension(path.extname(fileName));
+  if (!VIDEO_ALLOWED_EXTENSIONS.has(normalizedExt)) {
+    throw createHttpError(400, 'Only MP4 and WEBM videos are allowed.');
+  }
+  if (!detected || !VIDEO_ALLOWED_MIME_TYPES.has(detected.mime) || detected.ext !== normalizedExt) {
+    throw createHttpError(400, 'The uploaded file does not match the allowed MP4/WEBM video formats.');
+  }
+  const normalizedDeclaredMime = String(declaredMime || '').trim().toLowerCase();
+  if (
+    normalizedDeclaredMime
+    && normalizedDeclaredMime !== 'application/octet-stream'
+    && !VIDEO_ALLOWED_MIME_TYPES.has(normalizedDeclaredMime)
+  ) {
+    throw createHttpError(400, `Unsupported video MIME type: ${normalizedDeclaredMime}`);
   }
   return {
     mime: detected.mime,
@@ -5409,6 +5504,24 @@ async function handleApi(req, res, reqUrl) {
       const uploaded = await handleBinaryManagedUpload(req, res, {
         kind: 'file',
         uploadToSpaces: false
+      });
+      sendJson(res, 201, uploaded);
+    } catch (error) {
+      sendErrorJson(res, error, 400);
+    }
+    return true;
+  }
+
+  if (pathname === '/api/upload-video' && req.method === 'POST') {
+    try {
+      const meta = getUploadMetaFromHeaders(req.headers);
+      if (normalizeUploadCategory(meta.category) !== 'trainers') {
+        throw createHttpError(400, 'Trainer videos must use the trainers upload category.');
+      }
+      const uploaded = await handleBinaryManagedUpload(req, res, {
+        kind: 'video',
+        uploadToSpaces: false,
+        meta
       });
       sendJson(res, 201, uploaded);
     } catch (error) {
@@ -7139,16 +7252,17 @@ async function handleApi(req, res, reqUrl) {
           const info = trainerHasPosition
             ? db.prepare(`
                 INSERT INTO treneri (
-                  vards_uzvards, dzimsanas_datums, foto_attels, galerija,
+                  vards_uzvards, dzimsanas_datums, foto_attels, galerija, video_path,
                   izglitiba, josta, saka_studet, koucinga_pieredze,
                   par_mani, sasniegumi, slug, position, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               `).run(
                 fullName,
                 birthDate || null,
                 body.foto_attels ? String(body.foto_attels).trim() : null,
                 JSON.stringify(parseGallery(body.galerija)),
+                body.video_path ? String(body.video_path).trim() : null,
                 body.izglitiba != null ? String(body.izglitiba).trim() : null,
                 body.josta != null ? String(body.josta).trim() : null,
                 body.saka_studet != null ? String(body.saka_studet).trim() : null,
@@ -7162,16 +7276,17 @@ async function handleApi(req, res, reqUrl) {
               )
             : db.prepare(`
                 INSERT INTO treneri (
-                  vards_uzvards, dzimsanas_datums, foto_attels, galerija,
+                  vards_uzvards, dzimsanas_datums, foto_attels, galerija, video_path,
                   izglitiba, josta, saka_studet, koucinga_pieredze,
                   par_mani, sasniegumi, slug, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               `).run(
                 fullName,
                 birthDate || null,
                 body.foto_attels ? String(body.foto_attels).trim() : null,
                 JSON.stringify(parseGallery(body.galerija)),
+                body.video_path ? String(body.video_path).trim() : null,
                 body.izglitiba != null ? String(body.izglitiba).trim() : null,
                 body.josta != null ? String(body.josta).trim() : null,
                 body.saka_studet != null ? String(body.saka_studet).trim() : null,
@@ -7663,6 +7778,7 @@ async function handleApi(req, res, reqUrl) {
                 dzimsanas_datums = ?,
                 foto_attels = ?,
                 galerija = ?,
+                video_path = ?,
                 izglitiba = ?,
                 josta = ?,
                 saka_studet = ?,
@@ -7678,6 +7794,7 @@ async function handleApi(req, res, reqUrl) {
               birthDate || null,
               body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
               JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
+              body.video_path !== undefined ? (String(body.video_path || '').trim() || null) : existing.video_path,
               body.izglitiba != null ? String(body.izglitiba).trim() : existing.izglitiba,
               body.josta != null ? String(body.josta).trim() : existing.josta,
               body.saka_studet != null ? String(body.saka_studet).trim() : existing.saka_studet,
@@ -7697,6 +7814,7 @@ async function handleApi(req, res, reqUrl) {
                 dzimsanas_datums = ?,
                 foto_attels = ?,
                 galerija = ?,
+                video_path = ?,
                 izglitiba = ?,
                 josta = ?,
                 saka_studet = ?,
@@ -7711,6 +7829,7 @@ async function handleApi(req, res, reqUrl) {
               birthDate || null,
               body.foto_attels != null ? String(body.foto_attels).trim() : existing.foto_attels,
               JSON.stringify(parseGallery(body.galerija != null ? body.galerija : existing.galerija)),
+              body.video_path !== undefined ? (String(body.video_path || '').trim() || null) : existing.video_path,
               body.izglitiba != null ? String(body.izglitiba).trim() : existing.izglitiba,
               body.josta != null ? String(body.josta).trim() : existing.josta,
               body.saka_studet != null ? String(body.saka_studet).trim() : existing.saka_studet,
@@ -7723,6 +7842,11 @@ async function handleApi(req, res, reqUrl) {
             );
           }
           const row = db.prepare('SELECT * FROM treneri WHERE id = ?').get(id);
+          const oldVideoPath = String(existing.video_path || '').trim();
+          const newVideoPath = String(row.video_path || '').trim();
+          if (oldVideoPath && oldVideoPath !== newVideoPath) {
+            await removeLocalUploadFileIfSafe(oldVideoPath, `uploads/trainers/${id}/video`);
+          }
           sendJson(res, 200, { row: mapTrainerRow(row) });
           return;
         }
@@ -8211,7 +8335,9 @@ const server = http.createServer(async (req, res) => {
         '.pdf': 'application/pdf',
         '.csv': 'text/csv; charset=utf-8',
         '.xls': 'application/vnd.ms-excel',
-        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.mp4': 'video/mp4',
+        '.webm': 'video/webm'
       };
 
       const contentType = mimeTypes[ext] || 'application/octet-stream';
