@@ -1,0 +1,143 @@
+IPPON: персональные видео тренеров — диагностика и локальное исправление
+Дата: 2026-10-29
+
+ПРИЧИНА
+Публичный /uploads/ игнорирует HTTP Range. Все 6 действующих MP4 на
+www.ippon.lv при Range: bytes=0-1023 вернули 200, video/mp4, chunked,
+полный файл, без Accept-Ranges и Content-Range. Это воспроизведено и
+объясняется обработчиком /uploads/ в server.js: fs.readFile + HTTP 200.
+Nginx присутствует в публичном ответе; его конфигурации в репозитории нет,
+доступ к действующей конфигурации сервера не предоставлен.
+На основном домене ippon.lv есть 301 на www.ippon.lv; прямые URL видео
+на www возвращают 200 без 403/404/redirect. Видео same-origin, CORS не нужен.
+
+ФАКТИЧЕСКИЕ URL (префикс https://www.ippon.lv)
+2 /uploads/trainers/2/video/copy_2df16e37-28fa-46c5-ad8c-d2c6258097a5.mp4
+3 /uploads/trainers/3/video/copy_0edfeec8-e73a-453a-a169-08b3f86fc15e.mp4
+6 /uploads/trainers/6/video/copy_4032cf45-7d19-4e23-80e0-d2ad6232126c.mp4
+7 /uploads/trainers/7/video/copy_955030eb-ed11-4f5a-86c6-e5c5eec4a92e.mp4
+5 /uploads/trainers/5/video/copy_4561fa10-01d5-4bfd-a4cf-ae3c182aa322.mp4
+8 /uploads/trainers/8/video/copy_8c22feac-358b-481d-93b9-ba4d616d9816.mp4
+
+КОДЕКИ
+ffprobe скачан отдельно через npm pack ffprobe-static, без npm install
+и без изменения package.json/package-lock.json.
+Все 6: H.264 AVC High, Level 3.1, yuv420p, 720x1280; AAC-LC.
+ID    Размер, байт    Длительность, сек    moov offset    mdat offset
+2     10813120        29.12                32             25598
+3      7052365        20.24                32             18270
+6      7852161        26.32                32             23394
+7      9580626        34.20                32             29970
+5     12022593        32.32                32             28294
+8      7018759        24.08                32             21426
+Порядок атомов проверен отдельно чтением MP4: ftyp, moov, free, mdat.
+Faststart уже есть. Конвертация существующих видео НЕ нужна.
+
+ИЗМЕНЕНИЯ
+server.js: только MP4/WebM в /uploads/ направляются в потоковый обработчик.
+scripts/serve-video.js: GET/HEAD, 200/206/416/404/405, Content-Length,
+Content-Range, Accept-Ranges, одиночные, открытые и суффиксные диапазоны;
+освобождение потока при разрыве соединения, обработка ошибки чтения.
+Неподдерживаемые/multiple Range игнорируются с обычным 200; If-Range
+с несовпадающим Last-Modified приводит к полному ответу.
+treneris-single.html: video.load() после динамического изменения source.
+scripts/serve-video.test.js: воспроизводимый HTTP-регрессионный тест.
+treneri.html, CSS, дизайн и положение секции не изменены.
+TRENIŅŠ AR TRENERI остаётся между PAR MANI и SASNIEGUMI.
+
+UPLOAD
+Админка использует /api/upload-video с binary body и X-Upload-* заголовками.
+Видео хранятся локально в uploads/trainers/<id>/video, не в Spaces.
+Сохраняемая relativeUrl соответствует локальному файлу; MIME берётся
+из проверенного типа контейнера, расширение проверяется по сигнатуре.
+api/upload.php не участвует в этом пути загрузки видео.
+Нормализация не добавлена: все имеющиеся файлы уже совместимы.
+Ограничение: upload проверяет контейнер, но не проверяет кодеки внутри
+будущих MP4/WebM. Для будущих загрузок использовать H.264/AAC-LC MP4.
+
+РЕЗУЛЬТАТЫ ПРОВЕРОК
+node --check server.js и node --check scripts/serve-video.js: PASS.
+node --test scripts/serve-video.test.js: PASS; проверяются точные байты,
+0-1, 0-1023, открытый/суффиксный/обрезанный диапазон, 416, HEAD,
+невалидный/multiple Range, stale If-Range, отсутствующий файл, POST.
+curl -I на локальную копию реального видео: 200, video/mp4,
+Accept-Ranges: bytes, Content-Length: 10813120, тело отсутствует.
+curl с Range: bytes=0-1023: 206, Content-Length: 1024,
+Content-Range: bytes 0-1023/10813120; байты совпадают с оригиналом.
+Upload API локально: 201; MIME video/mp4, расширение .mp4, длина совпадает;
+загруженный файл отдаётся с 206. Невалидная сигнатура: 400.
+Сохранение ссылки через PUT /api/table/treneri/2 в отдельную тестовую БД:
+200; GET профиля возвращает новую ссылку; браузер воспроизводит её.
+Рабочие данные тренеров не редактировались. Тестовая БД создана отдельно.
+
+МОБИЛЬНАЯ ПРОВЕРКА И ОГРАНИЧЕНИЯ
+Playwright Chromium, viewport 320/390/412/1440: overflow отсутствует;
+ширина плеера 243/313/335/400 px, object-fit: contain, controls доступны
+по hit-test, playsinline=true, preload=metadata, autoplay=false.
+Подтверждены воспроизведение и seek на 15 сек без media error.
+Профиль без video_path проверен в тестовой БД: секция скрыта, source нет.
+Проверка touchscreen в отдельном эмулированном контексте не завершилась:
+браузер потерял целевой DOM во время проверки; touch PASS не заявляется.
+Реальные iPhone Safari и Android Chrome не тестировались.
+В локальном браузере есть посторонние ошибки загрузки legacy-ресурсов
+с club-wp.eu (DNS/Elementor chunks), не media errors.
+После деплоя обязательны публичный Range и проверка на реальных устройствах.
+
+ДЕПЛОЙ (НЕ ВЫПОЛНЕН)
+mobile-video.patch содержит только 4 файла исправления и теста, без БД,
+uploads, .env, скачанных видео и диагностических инструментов.
+SSH-адрес, каталог приложения и имя процесса/сервиса не установлены.
+Ниже точные операции, но переменные требуется заполнить реальными
+параметрами; не следует угадывать имя сервиса или выполнять оба рестарта.
+
+На локальном PowerShell после получения параметров:
+  $IpponSsh = 'USER@HOST'
+  scp ./mobile-video.patch "${IpponSsh}:~/mobile-video.patch"
+  ssh $IpponSsh
+
+На Linux-сервере (каталог должен быть действующим checkout IPPON):
+  set -eu
+  IPPON_APP_DIR='/ACTUAL/APP/DIRECTORY'
+  cd "$IPPON_APP_DIR"
+  git status --short
+  git apply --stat "$HOME/mobile-video.patch"
+  git apply --check "$HOME/mobile-video.patch"
+  backup_dir="$HOME/ippon-video-backup-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup_dir"
+  cp -p server.js treneris-single.html "$backup_dir/"
+  git apply "$HOME/mobile-video.patch"
+  node --check server.js
+  node --check scripts/serve-video.js
+  node --test scripts/serve-video.test.js
+
+Если git apply --check сообщает конфликт — остановиться, не применять
+с --reject/--force. Сначала сопоставить отличия действующего checkout.
+Если проверка после применения не проходит — не перезапускать процесс.
+
+Только подтверждённый вариант управления процессом:
+  pm2 restart ACTUAL_PROCESS_NAME
+ИЛИ
+  sudo systemctl restart ACTUAL_SERVICE_NAME
+
+Проверить публичную выдачу после перезапуска:
+  VIDEO_URL='https://www.ippon.lv/uploads/trainers/2/video/copy_2df16e37-28fa-46c5-ad8c-d2c6258097a5.mp4'
+  curl -fSI "$VIDEO_URL"
+  curl -fSs -D - -H 'Range: bytes=0-1023' "$VIDEO_URL" -o /tmp/ippon-video-range.bin
+  wc -c /tmp/ippon-video-range.bin
+Ожидается 206, Content-Range bytes 0-1023/10813120 и 1024 байта.
+Если публично всё ещё 200, проверить Nginx location /uploads/ и
+передачу Range/If-Range к Node. Не добавлять второй обработчик Range
+или конфигурацию Nginx вслепую. Действующая конфигурация не изучена.
+
+Откат кода при необходимости (до любых дальнейших изменений):
+  git apply --reverse --check "$HOME/mobile-video.patch"
+  git apply --reverse "$HOME/mobile-video.patch"
+  # Затем тот же подтверждённый restart процесса.
+Эти операции не затрагивают БД и существующие видео.
+
+ПРОВЕРКА БУДУЩЕГО ФАЙЛА (на сервере с установленным ffprobe)
+  ffprobe -v error -show_entries stream=codec_name,profile,pix_fmt,width,height,level -of json input.mp4
+Если будущий файл несовместим, отдельная копия без перезаписи оригинала:
+  ffmpeg -n -i input.mp4 -map 0:v:0 -map '0:a:0?' -c:v libx264 -pix_fmt yuv420p -crf 22 -preset medium -c:a aac -profile:a aac_low -b:a 128k -movflags +faststart output-compatible.mp4
+Проверить выход ffprobe и воспроизведение до загрузки нового файла.
+Не применять массово; для нынешних шести файлов это не требуется.

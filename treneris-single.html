@@ -755,10 +755,13 @@ h1, h2, h3, h4, h5, h6,
         const mime = getVideoMime(videoPath);
         videoEl.innerHTML = `${mime ? `<source src="${escapeHtml(videoPath)}" type="${escapeHtml(mime)}">` : `<source src="${escapeHtml(videoPath)}">`}Jūsu pārlūkprogramma neatbalsta video atskaņošanu.`;
         videoSection.style.display = 'block';
+        // Restart resource selection after inserting the source asynchronously.
+        videoEl.load();
       } else if (videoSection && videoEl) {
         videoEl.removeAttribute('src');
         videoEl.innerHTML = 'Jūsu pārlūkprogramma neatbalsta video atskaņošanu.';
         videoSection.style.display = 'none';
+        videoEl.load();
       }
 
       setRichContent(

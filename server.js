@@ -8,6 +8,7 @@ const { pipeline } = require('stream/promises');
 const Database = require('better-sqlite3');
 const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const XLSX = require('xlsx');
+const { serveVideo } = require('./scripts/serve-video');
 
 let sharp = null;
 let sharpLoadError = null;
@@ -8312,6 +8313,17 @@ const server = http.createServer(async (req, res) => {
   const pathname = decodeURIComponent(reqUrl.pathname);
   if (pathname.startsWith('/uploads/')) {
     const filePath = path.join(ROOT, pathname);
+    const videoMime = { '.mp4': 'video/mp4', '.webm': 'video/webm' }[path.extname(filePath).toLowerCase()];
+    if (videoMime) {
+      const relativePath = path.relative(UPLOADS_DIR, filePath);
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      serveVideo(req, res, filePath, videoMime);
+      return;
+    }
 
     fs.readFile(filePath, (err, data) => {
       if (err) {
