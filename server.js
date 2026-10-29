@@ -8,6 +8,7 @@ const { pipeline } = require('stream/promises');
 const Database = require('better-sqlite3');
 const { S3Client, ListObjectsV2Command, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const XLSX = require('xlsx');
+const { ratingPresentation } = require('./scripts/rating-source');
 const { serveVideo } = require('./scripts/serve-video');
 
 let sharp = null;
@@ -1181,7 +1182,6 @@ function ensureRezultatiSchema() {
     WHERE record_type IS NULL
        OR TRIM(record_type) = ''
        OR record_type NOT IN ('sacensibas', 'eksamens', 'reitings')
-       OR record_type IN ('eksamens', 'reitings')
   `);
   db.exec(`
     UPDATE ippon_sorevnovanija
@@ -3207,11 +3207,13 @@ function mapRezultatiLegacyHtmlSource(row, overrideRow = null, forcedType = null
 }
 
 function mapRezultatiTextSource(row, overrideRow = null, forcedType = null) {
-  const title = safeText(row.name);
   const defaultRecordType = forcedType || detectTextRecordType(row) || 'eksamens';
-  const recordType = normalizeRezultatiRecordType(overrideRow?.record_type || defaultRecordType);
+  const structured = parseManualStructuredData(overrideRow?.structured_data);
+  const presentation = ratingPresentation(row, overrideRow, defaultRecordType, structured);
+  const title = presentation.title;
+  const recordType = normalizeRezultatiRecordType(presentation.recordType);
   const layoutType = normalizeRezultatiLayoutType(
-    overrideRow?.layout_type || 'custom_html',
+    presentation.layoutType,
     recordType
   );
   const defaultImage = row.image ? (mapLegacyImageById(row.image)?.url || '') : '';
@@ -3221,6 +3223,12 @@ function mapRezultatiTextSource(row, overrideRow = null, forcedType = null) {
     id: row.area_id,
     source_table: 'ippon_text',
     source_id: row.area_id,
+    legacy_slug: presentation.recovered ? buildSourceSlug(
+      overrideRow.record_type, row.area_id,
+      overrideRow.slug_override || row.name || `${defaultRecordType}-${row.area_id}`,
+      overrideRow.record_type
+    ) : (defaultRecordType === 'reitings' && !safeText(row.name) && title
+      ? `sacensibas-${row.area_id}-reitings-${row.area_id}-reitings-${row.area_id}` : undefined),
     record_type: recordType,
     layout_type: layoutType,
     title,
@@ -3230,7 +3238,7 @@ function mapRezultatiTextSource(row, overrideRow = null, forcedType = null) {
     slug: buildSourceSlug(
       recordType,
       row.area_id,
-      overrideRow?.slug_override || title || `${recordType}-${row.area_id}`,
+      (presentation.recovered ? title : overrideRow?.slug_override) || title || `${recordType}-${row.area_id}`,
       recordType
     ),
     image: safeText(overrideRow?.image_override) || defaultImage || null,
@@ -6482,6 +6490,13 @@ async function handleApi(req, res, reqUrl) {
         return true;
       }
       const overrideMap = getSourceOverrideMap();
+      // Old malformed rating URLs must not resolve to a competition with the
+      // same numeric ID. Match the complete recorded alias, not just the ID.
+      const recoveredRating = queryRezultatiSourceReitingi(overrideMap).find(item => item.legacy_slug === key);
+      if (recoveredRating) {
+        sendJson(res, 200, { item: recoveredRating });
+        return true;
+      }
       if (parsed.record_type === 'sacensibas') {
         const row = db.prepare('SELECT * FROM ippon_sorevnovanija WHERE id = ? LIMIT 1').get(parsed.id);
         if (!row) {

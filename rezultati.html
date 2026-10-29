@@ -642,7 +642,7 @@ h1, h2, h3, h4, h5, h6,
 </style>
 <script>
   function esc(text) {
-    return String(text || '').replace(/[&<>"']/g, (ch) => ({
+    return String(text ?? '').replace(/[&<>"']/g, (ch) => ({
       '&':'&amp;',
       '<':'&lt;',
       '>':'&gt;',
@@ -652,7 +652,7 @@ h1, h2, h3, h4, h5, h6,
   }
 
   function normalizeEscapedBreaks(value) {
-    return String(value || '')
+    return String(value ?? '')
       .replace(/\\r\\n/g, '\n')
       .replace(/\\n/g, '\n')
       .replace(/\\r/g, '\n')
@@ -841,8 +841,8 @@ h1, h2, h3, h4, h5, h6,
           </section>`;
       }
     } else if (layout === 'rating_two_tables') {
-      const topRows = toArray(structured.system_rows).map((r) => [r.systema || '', r.punkti || '', r.turniri || '']);
-      const bottomRows = toArray(structured.rating_rows).map((r) => [r.sportists || '', r.punktu_kopsumma || '', r.vieta || '']);
+      const topRows = toArray(structured.system_rows).map((r) => [r.systema ?? '', r.punkti ?? '', r.turniri ?? '']);
+      const bottomRows = toArray(structured.rating_rows).map((r) => [r.sportists ?? '', r.punktu_kopsumma ?? '', r.vieta ?? '']);
       content += `
         <section class="rez-block">
           <h2 class="rez-block-title">Reitinga sistema</h2>
@@ -1043,7 +1043,8 @@ h1, h2, h3, h4, h5, h6,
         })
         : [];
 
-      const fromUrl = new URL(window.location.href).searchParams.get('slug') || '';
+      const requestedSlug = new URL(window.location.href).searchParams.get('slug') || '';
+      const fromUrl = items.find(item => item.legacy_slug === requestedSlug)?.slug || requestedSlug;
       const firstInline = items.find((it) => it.record_type !== 'sacensibas');
       activeSlug = fromUrl || (firstInline ? firstInline.slug : (items[0] ? items[0].slug : ''));
 

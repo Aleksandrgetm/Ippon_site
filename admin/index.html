@@ -955,6 +955,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="/assets/table-import.js"></script>
   <script>
     const AUTH = { login: 'Andrej', password: 'ippon.lv' };
     const SESSION_KEY = 'ippon_admin_session';
@@ -1833,34 +1834,7 @@
     }
 
     function parseCsvToMatrix(text) {
-      const rows = [];
-      const lines = String(text || '').split(/\r?\n/).filter((line) => line.trim() !== '');
-      for (const line of lines) {
-        const cells = [];
-        let cur = '';
-        let inQuotes = false;
-        for (let i = 0; i < line.length; i += 1) {
-          const ch = line[i];
-          if (ch === '"') {
-            if (inQuotes && line[i + 1] === '"') {
-              cur += '"';
-              i += 1;
-            } else {
-              inQuotes = !inQuotes;
-            }
-            continue;
-          }
-          if (!inQuotes && (ch === ';' || ch === ',')) {
-            cells.push(cur.trim());
-            cur = '';
-            continue;
-          }
-          cur += ch;
-        }
-        cells.push(cur.trim());
-        rows.push(cells);
-      }
-      return rows;
+      return window.IpponTableImport.parseCsv(text);
     }
 
     function matrixToHtmlTable(matrix) {
@@ -1868,14 +1842,15 @@
       const rows = matrix
         .filter((row) => Array.isArray(row) && row.some((cell) => String(cell ?? '').trim() !== ''));
       if (!rows.length) return '';
+      const columnCount = rows.reduce((count, row) => Math.max(count, row.length), 0);
       return `<table>${rows.map((row, rowIndex) => {
         const tag = rowIndex === 0 ? 'th' : 'td';
-        return `<tr>${row.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join('')}</tr>`;
+        return `<tr>${Array.from({ length: columnCount }, (_, index) => `<${tag}>${escapeHtml(row[index])}</${tag}>`).join('')}</tr>`;
       }).join('')}</table>`;
     }
 
     function escapeHtml(text) {
-      if (!text) return '';
+      if (text == null) return '';
       return String(text)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -2030,9 +2005,9 @@
       });
     }
 
-    function rezSetRows(rows) {
+    function rezSetRows(rows, syncStructured = true) {
       rezSacRows = rezNormalizeRows(rows);
-      rezApplyStructuredRowsToHidden();
+      if (syncStructured) rezApplyStructuredRowsToHidden();
       rezRenderInlineResultsList();
     }
     function setRezManualStatusValue(value) {
@@ -2174,7 +2149,7 @@
       selectedRezGalleryItems = Array.isArray(item.galerija) && item.galerija.length ? [...item.galerija] : [...structuredGallery];
             if (rezHtmlTableStatus) rezHtmlTableStatus.textContent = '';
       rezManualStructuredData.value = item.structured_data ? JSON.stringify(item.structured_data, null, 2) : '';
-      rezSetRows(Array.isArray(item?.structured_data?.rows) ? item.structured_data.rows : []);
+      rezSetRows(Array.isArray(item?.structured_data?.rows) ? item.structured_data.rows : [], item.record_type === 'sacensibas');
       rezResetInlineResultForm();
       rezManualCustomHtml.value = normalizeHtmlText(item.custom_html || item.description || '');
       if (rezManualHtmlPreview) {
@@ -6289,8 +6264,8 @@
         setStatus('Izvēlies Sacensību vai Eksāmena ierakstu kreisajā sarakstā.', 'error');
         return;
       }
-      const recordType = rezCurrentCategory === 'eksamens' ? 'eksamens' : 'sacensibas';
-      const layoutType = rezCurrentCategory === 'eksamens' ? 'custom_html' : 'competition_default';
+      const recordType = rezSelectedSource.record_type;
+      const layoutType = recordType === 'sacensibas' ? 'competition_default' : 'custom_html';
       const rawStructured = String(rezManualStructuredData.value || '').trim();
       let structuredForLayout = null;
       if (rezCurrentCategory === 'sacensibas') {
@@ -6318,7 +6293,7 @@
         slug_override: String(rezSourceSlugOverride.value || '').trim(),
         image_override: String(rezSourceImageOverride.value || '').trim() || photoValue,
         structured_data: structuredForLayout,
-        custom_html: normalizeHtmlText(String(rezSourceCustomHtml.value || '').trim() || String(rezManualCustomHtml.value || ''))
+        custom_html: normalizeHtmlText(String(rezManualCustomHtml.value || ''))
       };
       try {
         let savedSourceRow = null;
@@ -6917,6 +6892,9 @@
       rezHtmlTableFile.addEventListener('change', async (event) => {
         const file = event.target.files && event.target.files[0];
         if (!file) return;
+        const importSource = rezSelectedSource;
+        const importManual = rezSelectedManual;
+        const importCategory = rezCurrentCategory;
         try {
           const name = String(file.name || '').toLowerCase();
           let matrix = [];
@@ -6936,7 +6914,10 @@
           if (!tableHtml) {
             throw new Error('Failā nav tabulas datu importam.');
           }
-          const previous = normalizeHtmlText(rezManualCustomHtml.value || '').trim();
+          if (rezSelectedSource !== importSource || rezSelectedManual !== importManual || rezCurrentCategory !== importCategory) {
+            throw new Error('Ieraksts importēšanas laikā mainīts. Izvēlieties failu vēlreiz.');
+          }
+          const previous = rezManualCustomHtml.value || '';
           rezManualCustomHtml.value = previous ? `${previous}\n\n${tableHtml}` : tableHtml;
           const html = normalizeHtmlText(rezManualCustomHtml.value || '').trim();
           rezManualHtmlPreview.innerHTML = html || '<em>Priekšskatījums parādīsies šeit.</em>';

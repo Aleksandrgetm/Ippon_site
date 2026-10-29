@@ -560,7 +560,7 @@ h1, h2, h3, h4, h5, h6,
 </style>
 <script>
   function esc(text) {
-    return String(text || '').replace(/[&<>"']/g, (ch) => ({
+    return String(text ?? '').replace(/[&<>"']/g, (ch) => ({
       '&':'&amp;',
       '<':'&lt;',
       '>':'&gt;',
@@ -656,8 +656,8 @@ h1, h2, h3, h4, h5, h6,
           </section>`;
       }
     } else if (layout === 'rating_two_tables') {
-      const topRows = toArray(structured.system_rows).map((r) => [r.systema || '', r.punkti || '', r.turniri || '']);
-      const bottomRows = toArray(structured.rating_rows).map((r) => [r.sportists || '', r.punktu_kopsumma || '', r.vieta || '']);
+      const topRows = toArray(structured.system_rows).map((r) => [r.systema ?? '', r.punkti ?? '', r.turniri ?? '']);
+      const bottomRows = toArray(structured.rating_rows).map((r) => [r.sportists ?? '', r.punktu_kopsumma ?? '', r.vieta ?? '']);
       content += `
         <section class="rez-block">
           <h2 class="rez-block-title">Reitinga sistema</h2>
@@ -685,7 +685,7 @@ h1, h2, h3, h4, h5, h6,
       content += `
         <section class="rez-block">
           <h2 class="rez-block-title">Informacija</h2>
-          <div class="rez-custom-html">${item.custom_html || '<p>Nav custom HTML.</p>'}</div>
+          <div class="rez-custom-html">${String(item.custom_html || '<p>Nav custom HTML.</p>').replace(/\\r\\n|\\[rn]/g, '\n')}</div>
         </section>`;
     }
 
@@ -739,6 +739,12 @@ h1, h2, h3, h4, h5, h6,
       }
 
       if (item.record_type !== 'sacensibas') {
+        if (item.record_type === 'reitings') {
+          const ratingUrl = new URL('/rezultati.html', window.location.origin);
+          ratingUrl.searchParams.set('slug', item.slug);
+          window.location.replace(ratingUrl.toString());
+          return;
+        }
         setState('Ši lapa paredzeta tikai sacensibam.');
         return;
       }
